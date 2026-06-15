@@ -1,0 +1,55 @@
+[gd_scene load_steps=2 format=3 uid="uid://biwbp7mhl3co"]
+
+[ext_resource type="Script" uid="uid://cq7xjjxw10dly" path="res://module/InfiCanvas/Flowchart/Nodes/flowchart_node_base.gd" id="1_rd6u5"]
+
+[node name="FlowchartNode" type="Container"]
+offset_right = 270.0
+offset_bottom = 240.0
+script = ExtResource("1_rd6u5")
+metadata/_custom_type_script = "uid://cq7xjjxw10dly"
+
+[node name="VBoxContainer" type="VBoxContainer" parent="."]
+layout_mode = 2
+
+[node name="Spacer" type="Control" parent="VBoxContainer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 11)
+layout_mode = 2
+
+[node name="TabContainer" type="TabContainer" parent="VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+tab_alignment = 2
+current_tab = 0
+
+[node name="Notes" type="VBoxContainer" parent="VBoxContainer/TabContainer"]
+layout_mode = 2
+metadata/_tab_index = 0
+
+[node name="LineEdit" type="LineEdit" parent="VBoxContainer/TabContainer/Notes"]
+layout_mode = 2
+text = "What to Remember"
+placeholder_text = "Title"
+
+[node name="TextEdit" type="TextEdit" parent="VBoxContainer/TabContainer/Notes"]
+layout_mode = 2
+size_flags_vertical = 3
+text = "The other tab displays properties of the connected socket."
+wrap_mode = 1
+
+[node name="Socket" type="VBoxContainer" parent="VBoxContainer/TabContainer"]
+visible = false
+layout_mode = 2
+metadata/_tab_index = 1
+
+[node name="Label" type="Label" parent="VBoxContainer/TabContainer/Socket"]
+layout_mode = 2
+text = "No Socket Connected"
+
+[node name="Label2" type="Label" parent="VBoxContainer/TabContainer/Socket"]
+layout_mode = 2
+size_flags_vertical = 3
+text = "Socket Class:
+Socket ID:
+Socket State:
+"

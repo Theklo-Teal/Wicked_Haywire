@@ -1,0 +1,116 @@
+[gd_scene format=3 uid="uid://d06e3upn410j8"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_wac20"]
+resource_local_to_scene = true
+content_margin_left = 0.0
+content_margin_top = 0.0
+content_margin_right = 0.0
+content_margin_bottom = 0.0
+bg_color = Color(0.1, 0.1, 0.1, 0.6)
+border_color = Color(0.5014065, 0.50140655, 0.5014063, 1)
+border_blend = true
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+corner_detail = 5
+
+[sub_resource type="GDScript" id="GDScript_ig7tw"]
+script/source = "extends PanelContainer
+
+@export var closed_width : int = 25
+
+@export_enum(\"Right\", \"Left\", \"Top\", \"Bottom\") var open_direction : int : 
+	set(val):
+		open_direction = val
+		if not is_node_ready():
+			await ready
+		var themebox : StyleBoxFlat = get_theme_stylebox(\"panel\")
+		themebox.set_corner_radius_all(0)
+		themebox.set_border_width_all(0)
+		match val:
+			0:  # Right
+				custom_minimum_size = Vector2(closed_width, 0)
+				themebox.corner_radius_bottom_right = closed_width
+				themebox.corner_radius_top_right = closed_width
+				themebox.border_width_right = 8
+				dir_axis = \"size:x\"
+				axis = 0
+			1:  # Left
+				custom_minimum_size = Vector2(closed_width, 0)
+				themebox.corner_radius_bottom_left = closed_width
+				themebox.corner_radius_top_left = closed_width
+				themebox.border_width_left = 8
+				dir_axis = \"size:x\"
+				axis = 0
+			2:  # Top
+				custom_minimum_size = Vector2(0, closed_width)
+				themebox.corner_radius_top_left = closed_width
+				themebox.corner_radius_top_right = closed_width
+				themebox.border_width_top = 8
+				dir_axis = \"size:y\"
+				axis = 1
+			3:  # Bottom
+				custom_minimum_size = Vector2(0, closed_width)
+				themebox.corner_radius_bottom_right = closed_width
+				themebox.corner_radius_bottom_left = closed_width
+				themebox.border_width_bottom = 8
+				dir_axis = \"size:y\"
+				axis = 1
+
+var axis : int = 0
+var dir_axis = \"size:x\"
+var keep_open : bool = false
+
+func _ready() -> void:
+	
+	mouse_entered.connect(_on_mouse_entered)
+	mouse_exited.connect(_on_mouse_exited)
+	%header.text = name
+	_on_mouse_exited()
+
+func _on_mouse_entered():
+	$ScrollContainer.show()
+	var tween = create_tween()
+	tween.tween_property(self, dir_axis, get_parent().size[axis] * 0.25, 0.3)
+	tween.set_ease(Tween.EASE_OUT)
+	tween.set_trans(Tween.TRANS_BOUNCE)
+func _on_mouse_exited():
+	if not keep_open:
+		var tween = create_tween()
+		tween.tween_property(self, dir_axis, custom_minimum_size[axis], 0.3)
+		await tween.finished
+		$ScrollContainer.hide()
+
+
+func _on_header_toggled(toggled_on: bool) -> void:
+	keep_open = toggled_on
+"
+
+[node name="SideSweepBar" type="PanelContainer" unique_id=582035383]
+clip_contents = true
+custom_minimum_size = Vector2(32, 0)
+anchors_preset = 9
+anchor_bottom = 1.0
+offset_right = 563.0
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_wac20")
+script = SubResource("GDScript_ig7tw")
+
+[node name="ScrollContainer" type="ScrollContainer" parent="." unique_id=1506436741]
+layout_mode = 2
+horizontal_scroll_mode = 0
+vertical_scroll_mode = 3
+
+[node name="VBoxContainer" type="VBoxContainer" parent="ScrollContainer" unique_id=423666626]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="header" type="CheckButton" parent="ScrollContainer/VBoxContainer" unique_id=1042784737]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 1
+text = "Controls"
+
+[connection signal="toggled" from="ScrollContainer/VBoxContainer/header" to="." method="_on_header_toggled"]

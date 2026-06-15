@@ -1,0 +1,98 @@
+[gd_scene format=3 uid="uid://srwdmiarouk0"]
+
+[sub_resource type="GDScript" id="GDScript_nf6ab"]
+script/source = "extends Panel
+
+
+func _ready() -> void:
+	mouse_entered.connect(_on_enter)
+
+func _on_enter():
+	$Header.popup()
+	$Bottom.popup()
+"
+
+[node name="NewGraphNode" type="Control" unique_id=1265851364]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="mode" type="CheckButton" parent="." unique_id=269109425]
+layout_mode = 0
+offset_right = 44.0
+offset_bottom = 24.0
+
+[node name="VBoxContainer" type="VBoxContainer" parent="." unique_id=1576067231]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -20.0
+offset_top = -20.0
+offset_right = 20.0
+offset_bottom = 20.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Panel2" type="Panel" parent="VBoxContainer" unique_id=1498819663]
+custom_minimum_size = Vector2(200, 200)
+layout_mode = 2
+
+[node name="FoldableContainer" type="FoldableContainer" parent="VBoxContainer" unique_id=1573460834]
+layout_mode = 2
+title = "Example Title"
+
+[node name="Label" type="Label" parent="VBoxContainer/FoldableContainer" unique_id=256458183]
+layout_mode = 2
+text = "Stuff"
+
+[node name="Panel" type="Panel" parent="." unique_id=48602694]
+visible = false
+custom_minimum_size = Vector2(200, 200)
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -100.0
+offset_top = -100.0
+offset_right = 100.0
+offset_bottom = 100.0
+grow_horizontal = 2
+grow_vertical = 2
+script = SubResource("GDScript_nf6ab")
+
+[node name="Header" type="PopupPanel" parent="Panel" unique_id=1787088283]
+oversampling_override = 1.0
+position = Vector2i(476, 190)
+size = Vector2i(200, 31)
+
+[node name="Label" type="Label" parent="Panel/Header" unique_id=47787071]
+offset_left = 4.0
+offset_top = 4.0
+offset_right = 196.0
+offset_bottom = 27.0
+text = "TEXT TITLE"
+
+[node name="Bottom" type="PopupPanel" parent="Panel" unique_id=231271138]
+oversampling_override = 1.0
+position = Vector2i(460, 425)
+size = Vector2i(230, 100)
+
+[node name="TextEdit" type="TextEdit" parent="Panel/Bottom" unique_id=407755399]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 4.0
+offset_top = 4.0
+offset_right = 226.0
+offset_bottom = 96.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "Something to write on."

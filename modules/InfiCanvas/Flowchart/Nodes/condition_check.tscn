@@ -1,0 +1,114 @@
+[gd_scene format=3 uid="uid://ce32nv1ktqx4r"]
+
+[ext_resource type="Script" uid="uid://cpnm2e7cu1v48" path="res://modules/InfiCanvas/Flowchart/Nodes/condition_check.gd" id="1_ugl36"]
+[ext_resource type="Script" uid="uid://ddaiqnfpchm0j" path="res://modules/InfiCanvas/Flowchart/Sockets/flowchart_socket_base.gd" id="2_1elvd"]
+[ext_resource type="Script" uid="uid://bbxfvbwceblbs" path="res://modules/InfiCanvas/Flowchart/Sockets/socket_source.gd" id="3_ugl36"]
+[ext_resource type="Script" uid="uid://b7miyq2bh0pjs" path="res://modules/InfiCanvas/Flowchart/Sockets/socket_sink.gd" id="3_v1goa"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_1elvd"]
+bg_color = Color(0.3, 0.3, 0.3, 1)
+border_width_left = 22
+border_width_top = 12
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.5014065, 0.50140655, 0.5014063, 1)
+border_blend = true
+corner_radius_top_left = 22
+corner_radius_bottom_right = 12
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ugl36"]
+bg_color = Color(0.3, 0.3, 0.3, 1)
+border_width_left = 22
+border_width_top = 12
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.5014065, 0.50140655, 0.5014063, 1)
+border_blend = true
+corner_radius_top_right = 22
+corner_radius_bottom_left = 12
+
+[sub_resource type="Resource" id="Resource_h4asj"]
+script = ExtResource("3_ugl36")
+coord = Vector2i(-1, 1)
+metadata/_custom_type_script = "uid://bbxfvbwceblbs"
+
+[sub_resource type="Resource" id="Resource_huekt"]
+script = ExtResource("3_ugl36")
+coord = Vector2i(-1, 2)
+metadata/_custom_type_script = "uid://bbxfvbwceblbs"
+
+[sub_resource type="Resource" id="Resource_45eyy"]
+script = ExtResource("3_v1goa")
+coord = Vector2i(0, 2)
+metadata/_custom_type_script = "uid://b7miyq2bh0pjs"
+
+[sub_resource type="Resource" id="Resource_go32s"]
+script = ExtResource("3_v1goa")
+coord = Vector2i(0, 3)
+metadata/_custom_type_script = "uid://b7miyq2bh0pjs"
+
+[sub_resource type="LabelSettings" id="LabelSettings_1elvd"]
+font_size = 12
+
+[node name="ConditionCheck" type="Container" unique_id=1592788056]
+custom_minimum_size = Vector2(128, 192)
+offset_right = 128.0
+offset_bottom = 192.0
+script = ExtResource("1_ugl36")
+panelstyle = Array[StyleBox]([SubResource("StyleBoxFlat_1elvd"), SubResource("StyleBoxFlat_ugl36")])
+panelrect = Array[Rect2]([Rect2(0.5, 0.5, -1.5, -1.5)])
+panels = Array[int]([0])
+sockets = Array[ExtResource("2_1elvd")]([SubResource("Resource_h4asj"), SubResource("Resource_huekt"), SubResource("Resource_45eyy"), SubResource("Resource_go32s")])
+metadata/_custom_type_script = "uid://dxbdnxmvfy5cw"
+
+[node name="Label" type="Label" parent="." unique_id=945949955]
+layout_mode = 2
+size_flags_horizontal = 4
+text = "Check"
+horizontal_alignment = 1
+
+[node name="inp_buttons" type="HBoxContainer" parent="." unique_id=1730367616]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 0
+size_flags_vertical = 0
+metadata/grid_pos = Vector2(0.25, -1.75)
+metadata/edit_only_control = true
+metadata/hide_on_disable = true
+
+[node name="retractor" type="Button" parent="inp_buttons" unique_id=1119982235]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 0
+size_flags_vertical = 0
+tooltip_text = "Remove Input"
+disabled = true
+text = "-"
+
+[node name="extender" type="Button" parent="inp_buttons" unique_id=957746015]
+layout_mode = 2
+size_flags_horizontal = 0
+size_flags_vertical = 0
+tooltip_text = "Add Input"
+text = "+"
+
+[node name="pos_label" type="Label" parent="." unique_id=433597184]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 8
+size_flags_vertical = 0
+text = "ALL"
+label_settings = SubResource("LabelSettings_1elvd")
+metadata/grid_pos = Vector2(1.7, 1.2)
+
+[node name="neg_label" type="Label" parent="." unique_id=511126799]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 8
+size_flags_vertical = 0
+text = "SOME"
+label_settings = SubResource("LabelSettings_1elvd")
+metadata/grid_pos = Vector2(2.1, 2.2)
+
+[connection signal="pressed" from="inp_buttons/retractor" to="." method="_on_retractor_pressed"]
+[connection signal="pressed" from="inp_buttons/extender" to="." method="_on_extender_pressed"]

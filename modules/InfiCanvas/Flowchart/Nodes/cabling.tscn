@@ -1,0 +1,81 @@
+[gd_scene format=3 uid="uid://c3rlam11l6pyd"]
+
+[ext_resource type="Script" uid="uid://n8juad5yqvmg" path="res://modules/InfiCanvas/Flowchart/Old_Sockets/socket_bidir.gd" id="1_0usaj"]
+
+[sub_resource type="GDScript" id="GDScript_6bwjg"]
+script/source = "@tool
+extends Electronics
+
+var biased : bool = false  # Whether pull resistors are used.
+var pullup : bool = false  # Are they pull-up or pull-down?
+
+@export var bundles : Array[int] = [2, 2, 2, 2] : 
+	set(val):
+		bundles = val
+		if not is_node_ready():
+			await ready
+
+
+func set_bitwidth(val:int):
+	$Bus.bitwidth = val
+
+func _ready() -> void:
+	options[\"Bundles\"] = \"bundles\"
+func _set_bundles(_val:Array[int]):
+	pass
+
+func _cycle_finish():
+	if not $Bus.link == null:
+		pass
+		
+		#if not %Relay.link == null:
+			#aggregate += %Relay.link.aggregate
+			#$Relay.link.aggregate = aggregate
+			#pole.link.aggregate = aggregate
+"
+
+[sub_resource type="SystemFont" id="SystemFont_6t1ww"]
+
+[sub_resource type="LabelSettings" id="LabelSettings_32al6"]
+font = SubResource("SystemFont_6t1ww")
+
+[sub_resource type="SystemFont" id="SystemFont_21wjr"]
+
+[sub_resource type="LabelSettings" id="LabelSettings_vsira"]
+font = SubResource("SystemFont_21wjr")
+
+[node name="Cabling" type="Container" unique_id=120980545 node_paths=PackedStringArray("menu", "sockets")]
+offset_right = 30.0
+offset_bottom = 60.0
+script = SubResource("GDScript_6bwjg")
+menu = NodePath("@PopupMenu@27427")
+sockets = {
+NodePath("Bus"): Vector2i(-1, 1),
+NodePath("Bundles/Bidir_0"): Vector2i(0, 1)
+}
+metadata/_custom_type_script = "uid://cq7xjjxw10dly"
+
+[node name="Bus" type="Control" parent="." unique_id=1448302049]
+layout_mode = 2
+script = ExtResource("1_0usaj")
+show_name = false
+font = SubResource("LabelSettings_32al6")
+color = Color(1, 0.27058825, 0, 1)
+alt_color = Color(0, 0, 1, 1)
+metadata/_custom_type_script = "uid://n8juad5yqvmg"
+
+[node name="Bundles" type="Control" parent="." unique_id=1230827702]
+layout_mode = 2
+
+[node name="Bidir_0" type="Control" parent="Bundles" unique_id=1248032995]
+anchors_preset = 0
+offset_left = -15.0
+offset_top = 15.0
+offset_right = 15.0
+offset_bottom = 45.0
+script = ExtResource("1_0usaj")
+show_name = false
+font = SubResource("LabelSettings_vsira")
+color = Color(1, 0.27058825, 0, 1)
+alt_color = Color(0, 0, 1, 1)
+metadata/_custom_type_script = "uid://n8juad5yqvmg"

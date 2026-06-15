@@ -1,0 +1,1130 @@
+[gd_scene format=3 uid="uid://dwy8v5p2vu3mn"]
+
+[ext_resource type="PackedScene" uid="uid://bnatph83g21s6" path="res://modules/InfiCanvas/Flowchart/Flowchart.tscn" id="1_ig7tw"]
+[ext_resource type="Texture2D" uid="uid://cq5m3xexnd3hm" path="res://Wicked_Haywire_Logo.png" id="1_lquwl"]
+[ext_resource type="Script" uid="uid://ckwx0a4u6y2ce" path="res://styles/flowchart/flowchart_style.gd" id="3_h2yge"]
+[ext_resource type="Script" uid="uid://cf6g8f4qcf6wb" path="res://modules/InfiCanvas/Flowchart/Graphs/flowchart_graph_base.gd" id="4_lquwl"]
+
+[sub_resource type="GDScript" id="GDScript_0xm2m"]
+script/source = "extends Node
+
+#TODO Mode button switches visibility of Component tray versus Analyser tray, so components can't be placed during simulation mode.
+
+@export_storage var schematic : Schematic
+@export_storage var initial_traytab = 4
+@export_storage var split_container = 180 : 
+	set(val):
+		split_container = val
+		if not is_node_ready():
+			await ready
+			%TraySplitter.split_offsets[0] = val
+
+func _ready() -> void:
+	if schematic == null:
+		schematic = Schematic.new()
+	
+	%TrayTabBar.current_tab = initial_traytab
+	%Ribbon/TabContainer.current_tab = initial_traytab
+	
+	find_flowchart_style()
+	%Cell_Size.value_changed.connect( func(val):%Flowchart.appearance.cell_size = val )
+	%Grid_Thick.value_changed.connect( func(val):%Flowchart.appearance.grid_thick = val )
+	%Orig_Thick.value_changed.connect( func(val):%Flowchart.appearance.orig_thick = val )
+	%Grid_Color.color_changed.connect( func(val):%Flowchart.appearance.grid_color = val )
+	%Orig_Color.color_changed.connect( func(val):%Flowchart.appearance.orig_color = val )
+	%Back_Color.color_changed.connect( func(val):%Flowchart.appearance.color = val )
+	
+	find_electronics_parts()
+
+func _input(event: InputEvent) -> void:
+	if event is InputEventKey and event.is_released():
+		match event.keycode:
+			KEY_F1:
+				%Mode.button_pressed = not %Mode.button_pressed
+			KEY_ESCAPE:
+				var grab_part = G.grabbed_buttons.get_pressed_button()
+				if not grab_part == null:
+					grab_part.button_pressed = false
+					return
+
+
+#region Flowchart Style Management
+func find_flowchart_style():
+	%Cell_Size.value = %Flowchart.cell_size
+	%Grid_Thick.value = %Flowchart.grid_thick
+	%Orig_Thick.value = %Flowchart.orig_thick
+	%Grid_Color.color = %Flowchart.grid_color
+	%Orig_Color.color = %Flowchart.orig_color
+	%Back_Color.color = %Flowchart.color
+
+#endregion
+
+#region Ribbon/Tray
+
+func _on_tray_tab_bar_tab_changed(tab: int, tabbar: TabBar) -> void:
+	if tab < 0:
+		%Ribbon.hide()
+	else:
+		%Ribbon.show()
+		var tabtitle = tabbar.get_tab_title(tab)
+		%Ribbon/TabContainer.find_child(tabtitle, false).show()
+
+#region Electronics Components Tray
+
+func find_electronics_parts():
+	const dev_path = \"res://devices/\"
+	for dev_category : String in parts_categories:
+		var open_button := Button.new()
+		parts_categories[dev_category].append(open_button)
+		
+		open_button.text = dev_category.capitalize()
+		open_button.pressed.connect(_on_part_category_toggle.bind(dev_category, true))
+		
+		%part_categories.add_child(open_button)
+		
+		var box := VBoxContainer.new()
+		var close_button := Button.new()
+		var innerbox := VFlowContainer.new()
+		parts_categories[dev_category].append(close_button)
+		parts_categories[dev_category].append(box)
+		
+		box.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		close_button.text = dev_category.capitalize()
+		close_button.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		innerbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		innerbox.add_theme_constant_override(\"v_separation\", 0)
+		box.hide()
+		
+		close_button.pressed.connect(_on_part_category_toggle.bind(dev_category, false))
+		
+		%Components.add_child(box)
+		box.add_child(close_button)
+		box.add_child(innerbox)
+		for dev in DirAccess.get_files_at(dev_path.path_join(dev_category)):
+			if dev.get_extension() == \"uid\":
+				continue
+			var full_path = dev_path.path_join(dev_category).path_join(dev)
+			#var part = load(full_path) #TODO load all components at start up.
+			#G.part_pallet.append(part)
+			var dev_button := Button.new()
+			dev_button.text = dev.get_basename().capitalize()
+			dev_button.set_meta(\"path\", full_path)
+			#dev_button.set_meta(\"refer\", part)
+			dev_button.flat = true
+			dev_button.toggle_mode = true
+			dev_button.button_group = G.grabbed_buttons
+			innerbox.add_child(dev_button)
+
+var parts_categories = {
+	\"misc\" : [],
+	\"input\" : [],
+#	\"output\" : [],
+	\"checks\" : [],
+#	\"arithmetic\" : [],
+#	\"plexers\" : [],
+#	\"memory\" : [],
+	}
+
+func _on_part_category_toggle(category:String, show:bool):
+	parts_categories[category][0].visible = not show
+	parts_categories[category][1].visible = show
+	parts_categories[category][2].visible = show
+
+func _on_fold_devices_toggled(toggled_on: bool, butt:Button) -> void:
+	butt.text = [\"Unfold All\", \"Fold All\"][int(toggled_on)]
+	for category in parts_categories:
+		_on_part_category_toggle(category, toggled_on)
+#endregion
+
+#endregion
+
+func _on_sidebar_button_toggled(toggled_on: bool) -> void:
+	%Sidebar.visible = toggled_on
+
+func _on_sim_paused_toggled(toggled_on: bool, butt:Button) -> void:
+	butt.text = [\"Paused\", \"Running\"][int(toggled_on)]
+	butt.modulate = [Color.RED, Color.LIME_GREEN][int(toggled_on)]
+	%Flowchart.call([\"pause_sim\", \"resume_sim\"][int(toggled_on)])
+
+
+func _on_sim_rate_item_selected(index: int, butt:OptionButton) -> void:
+	var hz = butt.get_item_id(index) as float
+	%Flowchart.update_rate = 1.0 / hz
+
+
+#region Schematic Layers
+func scheme_add_layer(title:String=\"\"):
+	if title.is_empty():
+		title = \"Layer_\" + str(%Scheme_Layers.tab_count)
+	%Scheme_Layers.add_tab(title)
+	schematic.graphs[title] = FlowchartGraphElectronics.new()
+
+var scheme_layer_delete_target : String
+func _on_scheme_layers_tab_close_pressed(tab: int) -> void:
+	scheme_layer_delete_target = %Scheme_Layers.get_tab_title(tab)
+	if Input.is_key_pressed(KEY_CTRL):
+		scheme_rem_layer()
+	else:
+		$Confirm_Rem_Layer.dialog_text = \"Are you sure you want to delete layer «\" + scheme_layer_delete_target + \"»?\"
+		$Confirm_Rem_Layer.popup()
+func scheme_rem_layer(target:String=\"\"):
+	if target.is_empty():
+		target = scheme_layer_delete_target
+	var target_idx : int = -1
+	for i in range(%Scheme_Layers.tab_count):
+		if %Scheme_Layers.get_tab_title(i):
+			target_idx = i
+			break
+	
+	if target_idx > 0:
+		%Scheme_Layers.remove_tab(target_idx)
+		schematic.graphs.erase(target)
+		schematic.styles.erase(target)
+	
+	if %Scheme_Layers.tab_count == 0:
+		scheme_add_layer(\"Layer_Zero\")
+#endregion
+
+
+func _on_tray_splitter_drag_ended(splitter: SplitContainer) -> void:
+	split_container = splitter.split_offsets[0]
+
+
+func _on_mode_toggled(toggled_on: bool, button:Button) -> void:
+	%Flowchart.mode = int(toggled_on) as Flowchart.Mode
+	button.text = [\"Place\", \"Poke\"][int(toggled_on)]
+"
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_efxa6"]
+content_margin_left = 10.0
+content_margin_top = 4.0
+content_margin_right = 10.0
+content_margin_bottom = 4.0
+bg_color = Color(0, 0, 0, 0.6)
+skew = Vector2(0.15, 0)
+border_width_top = 8
+border_color = Color(0.2556589, 0.25565875, 0.25565884, 1)
+border_blend = true
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_detail = 5
+expand_margin_top = 6.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_dg77c"]
+content_margin_left = 10.0
+content_margin_top = 4.0
+content_margin_right = 10.0
+content_margin_bottom = 4.0
+bg_color = Color(0, 0, 0, 0.6)
+skew = Vector2(0.15, 0)
+border_width_top = 8
+border_color = Color(0.2556589, 0.25565875, 0.25565884, 1)
+border_blend = true
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_detail = 5
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ycdy4"]
+content_margin_left = 10.0
+content_margin_top = 4.0
+content_margin_right = 10.0
+content_margin_bottom = 4.0
+bg_color = Color(0.1, 0.1, 0.1, 0.6)
+skew = Vector2(0.15, 0)
+border_color = Color(1, 1, 1, 0.75)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_detail = 5
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_w48qg"]
+content_margin_left = 10.0
+content_margin_top = 4.0
+content_margin_right = 10.0
+content_margin_bottom = 4.0
+bg_color = Color(0.1, 0.1, 0.1, 0.3)
+border_width_left = 1
+border_width_right = 1
+border_color = Color(0.175, 0.175, 0.175, 1)
+corner_detail = 5
+expand_margin_top = 4.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_vivmo"]
+content_margin_left = 4.0
+content_margin_top = 4.0
+content_margin_right = 4.0
+content_margin_bottom = 4.0
+bg_color = Color(1, 1, 1, 0.75)
+draw_center = false
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+corner_detail = 5
+expand_margin_left = 2.0
+expand_margin_top = 6.0
+expand_margin_right = 2.0
+expand_margin_bottom = 2.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_2cqfq"]
+content_margin_left = 4.0
+content_margin_top = 4.0
+content_margin_right = 4.0
+content_margin_bottom = 4.0
+bg_color = Color(0, 0, 0, 0.6)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+corner_detail = 5
+expand_margin_top = 4.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_yaehf"]
+content_margin_left = 4.0
+content_margin_top = 4.0
+content_margin_right = 4.0
+content_margin_bottom = 4.0
+bg_color = Color(0.1, 0.1, 0.1, 0.6)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+corner_detail = 5
+expand_margin_top = 4.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_cegan"]
+content_margin_left = 4.0
+content_margin_top = 4.0
+content_margin_right = 4.0
+content_margin_bottom = 4.0
+bg_color = Color(0.1, 0.1, 0.1, 0.7882353)
+border_width_top = 8
+border_color = Color(0.4817894, 0.48178953, 0.48178923, 1)
+border_blend = true
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_detail = 5
+expand_margin_top = 6.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_82xsv"]
+content_margin_left = 4.0
+content_margin_top = 4.0
+content_margin_right = 4.0
+content_margin_bottom = 4.0
+bg_color = Color(0, 0, 0, 0.6)
+border_width_top = 10
+border_color = Color(0.4817894, 0.48178953, 0.48178923, 1)
+border_blend = true
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_detail = 5
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_getpj"]
+content_margin_left = 4.0
+content_margin_top = 4.0
+content_margin_right = 4.0
+content_margin_bottom = 4.0
+bg_color = Color(0, 0, 0, 0.6)
+border_color = Color(0.4817894, 0.48178953, 0.48178923, 1)
+border_blend = true
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_detail = 5
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ryguw"]
+content_margin_left = 0.0
+content_margin_top = 0.0
+content_margin_right = 0.0
+content_margin_bottom = 0.0
+bg_color = Color(0.1, 0.1, 0.1, 0.6)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_detail = 5
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_d13ii"]
+content_margin_left = 8.0
+content_margin_top = 0.0
+content_margin_right = 8.0
+content_margin_bottom = 3.0
+bg_color = Color(0.1, 0.1, 0.1, 0.6)
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+corner_detail = 5
+
+[sub_resource type="GDScript" id="GDScript_h2yge"]
+script/source = "@tool
+extends Flowchart
+
+@export var appearance : FlowchartStyle : 
+	set(val):
+		appearance = val
+		if val != null:
+			val.changed.connect(_on_appearance_changed)
+			_on_appearance_changed()
+
+func _on_appearance_changed():
+	cell_size = appearance.cell_size
+	min_cell_size = appearance.min_cell_size
+	grid_thick = appearance.grid_thick
+	orig_thick = appearance.orig_thick
+	grid_color = appearance.grid_color
+	orig_color = appearance.orig_color
+	color = appearance.color
+
+
+func _ready() -> void:
+	super()
+	
+	if appearance == null:
+		appearance = FlowchartStyle.new()
+	
+	$PopupMenu.index_pressed.connect(_on_popup_menu_pressed.bind(0))
+	$PopupMenu.clear(true)
+	var idx = -1
+	for each in popup_devices:
+		idx += 1
+		if popup_devices[each] is Dictionary:
+			var submenu = PopupMenu.new()
+			$PopupMenu.add_submenu_node_item(each, submenu)
+			submenu.index_pressed.connect(_on_popup_menu_pressed.bind(idx))
+			for subeach in popup_devices[each]:
+				submenu.add_item(subeach)
+		else:
+			$PopupMenu.add_item(each)
+
+func _gui_input(event: InputEvent) -> void:
+	super(event)
+	
+	if event is InputEventMouseButton:
+		if event.button_index == MOUSE_BUTTON_LEFT:
+			if event.is_released():
+				var grabbed = G.grabbed_buttons.get_pressed_button()
+				if not grabbed == null:
+					add_graph_node(grabbed.get_meta(\"path\"), to_canvas_coord(fin_mouse))
+
+
+
+var popup_devices = {
+	\"Info Panel\": \"res://module/InfiCanvas/Flowchart/Nodes/info_panel.tscn\",
+	\"Cabling\":\"res://modules/InfiCanvas/Flowchart/Nodes/cabling.tscn\",
+	#\"Ammeter\"
+	#\"Voltmeter\"
+	#\"Heartbeat\": \"res://module/InfiCanvas/Flowchart/Nodes/heartbeat.tscn\",
+	}
+func _on_popup_menu_pressed(idx:int, submenu:int) -> void:
+	var press_text : String
+	if submenu > 0:
+		press_text = $PopupMenu.get_item_submenu_node(submenu).get_item_text(idx)
+		add_graph_node(popup_devices[$PopupMenu.get_item_text(submenu)][press_text])
+	else:
+		press_text = $PopupMenu.get_item_text(idx)
+		add_graph_node(popup_devices[press_text])
+"
+
+[sub_resource type="Resource" id="Resource_1bvp3"]
+script = ExtResource("3_h2yge")
+cell_size = 100
+grid_color = Color(0.4758, 0.50040334, 0.61, 1)
+orig_color = Color(0.63, 0.59031004, 0.2331, 1)
+color = Color(0.36299998, 0.39416662, 0.55, 1)
+metadata/_custom_type_script = "uid://ckwx0a4u6y2ce"
+
+[sub_resource type="Resource" id="Resource_lquwl"]
+script = ExtResource("4_lquwl")
+
+[sub_resource type="GDScript" id="GDScript_1bvp3"]
+script/source = "extends HBoxContainer
+
+@export var minimum_width = 32
+
+func _ready() -> void:
+	%Controls_Sidebar/Box.hide()
+	%Indicators_Sidebar/Box.hide()
+	%Controls_Sidebar.custom_minimum_size.x = minimum_width
+	%Indicators_Sidebar.custom_minimum_size.x = minimum_width
+
+
+func _on_controls_sidebar_mouse_entered() -> void:
+	var final_size = %Controls_Sidebar/Box.size.x
+	%Controls_Sidebar/Box.show()
+	var tween = create_tween()
+	tween.set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+	tween.tween_property(%Controls_Sidebar, \"custom_minimum_size:x\", final_size, 1).from_current()
+func _on_controls_sidebar_mouse_exited() -> void:
+	if not %Controls_Check.button_pressed:
+		var tween = create_tween()
+		tween.set_trans(Tween.TRANS_EXPO)
+		tween.tween_property(%Controls_Sidebar, \"custom_minimum_size:x\", minimum_width, 0.5).from_current()
+		tween.chain().tween_callback(%Controls_Sidebar/Box.hide)
+
+
+func _on_indicators_sidebar_mouse_entered() -> void:
+	var final_size = %Indicators_Sidebar/Box.size.x
+	%Indicators_Sidebar/Box.show()
+	var tween = create_tween()
+	tween.set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+	tween.tween_property(%Indicators_Sidebar, \"custom_minimum_size:x\", final_size, 1).from_current()
+func _on_indicators_sidebar_mouse_exited() -> void:
+	if not %Indicators_Check.button_pressed:
+		var tween = create_tween()
+		tween.set_trans(Tween.TRANS_EXPO)
+		tween.tween_property(%Indicators_Sidebar, \"custom_minimum_size:x\", minimum_width, 0.5).from_current()
+		tween.chain().tween_callback(%Indicators_Sidebar/Box.hide)
+"
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_h2yge"]
+content_margin_left = 0.0
+content_margin_top = 0.0
+content_margin_right = 0.0
+content_margin_bottom = 0.0
+bg_color = Color(0.1, 0.1, 0.1, 0.6)
+border_width_right = 4
+border_blend = true
+corner_radius_top_right = 20
+corner_radius_bottom_right = 20
+corner_detail = 5
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_074og"]
+content_margin_left = 0.0
+content_margin_top = 0.0
+content_margin_right = 0.0
+content_margin_bottom = 0.0
+bg_color = Color(0.1, 0.1, 0.1, 0.6)
+border_width_left = 4
+border_blend = true
+corner_radius_top_left = 20
+corner_radius_bottom_left = 20
+corner_detail = 5
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_1bvp3"]
+content_margin_left = 10.0
+content_margin_top = 4.0
+content_margin_right = 10.0
+content_margin_bottom = 4.0
+bg_color = Color(0, 0, 0, 0.6)
+border_width_left = 1
+border_width_right = 1
+border_color = Color(0.175, 0.175, 0.175, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 20
+corner_detail = 5
+expand_margin_bottom = 4.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_lquwl"]
+content_margin_left = 10.0
+content_margin_top = 4.0
+content_margin_right = 10.0
+content_margin_bottom = 4.0
+bg_color = Color(0.1, 0.1, 0.1, 0.3)
+border_width_left = 1
+border_width_right = 1
+border_color = Color(0.175, 0.175, 0.175, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 20
+corner_detail = 5
+expand_margin_bottom = 4.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_7mycd"]
+content_margin_left = 10.0
+content_margin_top = 4.0
+content_margin_right = 10.0
+content_margin_bottom = 4.0
+bg_color = Color(0.1, 0.1, 0.1, 0.6)
+border_width_bottom = 2
+border_color = Color(1, 1, 1, 0.75)
+corner_radius_bottom_right = 18
+corner_radius_bottom_left = 6
+corner_detail = 5
+expand_margin_top = 4.0
+expand_margin_bottom = 4.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_272bh"]
+content_margin_left = 10.0
+content_margin_top = 4.0
+content_margin_right = 10.0
+content_margin_bottom = 4.0
+bg_color = Color(0.1, 0.1, 0.1, 0.3)
+border_width_left = 1
+border_width_right = 1
+border_color = Color(0.175, 0.175, 0.175, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 20
+corner_detail = 5
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_5vw27"]
+content_margin_left = 4.0
+content_margin_top = 4.0
+content_margin_right = 4.0
+content_margin_bottom = 4.0
+bg_color = Color(1, 1, 1, 0.75)
+draw_center = false
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+corner_radius_top_left = 6
+corner_radius_top_right = 20
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+corner_detail = 5
+expand_margin_left = 2.0
+expand_margin_top = 2.0
+expand_margin_right = 2.0
+expand_margin_bottom = 6.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_kek77"]
+content_margin_left = 4.0
+content_margin_top = 4.0
+content_margin_right = 4.0
+content_margin_bottom = 4.0
+bg_color = Color(0, 0, 0, 0.6)
+corner_radius_top_left = 6
+corner_radius_top_right = 23
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+corner_detail = 5
+expand_margin_bottom = 4.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_4c57u"]
+content_margin_left = 4.0
+content_margin_top = 4.0
+content_margin_right = 4.0
+content_margin_bottom = 4.0
+bg_color = Color(0.1, 0.1, 0.1, 0.6)
+corner_radius_top_left = 6
+corner_radius_top_right = 23
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+corner_detail = 5
+
+[node name="Main" type="Node" unique_id=824492953]
+script = SubResource("GDScript_0xm2m")
+
+[node name="MarginContainer" type="MarginContainer" parent="." unique_id=1312409171]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 9
+theme_override_constants/margin_top = 9
+theme_override_constants/margin_right = 9
+theme_override_constants/margin_bottom = 9
+
+[node name="HBoxContainer" type="HBoxContainer" parent="MarginContainer" unique_id=680067272]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="Sidebar" type="TabContainer" parent="MarginContainer/HBoxContainer" unique_id=1541099510]
+unique_name_in_owner = true
+visible = false
+custom_minimum_size = Vector2(250, 0)
+layout_mode = 2
+tab_alignment = 1
+current_tab = 1
+
+[node name="Files" type="VBoxContainer" parent="MarginContainer/HBoxContainer/Sidebar" unique_id=1592542723]
+visible = false
+layout_mode = 2
+metadata/_tab_index = 0
+
+[node name="Settings" type="VBoxContainer" parent="MarginContainer/HBoxContainer/Sidebar" unique_id=188177199]
+layout_mode = 2
+metadata/_tab_index = 1
+
+[node name="Help" type="VBoxContainer" parent="MarginContainer/HBoxContainer/Sidebar" unique_id=1046574586]
+visible = false
+layout_mode = 2
+metadata/_tab_index = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer/HBoxContainer" unique_id=1077216975]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 0
+
+[node name="HBoxContainer" type="HBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer" unique_id=99315425]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Sidebar_Button" type="Button" parent="MarginContainer/HBoxContainer/VBoxContainer/HBoxContainer" unique_id=118312094]
+custom_minimum_size = Vector2(180, 42)
+layout_mode = 2
+toggle_mode = true
+text = "Wicked Haywire"
+icon = ExtResource("1_lquwl")
+flat = true
+alignment = 0
+expand_icon = true
+
+[node name="TrayTabBar" type="TabBar" parent="MarginContainer/HBoxContainer/VBoxContainer/HBoxContainer" unique_id=1080942191]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/h_separation = 4
+theme_override_constants/tab_separation = 2
+theme_override_styles/tab_unselected = SubResource("StyleBoxFlat_efxa6")
+theme_override_styles/tab_hovered = SubResource("StyleBoxFlat_dg77c")
+theme_override_styles/tab_selected = SubResource("StyleBoxFlat_ycdy4")
+theme_override_styles/tab_disabled = SubResource("StyleBoxFlat_w48qg")
+theme_override_styles/tab_focus = SubResource("StyleBoxFlat_vivmo")
+theme_override_styles/button_pressed = SubResource("StyleBoxFlat_2cqfq")
+theme_override_styles/button_highlight = SubResource("StyleBoxFlat_yaehf")
+close_with_middle_mouse = false
+drag_to_rearrange_enabled = true
+deselect_enabled = true
+tab_count = 5
+tab_0/title = "Schematic"
+tab_1/title = "Layer"
+tab_2/title = "Selection"
+tab_3/title = "Analyzer"
+tab_4/title = "Components"
+
+[node name="Mode" type="Button" parent="MarginContainer/HBoxContainer/VBoxContainer/HBoxContainer" unique_id=996853106]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(60, 0)
+layout_mode = 2
+theme_override_styles/normal = SubResource("StyleBoxFlat_cegan")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_82xsv")
+theme_override_styles/hover = SubResource("StyleBoxFlat_getpj")
+toggle_mode = true
+text = "Place"
+
+[node name="CheckButton" type="CheckButton" parent="MarginContainer/HBoxContainer/VBoxContainer/HBoxContainer" unique_id=1644704588]
+layout_mode = 2
+button_pressed = true
+text = "Show Notes"
+
+[node name="Panel" type="Panel" parent="MarginContainer/HBoxContainer/VBoxContainer" unique_id=634716957]
+custom_minimum_size = Vector2(0, 8)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_ryguw")
+
+[node name="TraySplitter" type="VSplitContainer" parent="MarginContainer/HBoxContainer/VBoxContainer" unique_id=1270605567]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+split_offsets = PackedInt32Array(180)
+split_offset = 180
+
+[node name="Ribbon" type="VBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter" unique_id=638932600]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="TabContainer" type="TabContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon" unique_id=1104105169]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_d13ii")
+current_tab = 1
+tabs_position = 1
+tabs_visible = false
+
+[node name="Schematic" type="GridContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer" unique_id=1430983416]
+visible = false
+layout_mode = 2
+columns = 2
+metadata/_tab_index = 0
+
+[node name="Label" type="Label" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Schematic" unique_id=2011389897]
+layout_mode = 2
+text = "Title: "
+
+[node name="LineEdit" type="LineEdit" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Schematic" unique_id=1757617770]
+custom_minimum_size = Vector2(200, 0)
+layout_mode = 2
+text = "My_Schematic"
+
+[node name="Label2" type="Label" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Schematic" unique_id=181321867]
+layout_mode = 2
+text = "Author: "
+
+[node name="LineEdit2" type="LineEdit" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Schematic" unique_id=1810392306]
+custom_minimum_size = Vector2(200, 0)
+layout_mode = 2
+text = "Mr. Logician"
+
+[node name="Label3" type="Label" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Schematic" unique_id=1491248201]
+layout_mode = 2
+text = "Date:"
+
+[node name="LineEdit3" type="LineEdit" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Schematic" unique_id=1066086405]
+custom_minimum_size = Vector2(200, 0)
+layout_mode = 2
+text = "01/01/2000"
+
+[node name="Layer" type="VBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer" unique_id=74805143]
+layout_mode = 2
+metadata/_tab_index = 1
+
+[node name="HBoxContainer" type="HBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Layer" unique_id=1744934593]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Layer/HBoxContainer" unique_id=1091194247]
+layout_mode = 2
+text = "Title: "
+
+[node name="Layer_Title" type="LineEdit" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Layer/HBoxContainer" unique_id=358476146]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(200, 0)
+layout_mode = 2
+text = "Layer_Zero"
+
+[node name="Spacer" type="Control" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Layer/HBoxContainer" unique_id=263965334]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Add_Layer" type="Button" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Layer/HBoxContainer" unique_id=1608180689]
+layout_mode = 2
+text = "+Layer"
+
+[node name="Isolate_Layer" type="Button" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Layer/HBoxContainer" unique_id=1393966679]
+layout_mode = 2
+text = "Isolate"
+
+[node name="ThemePicker" type="HBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Layer" unique_id=269423435]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="Label" type="Label" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Layer/ThemePicker" unique_id=965329182]
+layout_mode = 2
+text = "Theme :"
+
+[node name="LineEdit" type="LineEdit" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Layer/ThemePicker" unique_id=967858835]
+custom_minimum_size = Vector2(200, 0)
+layout_mode = 2
+text = "Default"
+
+[node name="Button" type="Button" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Layer/ThemePicker" unique_id=2052023804]
+layout_mode = 2
+toggle_mode = true
+text = " V "
+
+[node name="Spacer" type="Control" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Layer/ThemePicker" unique_id=1681092427]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="dupl_theme" type="Button" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Layer/ThemePicker" unique_id=408443558]
+layout_mode = 2
+text = "Duplicate"
+
+[node name="rem_theme" type="Button" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Layer/ThemePicker" unique_id=357635897]
+layout_mode = 2
+text = "Delete"
+
+[node name="save_theme" type="Button" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Layer/ThemePicker" unique_id=516930966]
+layout_mode = 2
+text = "Save"
+
+[node name="GridContainer" type="GridContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Layer" unique_id=15343888]
+layout_mode = 2
+size_flags_vertical = 3
+columns = 2
+
+[node name="HBoxContainer6" type="HBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Layer/GridContainer" unique_id=726277918]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Layer/GridContainer/HBoxContainer6" unique_id=353559696]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Cell Size"
+
+[node name="Cell_Size" type="SpinBox" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Layer/GridContainer/HBoxContainer6" unique_id=89846456]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="HBoxContainer5" type="HBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Layer/GridContainer" unique_id=2011433886]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Layer/GridContainer/HBoxContainer5" unique_id=1037170165]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Back Color"
+
+[node name="Back_Color" type="ColorPickerButton" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Layer/GridContainer/HBoxContainer5" unique_id=1938737905]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(50, 0)
+layout_mode = 2
+edit_alpha = false
+edit_intensity = false
+
+[node name="HBoxContainer2" type="HBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Layer/GridContainer" unique_id=1037779447]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Layer/GridContainer/HBoxContainer2" unique_id=189272052]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Origin Thickness"
+
+[node name="Orig_Thick" type="SpinBox" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Layer/GridContainer/HBoxContainer2" unique_id=479772]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="HBoxContainer4" type="HBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Layer/GridContainer" unique_id=1036453755]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Layer/GridContainer/HBoxContainer4" unique_id=421097848]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Origin Color"
+
+[node name="Orig_Color" type="ColorPickerButton" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Layer/GridContainer/HBoxContainer4" unique_id=16310371]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(50, 0)
+layout_mode = 2
+edit_alpha = false
+edit_intensity = false
+
+[node name="HBoxContainer" type="HBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Layer/GridContainer" unique_id=534499431]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Layer/GridContainer/HBoxContainer" unique_id=1982196593]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Grid Thickness"
+
+[node name="Grid_Thick" type="SpinBox" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Layer/GridContainer/HBoxContainer" unique_id=1129275273]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="HBoxContainer3" type="HBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Layer/GridContainer" unique_id=878291063]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Layer/GridContainer/HBoxContainer3" unique_id=385043306]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Grid Color"
+
+[node name="Grid_Color" type="ColorPickerButton" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Layer/GridContainer/HBoxContainer3" unique_id=198879637]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(50, 0)
+layout_mode = 2
+edit_alpha = false
+edit_intensity = false
+
+[node name="Selection" type="VFlowContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer" unique_id=2147217386]
+visible = false
+layout_mode = 2
+metadata/_tab_index = 2
+
+[node name="Button" type="Button" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Selection" unique_id=636941842]
+layout_mode = 2
+text = "Isolate"
+
+[node name="Analyzer" type="VFlowContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer" unique_id=372241032]
+visible = false
+layout_mode = 2
+metadata/_tab_index = 3
+
+[node name="Sim_Paused" type="Button" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Analyzer" unique_id=1048943343]
+modulate = Color(6.256998e-07, 0.77758634, 0.11925071, 1)
+layout_mode = 2
+toggle_mode = true
+button_pressed = true
+text = "Running"
+
+[node name="Sim_Rate" type="OptionButton" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Analyzer" unique_id=1934546772]
+layout_mode = 2
+selected = 0
+item_count = 9
+popup/item_0/text = "1 Hz"
+popup/item_0/id = 1
+popup/item_1/text = "5 Hz"
+popup/item_1/id = 5
+popup/item_2/text = "10Hz"
+popup/item_2/id = 10
+popup/item_3/text = "20 Hz"
+popup/item_3/id = 20
+popup/item_4/text = "50 Hz"
+popup/item_4/id = 50
+popup/item_5/text = "100 Hz"
+popup/item_5/id = 100
+popup/item_6/text = "200 Hz"
+popup/item_6/id = 200
+popup/item_7/text = "500 Hz"
+popup/item_7/id = 500
+popup/item_8/text = "1 KHz"
+popup/item_8/id = 1000
+
+[node name="Components" type="HBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer" unique_id=954640791]
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 0
+metadata/_tab_index = 4
+
+[node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Components" unique_id=1700116013]
+layout_mode = 2
+
+[node name="fold_devices" type="Button" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Components/VBoxContainer" unique_id=559831295]
+layout_mode = 2
+toggle_mode = true
+text = "Unfold All"
+
+[node name="ScrollContainer2" type="ScrollContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Components/VBoxContainer" unique_id=1472731615]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+vertical_scroll_mode = 2
+
+[node name="part_categories" type="VBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Components/VBoxContainer/ScrollContainer2" unique_id=2061698861]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 0
+
+[node name="ScrollContainer" type="ScrollContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Components" unique_id=959007321]
+layout_mode = 2
+size_flags_horizontal = 3
+horizontal_scroll_mode = 4
+vertical_scroll_mode = 0
+scroll_hint_mode = 1
+
+[node name="Components" type="HBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Components/ScrollContainer" unique_id=288877506]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter" unique_id=1856936374]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="Flowchart" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer" unique_id=1802454809 instance=ExtResource("1_ig7tw")]
+unique_name_in_owner = true
+clip_contents = true
+layout_mode = 2
+size_flags_vertical = 3
+color = Color(0.36299998, 0.39416662, 0.55, 1)
+script = SubResource("GDScript_h2yge")
+appearance = SubResource("Resource_1bvp3")
+update_rate = 0.01
+graph = SubResource("Resource_lquwl")
+cell_size = 50
+grid_color = Color(0.4758, 0.50040334, 0.61, 1)
+orig_color = Color(0.63, 0.59031004, 0.2331, 1)
+chirality = 0
+
+[node name="Human_Interface" type="HBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/Flowchart" unique_id=1102069590]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+alignment = 1
+script = SubResource("GDScript_1bvp3")
+
+[node name="Controls_Sidebar" type="Panel" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/Flowchart/Human_Interface" unique_id=162312974]
+unique_name_in_owner = true
+clip_contents = true
+custom_minimum_size = Vector2(32, 0)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_h2yge")
+
+[node name="Box" type="VBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/Flowchart/Human_Interface/Controls_Sidebar" unique_id=2119130911]
+visible = false
+layout_mode = 0
+
+[node name="Controls_Check" type="CheckButton" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/Flowchart/Human_Interface/Controls_Sidebar/Box" unique_id=801766613]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 1
+text = "Controls"
+
+[node name="ScrollContainer" type="ScrollContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/Flowchart/Human_Interface/Controls_Sidebar/Box" unique_id=975825172]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+vertical_scroll_mode = 4
+
+[node name="Controls" type="VBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/Flowchart/Human_Interface/Controls_Sidebar/Box/ScrollContainer" unique_id=1416305988]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="Spacer" type="Control" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/Flowchart/Human_Interface" unique_id=1561482346]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+
+[node name="Indicators_Sidebar" type="Panel" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/Flowchart/Human_Interface" unique_id=688939817]
+unique_name_in_owner = true
+clip_contents = true
+custom_minimum_size = Vector2(32, 0)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_074og")
+
+[node name="Box" type="VBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/Flowchart/Human_Interface/Indicators_Sidebar" unique_id=67923909]
+visible = false
+layout_mode = 0
+
+[node name="Indicators_Check" type="CheckButton" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/Flowchart/Human_Interface/Indicators_Sidebar/Box" unique_id=721532446]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 1
+text = "Indicators"
+
+[node name="ScrollContainer" type="ScrollContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/Flowchart/Human_Interface/Indicators_Sidebar/Box" unique_id=1626965880]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+vertical_scroll_mode = 4
+
+[node name="Indicators" type="VBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/Flowchart/Human_Interface/Indicators_Sidebar/Box/ScrollContainer" unique_id=291306961]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="HBoxContainer" type="HBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer" unique_id=1817591134]
+layout_mode = 2
+
+[node name="Scheme_Layers" type="TabBar" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/HBoxContainer" unique_id=62690760]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/tab_unselected = SubResource("StyleBoxFlat_1bvp3")
+theme_override_styles/tab_hovered = SubResource("StyleBoxFlat_lquwl")
+theme_override_styles/tab_selected = SubResource("StyleBoxFlat_7mycd")
+theme_override_styles/tab_disabled = SubResource("StyleBoxFlat_272bh")
+theme_override_styles/tab_focus = SubResource("StyleBoxFlat_5vw27")
+theme_override_styles/button_pressed = SubResource("StyleBoxFlat_kek77")
+theme_override_styles/button_highlight = SubResource("StyleBoxFlat_4c57u")
+current_tab = 0
+drag_to_rearrange_enabled = true
+tab_count = 1
+tab_0/title = "Layer_Zero"
+
+[node name="Add_Layer" type="Button" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/HBoxContainer" unique_id=229728377]
+layout_mode = 2
+text = "+Layer"
+
+[node name="Confirm_Rem_Layer" type="ConfirmationDialog" parent="." unique_id=8701006]
+oversampling_override = 1.0
+title = "Deleting a Layer"
+initial_position = 4
+size = Vector2i(214, 106)
+ok_button_text = "Eliminate!"
+dialog_text = "Are you sure you want to delete this layer?"
+dialog_autowrap = true
+cancel_button_text = "What? No!"
+
+[connection signal="toggled" from="MarginContainer/HBoxContainer/VBoxContainer/HBoxContainer/Sidebar_Button" to="." method="_on_sidebar_button_toggled"]
+[connection signal="tab_changed" from="MarginContainer/HBoxContainer/VBoxContainer/HBoxContainer/TrayTabBar" to="." method="_on_tray_tab_bar_tab_changed" flags=18]
+[connection signal="toggled" from="MarginContainer/HBoxContainer/VBoxContainer/HBoxContainer/Mode" to="." method="_on_mode_toggled" flags=18]
+[connection signal="drag_ended" from="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter" to="." method="_on_tray_splitter_drag_ended" flags=18]
+[connection signal="toggled" from="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Analyzer/Sim_Paused" to="." method="_on_sim_paused_toggled" flags=18]
+[connection signal="item_selected" from="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Analyzer/Sim_Rate" to="." method="_on_sim_rate_item_selected" flags=18]
+[connection signal="toggled" from="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/Components/VBoxContainer/fold_devices" to="." method="_on_fold_devices_toggled" flags=18]
+[connection signal="mouse_entered" from="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/Flowchart/Human_Interface/Controls_Sidebar" to="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/Flowchart/Human_Interface" method="_on_controls_sidebar_mouse_entered"]
+[connection signal="mouse_exited" from="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/Flowchart/Human_Interface/Controls_Sidebar" to="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/Flowchart/Human_Interface" method="_on_controls_sidebar_mouse_exited"]
+[connection signal="mouse_entered" from="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/Flowchart/Human_Interface/Indicators_Sidebar" to="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/Flowchart/Human_Interface" method="_on_indicators_sidebar_mouse_entered"]
+[connection signal="mouse_exited" from="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/Flowchart/Human_Interface/Indicators_Sidebar" to="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/Flowchart/Human_Interface" method="_on_indicators_sidebar_mouse_exited"]
+[connection signal="tab_close_pressed" from="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/HBoxContainer/Scheme_Layers" to="." method="_on_scheme_layers_tab_close_pressed"]
+[connection signal="confirmed" from="Confirm_Rem_Layer" to="." method="scheme_rem_layer"]

@@ -1,0 +1,159 @@
+[gd_scene format=3 uid="uid://dko43v3p83q4"]
+
+[ext_resource type="Script" uid="uid://fv0imbgspl8d" path="res://modules/InfiCanvas/Flowchart/Old_Sockets/socket_sink.gd" id="1_tn1od"]
+[ext_resource type="Script" uid="uid://n8juad5yqvmg" path="res://modules/InfiCanvas/Flowchart/Old_Sockets/socket_bidir.gd" id="2_tn1od"]
+
+[sub_resource type="GDScript" id="GDScript_28hit"]
+script/source = "@tool
+extends Electronics
+
+var thrown : bool = false
+var manual : bool = false
+
+func _ready() -> void:
+	options[\"Mirror Horizontal\"] = \"mirror_horizontal\"
+	options[\"Mirror Vertical\"] = \"mirror_vertical\"
+	%PoleTab_1.button_down.connect(set_manual.bind(true))
+	%PoleTab_2.button_down.connect(set_manual.bind(true))
+	%PoleTab_1.button_up.connect(set_manual.bind(false))
+	%PoleTab_2.button_up.connect(set_manual.bind(false))
+
+func set_manual(val:bool):
+	manual = val
+
+func _set_mirror_horizontal():
+	pass
+func _set_mirror_vertical():
+	pass
+
+
+func set_bitwidth(val:int):
+	super(val)
+	if not is_node_ready():
+		await ready
+	$Relay.bitwidth = bitwidth
+	$Pole_1.bitwidth = bitwidth
+	$Pole_2.bitwidth = bitwidth
+
+
+func _cycle_finish():
+	var pole = [$Pole_1, $Pole_2][int(thrown)]
+	if not pole.link == null:
+		var aggregate : Array = pole.link.aggregate
+		if not %Relay.link == null:
+			aggregate += %Relay.link.aggregate
+			$Relay.link.aggregate = aggregate
+			pole.link.aggregate = aggregate
+	
+
+func _update(graph:FlowchartGraph):
+	if manual:
+		if %PoleTab_2.button_pressed != thrown:
+			thrown = %PoleTab_2.button_pressed
+	else:
+		var active = graph.read($Coil_1) > 0 or graph.read($Coil_2) > 0
+		if active != thrown:
+			thrown = active
+			[%PoleTab_1, %PoleTab_2][int(thrown)].set_pressed_no_signal(true)
+"
+
+[sub_resource type="ButtonGroup" id="ButtonGroup_i7g6k"]
+
+[sub_resource type="SystemFont" id="SystemFont_caeur"]
+
+[sub_resource type="LabelSettings" id="LabelSettings_nk3f3"]
+font = SubResource("SystemFont_caeur")
+
+[sub_resource type="SystemFont" id="SystemFont_28hit"]
+
+[sub_resource type="LabelSettings" id="LabelSettings_caeur"]
+font = SubResource("SystemFont_28hit")
+
+[node name="SwitchRelay" type="Container" unique_id=1077077745 node_paths=PackedStringArray("sockets")]
+offset_right = 120.0
+offset_bottom = 90.0
+script = SubResource("GDScript_28hit")
+sockets = {
+NodePath("Relay"): Vector2i(2, 0),
+NodePath("Pole_1"): Vector2i(1, -1),
+NodePath("Pole_2"): Vector2i(3, -1),
+NodePath("Coil_1"): Vector2i(0, 1),
+NodePath("Coil_2"): Vector2i(-1, 1)
+}
+metadata/_custom_type_script = "uid://dxbdnxmvfy5cw"
+
+[node name="VBoxContainer" type="VBoxContainer" parent="." unique_id=1077634120]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 0
+
+[node name="Panel" type="Panel" parent="VBoxContainer" unique_id=536020794]
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 2
+
+[node name="HBoxContainer" type="HBoxContainer" parent="VBoxContainer" unique_id=891698665]
+layout_mode = 2
+size_flags_vertical = 3
+alignment = 1
+
+[node name="PoleTab_1" type="Button" parent="VBoxContainer/HBoxContainer" unique_id=1809496607]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+button_group = SubResource("ButtonGroup_i7g6k")
+
+[node name="PoleTab_2" type="Button" parent="VBoxContainer/HBoxContainer" unique_id=1154248700]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+button_pressed = true
+button_group = SubResource("ButtonGroup_i7g6k")
+
+[node name="Coil_1" type="Control" parent="." unique_id=147842500]
+layout_mode = 2
+script = ExtResource("1_tn1od")
+show_name = false
+font = SubResource("LabelSettings_nk3f3")
+color = Color(0, 0, 0.8039216, 1)
+metadata/_custom_type_script = "uid://fv0imbgspl8d"
+
+[node name="Coil_2" type="Control" parent="." unique_id=208176613]
+layout_mode = 2
+script = ExtResource("1_tn1od")
+show_name = false
+font = SubResource("LabelSettings_nk3f3")
+color = Color(0, 0, 0.8039216, 1)
+metadata/_custom_type_script = "uid://fv0imbgspl8d"
+
+[node name="Relay" type="Control" parent="." unique_id=1929090825]
+layout_mode = 2
+script = ExtResource("2_tn1od")
+enabled = true
+font = SubResource("LabelSettings_caeur")
+label_side = "Below"
+color = Color(1, 0.27058825, 0, 1)
+alt_color = Color(0, 0, 1, 1)
+metadata/_custom_type_script = "uid://n8juad5yqvmg"
+
+[node name="Pole_1" type="Control" parent="." unique_id=2029627357]
+layout_mode = 2
+script = ExtResource("2_tn1od")
+enabled = true
+show_name = false
+font = SubResource("LabelSettings_caeur")
+color = Color(1, 0.27058825, 0, 1)
+alt_color = Color(0, 0, 1, 1)
+metadata/_custom_type_script = "uid://n8juad5yqvmg"
+
+[node name="Pole_2" type="Control" parent="." unique_id=1403658494]
+layout_mode = 2
+script = ExtResource("2_tn1od")
+show_name = false
+font = SubResource("LabelSettings_caeur")
+color = Color(1, 0.27058825, 0, 1)
+alt_color = Color(0, 0, 1, 1)
+metadata/_custom_type_script = "uid://n8juad5yqvmg"

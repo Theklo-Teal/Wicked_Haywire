@@ -1,0 +1,182 @@
+[gd_scene format=3 uid="uid://b40x0cq1p6c37"]
+
+[ext_resource type="Script" uid="uid://dtsa06qk1d64r" path="res://modules/InfiCanvas/Flowchart/Old_Sockets/socket_source.gd" id="1_kysup"]
+
+[sub_resource type="GDScript" id="GDScript_a8wdm"]
+script/source = "@tool
+extends Electronics
+
+@export var slider : StyleBox : 
+	set(val):
+		slider = val
+		queue_redraw()
+		if not val.changed.is_connected(queue_redraw):
+			val.changed.connect(queue_redraw)
+@export var button_high : StyleBox : 
+	set(val):
+		button_high = val
+		queue_redraw()
+		if not val.changed.is_connected(queue_redraw):
+			val.changed.connect(queue_redraw)
+@export var button_low : StyleBox : 
+	set(val):
+		button_low = val
+		queue_redraw()
+		if not val.changed.is_connected(queue_redraw):
+			val.changed.connect(queue_redraw)
+
+enum Orient{
+	RIGHT,
+	DOWN,
+	LEFT,
+	UP
+}
+
+var orientation : Orient
+
+func _ready() -> void:
+	options[\"Rotate CW\"] = \"rotate_cw\"
+	options[\"Rotate CCW\"] = \"rotate_ccw\"
+	options[\"High Color\"] = \"high_color\"
+	options[\"Low Color\"] = \"low_color\"
+
+func rotate_cw():
+	pass
+func rotate_ccw():
+	pass
+func _set_high_color(val:Color):
+	pass
+func _set_low_color(val:Color):
+	pass
+
+
+func _update(graph:FlowchartGraph):
+	graph.write($Source, $%Panel.high)
+
+
+func _on_mouse_entered() -> void:
+	%Header.show()
+func _on_header_mouse_exited() -> void:
+	%Header.hide()
+"
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_18wlh"]
+bg_color = Color(0.8471467, 0.88, 0.8096, 1)
+skew = Vector2(0.3, 0)
+border_width_left = 12
+border_width_top = 12
+border_color = Color(0.53, 0.5176333, 0.424, 1)
+border_blend = true
+corner_radius_top_left = 22
+corner_radius_top_right = 22
+corner_radius_bottom_right = 22
+corner_radius_bottom_left = 22
+corner_detail = 5
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_kysup"]
+bg_color = Color(0.08189999, 0.63, 0.109304965, 1)
+border_width_left = 12
+border_width_top = 12
+border_color = Color(0, 1, 0.20000005, 1)
+border_blend = true
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+corner_detail = 5
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_a8wdm"]
+bg_color = Color(0.36420333, 0.37, 0.1961, 1)
+border_width_right = 22
+border_width_bottom = 22
+border_color = Color(0.1428, 0.28, 0.17024001, 1)
+border_blend = true
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+corner_detail = 5
+
+[sub_resource type="GDScript" id="GDScript_kysup"]
+script/source = "extends Panel
+
+@export var node : FlowchartNode
+
+var high : bool
+var pressed : bool
+var latched : bool
+var sliding : bool
+
+func _gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		queue_redraw()
+		pressed = event.is_pressed()
+
+func _draw() -> void:
+	var button_box = [node.button_high, node.button_low][int(int(pressed) ^ int(latched))]
+	var rect = Rect2(
+		Vector2.ZERO,
+		size
+	)
+	if latched:
+		rect.position = size.x * 0.33
+	draw_style_box(button_box, rect)
+"
+
+[sub_resource type="SystemFont" id="SystemFont_18wlh"]
+
+[sub_resource type="LabelSettings" id="LabelSettings_sy3c6"]
+font = SubResource("SystemFont_18wlh")
+
+[node name="PushButton" type="Container" unique_id=987734427 node_paths=PackedStringArray("sockets")]
+offset_right = 120.0
+offset_bottom = 90.0
+script = SubResource("GDScript_a8wdm")
+slider = SubResource("StyleBoxFlat_18wlh")
+button_high = SubResource("StyleBoxFlat_kysup")
+button_low = SubResource("StyleBoxFlat_a8wdm")
+sockets = {
+NodePath("Source"): Vector2i(-1, 1)
+}
+metadata/_custom_type_script = "uid://dxbdnxmvfy5cw"
+
+[node name="VBoxContainer" type="VBoxContainer" parent="." unique_id=711792513]
+layout_mode = 2
+alignment = 2
+
+[node name="Panel" type="Panel" parent="VBoxContainer" unique_id=714153517 node_paths=PackedStringArray("node")]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+script = SubResource("GDScript_kysup")
+node = NodePath("../..")
+
+[node name="Header" type="PanelContainer" parent="VBoxContainer" unique_id=1854189738]
+unique_name_in_owner = true
+visible = false
+show_behind_parent = true
+layout_mode = 2
+mouse_filter = 2
+
+[node name="HBoxContainer" type="HBoxContainer" parent="VBoxContainer/Header" unique_id=636181859]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="VBoxContainer/Header/HBoxContainer" unique_id=121966143]
+layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 0
+text = "Push Button"
+
+[node name="Pin" type="CheckBox" parent="VBoxContainer/Header/HBoxContainer" unique_id=235282714]
+layout_mode = 2
+
+[node name="Source" type="Control" parent="." unique_id=1434408607]
+layout_mode = 2
+script = ExtResource("1_kysup")
+show_name = false
+font = SubResource("LabelSettings_sy3c6")
+color = Color(1, 0.27058825, 0, 1)
+metadata/_custom_type_script = "uid://dtsa06qk1d64r"
+
+[connection signal="mouse_entered" from="." to="." method="_on_mouse_entered"]
+[connection signal="mouse_exited" from="VBoxContainer/Header" to="." method="_on_header_mouse_exited"]

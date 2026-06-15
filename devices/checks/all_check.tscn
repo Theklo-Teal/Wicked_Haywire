@@ -1,0 +1,5 @@
+[gd_scene format=3 uid="uid://dcpg31ju6b7i5"]
+
+[ext_resource type="PackedScene" uid="uid://ce32nv1ktqx4r" path="res://modules/InfiCanvas/Flowchart/Nodes/condition_check.tscn" id="1_mlaba"]
+
+[node name="ALL_Check" unique_id=1592788056 instance=ExtResource("1_mlaba")]

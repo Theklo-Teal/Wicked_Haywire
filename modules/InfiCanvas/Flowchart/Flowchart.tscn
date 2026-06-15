@@ -1,0 +1,133 @@
+[gd_scene format=3 uid="uid://bnatph83g21s6"]
+
+[ext_resource type="Script" uid="uid://ch21vd3wceeie" path="res://modules/InfiCanvas/Flowchart/flowchart.gd" id="1_88cu4"]
+[ext_resource type="Script" uid="uid://d02c16crluegs" path="res://modules/InfiCanvas/spatial_partitioning.gd" id="2_gatyp"]
+
+[sub_resource type="Resource" id="Resource_gatyp"]
+script = ExtResource("2_gatyp")
+metadata/_custom_type_script = "uid://d02c16crluegs"
+
+[sub_resource type="Resource" id="Resource_3gi3x"]
+script = ExtResource("2_gatyp")
+metadata/_custom_type_script = "uid://d02c16crluegs"
+
+[sub_resource type="ButtonGroup" id="ButtonGroup_gatyp"]
+
+[sub_resource type="InputEventKey" id="InputEventKey_3gi3x"]
+device = -1
+keycode = 4194332
+
+[sub_resource type="Shortcut" id="Shortcut_dvd76"]
+events = [SubResource("InputEventKey_3gi3x")]
+
+[sub_resource type="InputEventKey" id="InputEventKey_ynn0g"]
+device = -1
+keycode = 4194333
+
+[sub_resource type="Shortcut" id="Shortcut_r2yxo"]
+events = [SubResource("InputEventKey_ynn0g")]
+
+[sub_resource type="InputEventKey" id="InputEventKey_aay5b"]
+device = -1
+keycode = 4194334
+
+[sub_resource type="Shortcut" id="Shortcut_ogkfm"]
+events = [SubResource("InputEventKey_aay5b")]
+
+[node name="Flowchart" type="ColorRect" unique_id=117644141]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.27387273, 0.27387273, 0.27387273, 1)
+script = ExtResource("1_88cu4")
+update_rate = 0.05
+parti = Dictionary[Variant, ExtResource("2_gatyp")]({
+&"node": SubResource("Resource_gatyp"),
+&"wire": SubResource("Resource_3gi3x")
+})
+cell_size = 44
+chirality = 1
+
+[node name="VBoxContainer" type="VBoxContainer" parent="." unique_id=2124179095]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -83.5
+offset_top = -40.0
+offset_right = 83.5
+grow_horizontal = 2
+grow_vertical = 0
+
+[node name="LineEdit" type="LineEdit" parent="VBoxContainer" unique_id=1522757836]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+placeholder_text = "Tunnel Name"
+alignment = 1
+
+[node name="wire_shapes" type="HBoxContainer" parent="VBoxContainer" unique_id=801389607]
+unique_name_in_owner = true
+layout_mode = 2
+alignment = 1
+
+[node name="Bevel" type="Button" parent="VBoxContainer/wire_shapes" unique_id=1264972855]
+layout_mode = 2
+toggle_mode = true
+button_pressed = true
+button_group = SubResource("ButtonGroup_gatyp")
+shortcut = SubResource("Shortcut_dvd76")
+text = "F1"
+
+[node name="Chicane" type="Button" parent="VBoxContainer/wire_shapes" unique_id=1053592191]
+layout_mode = 2
+toggle_mode = true
+button_group = SubResource("ButtonGroup_gatyp")
+shortcut = SubResource("Shortcut_r2yxo")
+text = "F2"
+
+[node name="Square" type="Button" parent="VBoxContainer/wire_shapes" unique_id=1783291684]
+layout_mode = 2
+toggle_mode = true
+button_group = SubResource("ButtonGroup_gatyp")
+shortcut = SubResource("Shortcut_ogkfm")
+text = "F3"
+
+[node name="HBoxContainer" type="HBoxContainer" parent="VBoxContainer" unique_id=926539074]
+layout_mode = 2
+alignment = 1
+
+[node name="zoom" type="Button" parent="VBoxContainer/HBoxContainer" unique_id=1790854103]
+unique_name_in_owner = true
+layout_mode = 2
+text = "100 %"
+
+[node name="origin" type="Button" parent="VBoxContainer/HBoxContainer" unique_id=567962751]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Go To Center"
+
+[node name="PopupMenu" type="PopupMenu" parent="." unique_id=897390472]
+oversampling_override = 1.0
+size = Vector2i(149, 251)
+item_count = 6
+item_0/text = "Info Panel"
+item_0/id = 0
+item_1/text = "Ammeter"
+item_1/id = 1
+item_2/text = "Voltmeter"
+item_2/id = 2
+item_3/text = "Cabling"
+item_3/id = 3
+item_4/text = "Diode"
+item_4/id = 4
+item_5/text = "Tri-State Buffer"
+item_5/id = 5
+
+[node name="Update_Timer" type="Timer" parent="." unique_id=1023817412]
+wait_time = 0.05
+ignore_time_scale = true

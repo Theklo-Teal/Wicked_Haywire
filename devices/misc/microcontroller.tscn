@@ -1,0 +1,10 @@
+[gd_scene format=3 uid="uid://2hbuk7tkbbk5"]
+
+[ext_resource type="Script" uid="uid://cq7xjjxw10dly" path="res://modules/InfiCanvas/Flowchart/Nodes/flowchart_node_base.gd" id="1_lxoyh"]
+
+[node name="Microcontroller" type="Container" unique_id=1210791947 node_paths=PackedStringArray("menu")]
+offset_right = 30.0
+offset_bottom = 30.0
+script = ExtResource("1_lxoyh")
+menu = NodePath("@PopupMenu@114174")
+metadata/_custom_type_script = "uid://cq7xjjxw10dly"

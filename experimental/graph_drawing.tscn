@@ -1,0 +1,105 @@
+[gd_scene format=3 uid="uid://3wusasr1rrof"]
+
+[sub_resource type="GDScript" id="GDScript_u6phq"]
+script/source = "extends Control
+
+var drag_wire := Wire_Segm.new(Vector2.ZERO, Vector2.ONE, false)
+var wiring : Dictionary[String, Array]  ## Name of separated graphs associated to an array of wires in each of those graphs.
+
+
+class Wire:
+	var wires : Array[Wire_Segm]
+	
+	## Add segments to wires. If a graph is connected to another, they are merged as a single graph.
+	func extend():
+		pass
+
+class Wire_Segm:
+	var rect : Rect2
+	var origin : int  ## Defines which corner of the rectangle is a line ending. From that the other ending can be extrapolated.
+	var chi : bool  ## Whether the wire follows the perimeter of the rectangle in clockwise direction. In other words, which corner of the rectangle is part of the wire.
+	var ori_conn : Array[Wire]  ## Which other wires connect to the origin end.
+	var end_conn : Array[Wire]  ## Which ogther wires conncet to the opposite end.
+	
+	func _init(start:Vector2, stop:Vector2, clockwise:bool):
+		set_rect(start, stop)
+		chi = clockwise
+	
+	func set_rect(start:Vector2, stop:Vector2):
+		#TODO find which corners of the rectangle are end points.
+		rect = Rect2(start, stop - start).abs()
+		origin = int(start < stop)
+	
+	## Returns all the corners of the rectangle from top-right towards [code]chi[/code] direction.
+	func get_corners() -> PackedVector2Array:
+		var clockwise = [Vector2(rect.end.x, rect.position.y), rect.end, Vector2(rect.position.x, rect.end.y), rect.position]
+		if not chi:
+			clockwise.reverse()
+		return clockwise
+	
+	## Returns the two coordinates of the ends of the wire.
+	func get_ends() -> PackedVector2Array:
+		var corn = get_corners()
+		var start = corn[origin]
+		var stop = corn[(origin + 2) % 4]
+		return [start, stop]
+	
+	## Finds which wire part and which end is closest to the given point and whether one is closer than the other.
+	func get_closest_end(point:Vector2) -> Dictionary:
+		var ends = get_ends()
+		var end_choice =  abs(point - ends[0]) > abs(point - ends[1])
+		return {
+			\"end\" : ends[end_choice],
+			\"side\" : [Vector2.ZERO, Vector2.ONE],
+			\"near_end\" : true,
+			}
+	
+	func draw(canvas:Control, color:=Color.WHITE):
+		var start = rect.position
+		var stop = rect.end
+		var sixa = rect.size.min_axis_index()
+		var ans := Vector2.ZERO
+		ans.x = [start.x, stop.x][sixa]
+		ans.y = [stop.y, start.y][sixa]
+		canvas.draw_polyline([start, ans, stop], color, 4)
+
+
+var drag_start : Vector2
+func _input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.is_pressed():
+			drag_start = event.position
+			for wire in wiring:
+				if wire.rect.has_point(event.position):
+					drag_start = wire.get_end1()
+		else:
+			wiring.append(Wire.new(drag_start, event.position, Input.is_key_pressed(KEY_SHIFT)))
+			queue_redraw()
+	
+	if event is InputEventMouseMotion:
+		if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+			queue_redraw()
+
+func _draw() -> void:
+	for wire in wiring:
+		wire.draw(self)
+	
+	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		drag_wire.set_rect(drag_start, get_local_mouse_position())
+		drag_wire.chiral = Input.is_key_pressed(KEY_SHIFT)
+		drag_wire.draw(self, Color.BISQUE)
+
+
+## Walk along lines and find what connects to what.
+func get_network():
+	pass
+"
+
+[node name="Control" type="Control" unique_id=670497810]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = SubResource("GDScript_u6phq")
