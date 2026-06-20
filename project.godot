@@ -17,7 +17,7 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 config/name="Wicked Haywire"
 run/main_scene="uid://dwy8v5p2vu3mn"
 config/features=PackedStringArray("4.6", "Forward Plus")
-config/icon="uid://cq5m3xexnd3hm"
+config/icon="uid://bliggdgfw3v4k"
 
 [autoload]
 

@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bliggdgfw3v4k"
-path="res://.godot/imported/Wicked_Haywire_Logo.png-3aa032a1d2afe22697d1e13d5e811080.ctex"
+uid="uid://c6ft8bxllosau"
+path="res://.godot/imported/Logic_XOR.png-dc3d2966d53338b4170fd1380b1cdc2c.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Wicked_Haywire_Logo.png"
-dest_files=["res://.godot/imported/Wicked_Haywire_Logo.png-3aa032a1d2afe22697d1e13d5e811080.ctex"]
+source_file="res://media/Logic_XOR.png"
+dest_files=["res://.godot/imported/Logic_XOR.png-dc3d2966d53338b4170fd1380b1cdc2c.ctex"]
 
 [params]
 
