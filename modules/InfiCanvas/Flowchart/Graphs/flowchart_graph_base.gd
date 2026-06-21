@@ -157,9 +157,9 @@ func connect_socket(socket:ChartSocket):
 func disconnect_socket(socket:ChartSocket):
 	reconn[socket] = null
 
-## Performs a breadth-first search to return a list of sockets which are connects together according to their wire and tunnel references.
-func follow_wires(unchecked : Array[ChartSocket], checked : Array[ChartSocket] = [], tunnels : Array[String] = []) -> Array[ChartSocket]:
-	return checked
+### Performs a breadth-first search to return a list of sockets which are connects together according to their wire and tunnel references.
+#func follow_wires(unchecked : Array[ChartSocket], checked : Array[ChartSocket] = [], tunnels : Array[String] = []) -> Array[ChartSocket]:
+	#return checked
 
 #region Simulation Handlers
 signal sim_cycle_begun
