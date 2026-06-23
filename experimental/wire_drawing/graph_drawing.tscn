@@ -1,0 +1,195 @@
+[gd_scene format=3 uid="uid://3wusasr1rrof"]
+
+[sub_resource type="GDScript" id="GDScript_u6phq"]
+script/source = "extends Control
+
+#TODO Maybe have staggered socket locations?
+#TODO Have sockets indexed in a dictionary so they can never occupy the same coordinate.
+
+var net := xNetwork.new()
+var ref_sock : xSocket  ## A selected xSocket
+var ref_wire : xNetwork.xWire  ## selected xNetwork.xWire
+var ref_segm : xWireSegm ## Selected Segment
+var segm_info : Dictionary  ## Information on the selected segment.
+
+var start_drag : Vector2
+var was_dragging : bool
+func _gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseMotion:
+		queue_redraw()
+		if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
+			was_dragging = true
+	
+	if event is InputEventKey and not event.is_echo():
+		match event.keycode:
+			KEY_SHIFT:
+				if was_dragging:
+					# Change the orientation of wire being created.
+					queue_redraw()
+			KEY_DELETE:
+				pass
+	
+	if event is InputEventMouseButton:
+		if event.is_pressed():
+			queue_redraw()
+			start_drag = event.position
+			ref_sock = null
+			ref_wire = null
+			ref_segm = null
+			if net.get_socket(event.position) == null:
+				# If not pressing over a socket, select a wire.
+				_mouse_over_segment(event.position)
+			if ref_segm == null:
+				# If no wire is pressed on, add a socket, if it doesn't exit at that place.
+				ref_sock = net.add_socket(event.position)
+		elif event.is_released():
+			match event.button_index:
+				MOUSE_BUTTON_LEFT:
+					# Create wire
+					if was_dragging:
+						var ori_sock = ref_sock
+						if ori_sock != null:  #TODO Figure out how can ori_sock be null.
+							ref_sock = net.add_socket(event.position)
+							ref_segm = net.add_wire_segm(ori_sock, ref_sock)
+							ref_wire = ref_segm.wire
+					was_dragging = false
+					queue_redraw()
+				MOUSE_BUTTON_RIGHT:
+					# Move wire
+					was_dragging = false
+					queue_redraw()
+
+func _mouse_over_segment(where:Vector2):
+	ref_wire = null
+	ref_segm = null
+	for wire in net.list:
+		var found = wire.find_segment(where)
+		if found.size() == 0:
+			continue
+		if found.size() == 1:
+			segm_info = found[0].near(where)
+			if not segm_info.is_empty():
+				ref_segm = found[0]
+				ref_wire = wire
+				break
+		else:  #TODO Allow user to click multiple times to select a different overlapping segment.
+			segm_info = found[0].near(where)
+			if not segm_info.is_empty():
+				ref_segm = found[0]
+				ref_wire = wire
+
+func _draw() -> void:
+	for sock in net.sockets.values():
+		sock.draw(self, ref_sock == sock)
+	
+	# Cell Highlight
+	if not was_dragging:
+		var clr = Color.WHITE
+		clr.a = 0.3
+		var grid = X.to_grid(get_local_mouse_position())
+		draw_circle(grid.cell_position, X.CELL_RAD, clr)
+	
+	for wire in net.list:
+		wire.draw(self, ref_segm)
+	
+	if was_dragging and ref_sock != null:
+		var rect = Rect2(ref_sock.position, get_local_mouse_position() - ref_sock.position)
+		xWireSegm.draw_length(self, rect, Input.is_key_pressed(KEY_SHIFT), xWireSegm.BEND, Color.BISQUE)
+
+#
+#func anything_selected():
+	#return not [ref_sock, ref_segm].all(func(a): return a == null)
+#
+#func _find_hover_sock(point:Vector2):
+	#ref_sock = null
+	#for s in net.sockets:
+		#if s.near(point):
+			#ref_sock = s
+			#return
+#
+#func _find_hover_segm(point:Vector2) -> Dictionary:
+	#ref_wire = null
+	#ref_segm = null
+	#if ref_sock == null:
+		#for wire in net.netlist:
+			#for segm in wire.find_segment(point):
+				#var dist = segm.near(point)
+				#if dist.is_empty(): continue
+				#ref_wire = wire
+				#ref_segm = segm
+				#return dist
+	#return {}
+#
+#var drag_start : Vector2
+#var was_drag := false
+#func _input(event: InputEvent) -> void:
+	#if event is InputEventKey and not event.is_echo():
+		#match event.keycode:
+			#KEY_SPACE:
+				#if event.is_released():
+					#queue_redraw()
+					#net.sockets.append(xSocket.new(get_local_mouse_position().snappedf(X.CELL_DIA)))
+			#KEY_SHIFT:
+				## Change the orientation of wire being created.
+				#queue_redraw()
+			#KEY_DELETE:
+				#if event.is_released():
+					#if ref_wire != null:
+						#queue_redraw()
+						#var error = net.delete_segm(ref_wire, ref_segm)
+						#if error != ERR_DOES_NOT_EXIST:
+							#ref_segm = null
+						#if error == ERR_TIMEOUT:
+							#ref_wire = null
+					#if ref_sock != null:
+						#queue_redraw()
+						#var error = net.delete_sock(ref_sock)
+	#
+	#if event is InputEventMouseButton:
+		#if event.is_pressed():
+			#if event.button_index == MOUSE_BUTTON_LEFT:
+				#_find_hover_sock(event.position)
+				#var segm_info = _find_hover_segm(event.position)
+				#if ref_sock != null:
+					#drag_start = ref_sock.position
+				#elif ref_segm != null:
+					#drag_start = segm_info.ratio
+		#elif event.is_released():
+			#if event.button_index == MOUSE_BUTTON_LEFT:
+				#queue_redraw()
+				#_find_hover_sock(event.position)  # Find socket at drag end.
+				#
+				#if was_drag:
+					#was_drag = false
+					#if drag_start.distance_to(event.position) > 16:
+						## extend a wire
+						#if ref_sock == null:
+							#var new_sock = xSocket.new(event.position.snappedf(X.CELL_DIA), true)
+							#net.sockets.append(new_sock)
+							#ref_sock = new_sock
+						#if ref_sock.get_port() == null:
+							#ref_sock.wire = xNetwork.xWire.new()
+							#net.netlist[ref_sock.wire] = xNetwork.xPort.new()
+						#var alt = Input.is_key_pressed(KEY_SHIFT)
+						#ref_sock.wire.extend(xWireSegm.from_length(drag_start, ref_sock.position, alt))
+	#
+	#if event is InputEventMouseMotion and anything_selected():
+		#was_drag = true
+		#queue_redraw()  # Display dragged wire
+		##if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		##	pass
+		#if Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
+			#if ref_segm != null:
+				#ref_segm.move_vert(xWireSegm.VERT.ENDING, event.position)
+			#if ref_sock != null:
+				#ref_sock.position = event.position
+"
+
+[node name="Control" type="Control" unique_id=670497810]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = SubResource("GDScript_u6phq")

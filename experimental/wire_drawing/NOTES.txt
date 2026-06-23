@@ -1,0 +1,8 @@
+## New idea for a wiring system. Sockets have a world relative position
+## (or relative to their nodes, then have world position) and act as anchors
+## to wire segments, which have position relative to other connected wires,
+## or if connected to Sockets, it's relative to those nets.sockets.
+## When clicking on a wire, we test which wires have rects containing the mouse
+## and on each of the wires, which of their segments are under the mouse.
+## Then whether it's a side of a segment's rect or a end. If a side, we do a resizing
+## operation. If it's an end, then we extend the wire with a new segment.
