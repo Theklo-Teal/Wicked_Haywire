@@ -11,7 +11,7 @@ var end_conn : Array[xNetConnect]  ## Other segments connected to the last corne
 var ori_position : Vector2  ## The last known absolute position of the origin corner, as a default if there are no connections.
 var end_position: Vector2  ## The last known absolute position of the ending corner, as a default if there are no connections.
 var color := Color.GOLDENROD
-var alt_color := Color.BISQUE
+var alt_color := Color.YELLOW
 
 enum VERT {
 	ORIGIN,

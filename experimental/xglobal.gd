@@ -5,8 +5,8 @@ extends Node
 const CELL_DIA = 20  ## Size of row cells.
 var CELL_RAD = CELL_DIA / 2.0
 var ROW_HEI = tan(deg_to_rad(60)) * CELL_RAD
-const VIA_RAD = 3  ## Hole size inside sockets
-const CLEARANCE = 1.5  ## Minimum distance between wires or sockets, so they don't touch.
+const VIA_RAD = 7  ## Hole size inside sockets
+const CLEARANCE = 4  ## Minimum distance between wires or sockets, so they don't touch.
 
 ## Returns [code]cell_coord[/code] on the grid and the actual space [code]cell_position[/code]
 ## of that cell.

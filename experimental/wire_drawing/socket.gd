@@ -27,9 +27,8 @@ func near(point:Vector2) -> bool:
 
 func draw(canvas:Control, highlight:=false):
 	var thick = (X.CELL_RAD - X.VIA_RAD) # Find the thickness that produces a hole of constant size.
-	canvas.draw_circle(position, X.CELL_RAD - thick / 2.0 - X.CLEARANCE, Color.GOLDENROD, false, thick)
-	if highlight:
-		canvas.draw_circle(position, X.CELL_RAD - X.CLEARANCE, Color.BISQUE, false, X.CLEARANCE * 1.5)
+	var clr : Color = Color.YELLOW if highlight else Color.GOLDENROD
+	canvas.draw_circle(position, X.CELL_RAD - thick / 2.0 - X.CLEARANCE, clr, false, thick)
 
 
 #region Simulation Fuctions

@@ -5,9 +5,19 @@ class_name xNetwork
 ## connected by Wires and wires refer to a Port where sockets emit to or receive
 ## signals from. Ports shared between Wires mean they have a tunnel between them.
 
+#TODO Make mouse hover cell match proper position of staggered cells.
+#TODO Ensure no wires are created where there is already a connection.
+#TODO Wire deletion
+#TODO Wire detach
+#TODO Wire split
+#TODO Wire join
+#TODO Chamfer adjust by dragging
+#TODO Wire shifting (Soon:tm:)
+#TODO Wire merge (Soon:tm:)
+#TODO Port management with wires. (Network merge and join)
+
 var sockets : Dictionary[Vector2i, xSocket]  ## Being in a dictionary of position, we can be sure sockets don't overlap.
 var list : Dictionary[xWire, xPort]  ## Isolated graphs and the signal ports associated. If [code]Port[/code] is null, the graph needs updating.
-
 
 #region Get things
 func get_Port(wire:xWire) -> xPort:
