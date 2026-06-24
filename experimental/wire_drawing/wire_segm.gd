@@ -28,11 +28,7 @@ func get_rect() -> Rect2:
 		#if each is xSocket:
 			#end = each.position
 			#break
-	#return Rect2(ori, end - ori).abs()
-	var pos = Vector2(min(ori.x, end.x), min(ori.y, end.y))
-	var siz = (ori - end).abs()
-	#print(Rect2(pos, siz).)
-	return Rect2(pos, siz)
+	return Rect2(ori, end - ori).abs()
 
 ## Returns which line coming from an end is either the longest or the shortest.
 func get_leg(longest:bool) -> VERT:
@@ -131,11 +127,14 @@ func find_point(subratio:float) -> Vector2:
 #region Constructors
 func _init(box:Rect2, ori:CORN, mid:CORN, end:CORN) -> void:
 	box = box.abs()
+	var verts = all_verts(box)
+	ori_position = verts[ori]
+	end_position = verts[end]
+	
 	var min_size = X.CELL_RAD - X.CLEARANCE
 	if min(box.size.y, box.size.x) <= min_size:
 		mid = CORN.NULL
-	ori_position = box.position
-	end_position = box.end
+	
 	corners = [ori, mid, end]
 
 ## Get a wire segment knowing the winding direction.
@@ -216,7 +215,7 @@ static func find_bend_distance(box_size:Vector2, ratio:float, invert:bool) -> fl
 ## 0 and 1. If more than 0, it provides vertices to produce a diagonal segment.
 ## Otherwise, only the vertex at the mid corner is provided.
 static func find_verts(box:Rect2, ori:CORN, mid:CORN, end:CORN, ratio:float=-1) -> PackedVector2Array:
-	var box_verts = all_verts(box.abs())
+	var box_verts = all_verts(box)
 	var verts = [
 		box_verts[ori],
 		box_verts[end] ]
@@ -254,6 +253,8 @@ static func find_verts(box:Rect2, ori:CORN, mid:CORN, end:CORN, ratio:float=-1) 
 #region Draw Methods
 ## Draws this wire segment on canvas.
 func draw(canvas:Control, highlight:bool=false):
+	canvas.draw_circle(ori_position, X.CELL_DIA, Color.BLUE, false, 4)
+	canvas.draw_circle(end_position, X.CELL_DIA, Color.RED, false, 4)
 	draw_along(canvas, get_rect(), corners[0], corners[1], corners[2], bend, alt_color if highlight else color)
 
 ## Given a rectangle with positive size, draw a wire.
