@@ -1,3 +1,6 @@
+*saliko_functions.gd
+saliko_functions.gd
+
 # Godot 4+ specific ignores
 .godot/
 .nomedia

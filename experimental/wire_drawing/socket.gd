@@ -3,6 +3,7 @@ class_name xSocket
 
 ## Anchors to world coordinate for Segments
 var layer : StringName
+var tunnel : StringName
 var position: Vector2
 
 func _init(where:Vector2):

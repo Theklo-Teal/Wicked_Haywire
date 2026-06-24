@@ -5,17 +5,6 @@ class_name xNetwork
 ## connected by Wires and wires refer to a Port where sockets emit to or receive
 ## signals from. Ports shared between Wires mean they have a tunnel between them.
 
-#TODO Make mouse hover cell match proper position of staggered cells.
-#TODO Ensure no wires are created where there is already a connection.
-#TODO Wire deletion
-#TODO Wire detach
-#TODO Wire split
-#TODO Wire join
-#TODO Chamfer adjust by dragging
-#TODO Wire shifting (Soon:tm:)
-#TODO Wire merge (Soon:tm:)
-#TODO Port management with wires. (Network merge and join)
-
 var sockets : Dictionary[Vector2i, xSocket]  ## Being in a dictionary of position, we can be sure sockets don't overlap.
 var list : Dictionary[xWire, xPort]  ## Isolated graphs and the signal ports associated. If [code]Port[/code] is null, the graph needs updating.
 
@@ -31,14 +20,14 @@ func get_Wire(port:xPort) -> Array[xWire]:
 
 ## Returns an existing socket or [code]null[/code] if there's none at that coordinate.
 func get_socket(where:Vector2) -> xSocket:
-	var coords = X.to_grid(where)
-	return sockets.get(coords.cell_coord)
+	var cell = X.to_grid(where)
+	return sockets.get(cell.coord)
 #endregion
 #region Add Things
 ## Returns an existing socket or creates one if it doesn't exist at the coordinate.
 func add_socket(where:Vector2) -> xSocket:
-	var coords = X.to_grid(where)
-	var sock : xSocket = sockets.get_or_add(coords.cell_coord, xSocket.new(coords.cell_position))
+	var cell = X.to_grid(where)
+	var sock : xSocket = sockets.get_or_add(cell.coord, xSocket.new(cell.position))
 	return sock
 
 func add_wire_segm(from:xSocket, to:xSocket, short_first:bool=false) -> xWireSegm:
