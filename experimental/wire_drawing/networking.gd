@@ -43,6 +43,8 @@ func add_wire_segm(from:xSocket, to:xSocket, short_first:bool=false) -> xWireSeg
 		from.wire = wire
 	
 	var segm = xWireSegm.from_length(from.position, to.position, short_first)
+	segm.ori_conn.append(from)
+	segm.end_conn.append(to)
 	segm.wire = wire
 	wire.segms.append(segm)
 	wire.rect = wire.rect.merge(segm.get_rect())
@@ -73,13 +75,15 @@ func delete_segm(w:xWire, s:xWireSegm) -> Error:
 class xWire:
 	var rect : Rect2
 	var layer : StringName
+	var endpoints : Dictionary[xWireSegm, xSocket]
 	var segms : Array[xWireSegm]
 	
 	func draw(canvas:Control, selected:xWireSegm):
 		for each in segms:
 			each.draw(canvas, each == selected)
 	
-	## Returns a list of segments which [code]xWireSegm.rect[/code] contains [code]point[/code].[br]
+	## Returns a list of segments which [code]xWireSegm.rect[/code] contains
+	## [code]point[/code].[br]
 	## Returns empty if the point is outside this Wire's [code]rect[/code].
 	func find_segment(point:Vector2) -> Array[xWireSegm]:
 		#NOTE we grow the rects, because the drawn line is split lengthwise,

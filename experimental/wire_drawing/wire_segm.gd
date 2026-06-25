@@ -20,14 +20,14 @@ func get_connections() -> Array[xNetConnect]:
 func get_rect() -> Rect2:
 	var ori := ori_position
 	var end := end_position
-	#for each in ori_conn:
-		#if each is xSocket:
-			#ori = each.position
-			#break
-	#for each in end_conn:
-		#if each is xSocket:
-			#end = each.position
-			#break
+	for each in ori_conn:
+		if each is xSocket:
+			ori = each.position
+			break
+	for each in end_conn:
+		if each is xSocket:
+			end = each.position
+			break
 	return Rect2(ori, end - ori).abs()
 
 ## Returns which line coming from an end is either the longest or the shortest.
@@ -60,7 +60,8 @@ func get_verts(with_bend:=false) -> PackedVector2Array:
 ## [code]distance[/code] - Travel along the wire until the point in absolute value.[br]
 ## [code]ratio[/code] - Travel along the wire as a ratio of the [code]length[/code].[br]
 ## [code]subratio[/code] - Travel along found segment, plus count of segments until then.[br]
-## [code]ratio[/code] can be between 0 (first corner) and 1 (last corner).[br]
+## [code]ratio[/code] - Can be between 0 (first corner) and 1 (last corner).[br]
+## [code]socket[/code] - the [code]xSocket[/code] connected to the end closest to the point.[br]
 ## The integer part of [code]subratio[/code] tells on which line of the wire the point falls.[br]
 ## Returns empty if the point is not over the lines drawn by the wire segment.
 ## This includes around the mid corner, if there's a diagonal bend so nothing
@@ -102,11 +103,19 @@ func near(point:Vector2) -> Dictionary:
 	
 	if not solved:
 		return {}
+	var ratio = inverse_lerp(0, total, accum)
+	var sock : xSocket
+	for each in [ori_conn, end_conn][int(ratio < 0.5)]:
+		if each is xSocket:
+			sock = each
+			break
 	return {
 		"distance": accum,
 		"length": total,
-		"ratio": inverse_lerp(0, total, accum),
-		"subratio" : subratio,}
+		"ratio": ratio,
+		"subratio" : subratio,
+		"socket": sock,
+		}
 
 ## Finds the vertex of a point along the wire segment.[br]
 ## Use [code]near().subratio/code] to find the [code]where[/code].
@@ -253,8 +262,7 @@ static func find_verts(box:Rect2, ori:CORN, mid:CORN, end:CORN, ratio:float=-1) 
 #region Draw Methods
 ## Draws this wire segment on canvas.
 func draw(canvas:Control, highlight:bool=false):
-	canvas.draw_circle(ori_position, X.CELL_DIA, Color.BLUE, false, 4)
-	canvas.draw_circle(end_position, X.CELL_DIA, Color.RED, false, 4)
+																																						
 	draw_along(canvas, get_rect(), corners[0], corners[1], corners[2], bend, alt_color if highlight else color)
 
 ## Given a rectangle with positive size, draw a wire.

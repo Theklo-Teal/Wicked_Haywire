@@ -37,14 +37,12 @@ func _gui_input(event: InputEvent) -> void:
 				delta = delta.length() * delta.sign()[axis] * dir
 				delta /= rect.size[axis]
 				ref_segm.bend = clamp(segm_info.bend + delta, 0, 1) 
-			else:
-				# Detach Wire
-				var rect = segm_info.rect
-				var adjust = event.position.clamp(rect.position, rect.end) 
-				if segm_info.subratio < 1:
-					ref_segm.ori_position = adjust
-				else:
-					ref_segm.end_position = adjust
+			#else:
+				## Detach Wire
+				#if segm_info.subratio < 1:
+					#ref_segm.ori_position = event.position
+				#else:
+					#ref_segm.end_position = event.position
 	
 	if event is InputEventKey and not event.is_echo():
 		match event.keycode:
@@ -80,27 +78,28 @@ func _gui_input(event: InputEvent) -> void:
 					pass
 				elif event.button_index == MOUSE_BUTTON_RIGHT:
 					# Detach wire
-					if floor(segm_info.subratio) == 0:  # Clicked near Origin
-						pass
-					elif floor(segm_info.subratio) == 2:  # Clicked near Ending
-						pass
+					if floor(segm_info.subratio) != 1:  # Not clicking on a bend.
+						ref_sock = segm_info.socket
 		elif event.is_released():
-			match event.button_index:
-				MOUSE_BUTTON_LEFT:
-					if was_dragging:
+			if was_dragging:
+				was_dragging = false
+				queue_redraw()
+				match event.button_index:
+					MOUSE_BUTTON_LEFT:
 						var ori_sock = ref_sock
-						var last_segm = ref_segm
 						if ori_sock != null:
-							if last_segm == null:
+							# Create wire
+							ref_sock = net.add_socket(event.position)
+							ref_segm = net.add_wire_segm(ori_sock, ref_sock, Input.is_key_pressed(KEY_SHIFT))
+							ref_wire = ref_segm.wire
+					MOUSE_BUTTON_RIGHT:
+						if not segm_info.is_empty() and floor(segm_info.subratio) != 1:
+							var ori_sock = segm_info.socket
+							if ori_sock != null:
 								# Create wire
 								ref_sock = net.add_socket(event.position)
 								ref_segm = net.add_wire_segm(ori_sock, ref_sock, Input.is_key_pressed(KEY_SHIFT))
 								ref_wire = ref_segm.wire
-							else:
-								# Join wire
-								pass
-					was_dragging = false
-					queue_redraw()
 
 func _mouse_over_segment(where:Vector2):
 	ref_wire = null

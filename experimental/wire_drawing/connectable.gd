@@ -1,5 +1,5 @@
 @abstract
-extends RefCounted
+extends Dijkstra.DijkstraNode
 class_name xNetConnect
 
 ## An abstract class for things that can be connected in a network, like sockets
