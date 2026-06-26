@@ -23,3 +23,8 @@ config/icon="uid://bliggdgfw3v4k"
 
 G="*uid://by86sovyik06t"
 X="*uid://bbqatt6vqkjhw"
+
+[internationalization]
+
+locale/translations=PackedStringArray("res://localization/main_menu.en.translation", "res://localization/main_menu.eo.translation", "res://localization/main_menu.pt.translation", "res://localization/sch_menu.en.translation", "res://localization/sch_menu.eo.translation", "res://localization/sch_menu.pt.translation")
+locale/locale_filter_mode=0

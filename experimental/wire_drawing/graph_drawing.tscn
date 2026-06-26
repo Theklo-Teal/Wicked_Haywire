@@ -4,6 +4,7 @@
 script/source = "extends Control
 
 #TODO Ensure no wires are created where there is already a connection.
+#TODO Allow cycling selection through overlapping wires.
 #TODO Wire deletion
 #TODO Wire detach
 #TODO Wire split
@@ -13,30 +14,66 @@ script/source = "extends Control
 #TODO Port management with wires. (Network merge and split)
 
 var net := xNetwork.new()
-var ref_sock : xSocket  ## A selected xSocket
-var ref_wire : xNetwork.xWire  ## selected xNetwork.xWire
-var ref_segm : xWireSegm ## Selected Segment
-var segm_info : Dictionary  ## Information on the selected segment.
+
+func _ready() -> void:
+	for i in range(20):
+		var coord = Vector2i(1, i + 5)
+		var sock = xSocket.new()
+		sock.mode = xSocket.INPUT if i % 2 == 0 else xSocket.OUTPUT
+		net.register_joint(coord, X.layer, sock)
+
+func _mouse_over_joint(where:Vector2):
+	var cell = X.to_grid(where).coord
+	cell = Vector3i(cell.x, cell.y, X.layer)
+	X.coord_joint = cell
+	X.sel_joint = net.netlist.joints.get(cell)
+
+func _mouse_over_wire(where:Vector2):
+	X.sel_wire = null
+	for wire in net.wires:
+		X.info_wire = wire.near(where)
+		if not X.info_wire.is_empty():
+			X.sel_wire = wire
+			X.info_wire[\"bend\"] = X.sel_wire.bend
+			break
+
+func _resize_bend(wire:xWire, ini_bend:float, ini_pos:Vector2, end_pos:Vector2):
+		var verts = wire.get_verts()
+		var short_vert = wire.get_leg(false)
+		var rect = wire.get_rect()
+		var axis = rect.size.min_axis_index()
+		var dir = 1 if ini_pos[axis] > verts[short_vert][axis] else -1
+		var delta = end_pos - ini_pos
+		var dist : float = delta.length() * delta.sign()[axis] * dir
+		dist /= rect.size[axis]
+		wire.bend = clamp(ini_bend + dist, 0, 1) 
+
 
 var start_drag : Vector2
-var was_dragging : bool
+var was_drag : bool
 func _gui_input(event: InputEvent) -> void:
+	if event is InputEventKey and not event.is_echo():
+		match event.keycode:
+			KEY_SHIFT:
+				if was_drag:
+					# Change the orientation of wire being created.
+					queue_redraw()
+			KEY_DELETE:
+				if X.sel_wire != null:
+					# Delete wire selected.
+					pass
+			KEY_ESCAPE:
+				if was_drag and X.sel_wire != null:
+					# Delete wire being pulled.
+					pass
+	
 	if event is InputEventMouseMotion:
-		queue_redraw()
+		queue_redraw()  # Redraw to show cell indicator
 		if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
-			was_dragging = true
-		if Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) and ref_segm != null:
-			if floor(segm_info.subratio) == 1:  # Clicked on Bend
-				# Resize Bend
-				var verts = ref_segm.get_verts()
-				var short_vert = ref_segm.get_leg(false)
-				var rect = ref_segm.get_rect()
-				var axis = rect.size.min_axis_index()
-				var dir = 1 if start_drag[axis] > verts[short_vert][axis] else -1
-				var delta = event.position - start_drag
-				delta = delta.length() * delta.sign()[axis] * dir
-				delta /= rect.size[axis]
-				ref_segm.bend = clamp(segm_info.bend + delta, 0, 1) 
+			was_drag = true
+		if Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) and X.sel_wire != null:
+			if floor(X.info_wire.subratio) == 1:  # Clicked on Bend
+				_resize_bend(X.sel_wire, X.info_wire.bend, start_drag, event.position)
 			#else:
 				## Detach Wire
 				#if segm_info.subratio < 1:
@@ -44,104 +81,72 @@ func _gui_input(event: InputEvent) -> void:
 				#else:
 					#ref_segm.end_position = event.position
 	
-	if event is InputEventKey and not event.is_echo():
-		match event.keycode:
-			KEY_SHIFT:
-				if was_dragging:
-					# Change the orientation of wire being created.
-					queue_redraw()
-			KEY_DELETE:
-				if ref_segm != null:
-					# Delete wire selected.
-					pass
-			KEY_ESCAPE:
-				if was_dragging and ref_segm != null:
-					# Delete wire being pulled.
-					pass
-	
 	if event is InputEventMouseButton:
 		if event.is_pressed():
 			queue_redraw()
 			start_drag = event.position
-			ref_sock = null
-			ref_wire = null
-			ref_segm = null
-			if net.get_socket(event.position) == null:
-				# If not pressing over a socket, select a wire.
-				_mouse_over_segment(event.position)
-			if ref_segm == null and event.button_index == MOUSE_BUTTON_LEFT:
-				# If no wire is pressed on, add a socket, if it doesn't exit at that place.
-				ref_sock = net.add_socket(event.position)
-			elif ref_segm != null:  # A segment was found and selected
-				if event.button_index == MOUSE_BUTTON_LEFT:
-					# Split wire
-					pass
-				elif event.button_index == MOUSE_BUTTON_RIGHT:
-					# Detach wire
-					if floor(segm_info.subratio) != 1:  # Not clicking on a bend.
-						ref_sock = segm_info.socket
+			_mouse_over_joint(event.position)
+			#if net.get_socket(event.position) == null:
+				## If not pressing over a socket, select a wire.
+				#_mouse_over_wire(event.position)
+			#if X.sel_wire == null and event.button_index == MOUSE_BUTTON_LEFT:
+				## If no wire is pressed on, add a socket, if it doesn't exit at that place.
+				#X.sel_joint = net.add_socket(event.position)
+			#elif X.sel_wire != null:  # A segment was found and selected
+				#if event.button_index == MOUSE_BUTTON_LEFT:
+					## Split wire
+					#pass
+				#elif event.button_index == MOUSE_BUTTON_RIGHT:
+					## Detach wire
+					#if floor(X.info_wire.subratio) != 1:  # Not clicking on a bend.
+						#X.sel_joint = X.info_wire.socket
 		elif event.is_released():
-			if was_dragging:
-				was_dragging = false
+			if was_drag:
+				was_drag = false
 				queue_redraw()
-				match event.button_index:
-					MOUSE_BUTTON_LEFT:
-						var ori_sock = ref_sock
-						if ori_sock != null:
-							# Create wire
-							ref_sock = net.add_socket(event.position)
-							ref_segm = net.add_wire_segm(ori_sock, ref_sock, Input.is_key_pressed(KEY_SHIFT))
-							ref_wire = ref_segm.wire
-					MOUSE_BUTTON_RIGHT:
-						if not segm_info.is_empty() and floor(segm_info.subratio) != 1:
-							var ori_sock = segm_info.socket
-							if ori_sock != null:
-								# Create wire
-								ref_sock = net.add_socket(event.position)
-								ref_segm = net.add_wire_segm(ori_sock, ref_sock, Input.is_key_pressed(KEY_SHIFT))
-								ref_wire = ref_segm.wire
+				#match event.button_index:
+					#MOUSE_BUTTON_LEFT:
+						#var ori_sock = X.sel_joint
+						#if ori_sock != null:
+							## Create wire
+							#X.sel_joint = net.add_socket(event.position)
+							#X.sel_wire = net.add_wire_segm(ori_sock, X.sel_joint, Input.is_key_pressed(KEY_SHIFT))
+					#MOUSE_BUTTON_RIGHT:
+						#if not X.info_wire.is_empty() and floor(X.info_wire.subratio) != 1:
+							#var ori_sock = X.info_wire.socket
+							#if ori_sock != null:
+								## Create wire
+								#X.sel_joint = net.add_socket(event.position)
+								#X.sel_wire = net.add_wire(ori_sock, X.sel_joint, Input.is_key_pressed(KEY_SHIFT))
 
-func _mouse_over_segment(where:Vector2):
-	ref_wire = null
-	ref_segm = null
-	for wire in net.list:
-		var found = wire.find_segment(where)
-		if found.size() == 0:
-			continue
-		#if found.size() == 1:
-		else:
-			segm_info = found[0].near(where)
-			if not segm_info.is_empty():
-				ref_segm = found[0]
-				ref_wire = wire
-				segm_info[\"bend\"] = ref_segm.bend
-				segm_info[\"rect\"] = ref_segm.get_rect()
-				break
-		#else:  #TODO Allow user to click multiple times to select a different overlapping segment.
-			#segm_info = found[0].near(where)
-			#if not segm_info.is_empty():
-				#ref_segm = found[0]
-				#ref_wire = wire
-				#segm_info[\"bend\"] = ref_segm.bend
 
 func _draw() -> void:
-	for sock in net.sockets.values():
-		sock.draw(self, ref_sock == sock)
+	# Draw stuff on the netlist
+	for coord in net.netlist.joints:
+		if coord.z != X.layer:
+			continue
+		var joint = net.netlist.joints[coord]
+		joint.draw( self, X.from_grid(Vector2i(coord.x,coord.y)), joint == X.sel_joint)
+	for wire in net.netlist.wires:
+		wire.draw(self, wire == X.sel_wire)
 	
-	# Cell Highlight
-	if not was_dragging:
+	## Cell Highlight
+	if not was_drag:
 		var clr = Color.WHITE
 		clr.a = 0.3
 		var grid = X.to_grid(get_local_mouse_position())
 		draw_circle(grid.position, X.CELL_RAD, clr)
 	
-	for wire in net.list:
-		wire.draw(self, ref_segm)
-	
-	if was_dragging and ref_sock != null:
-		var rect_size = X.to_grid(get_local_mouse_position()).position - ref_sock.position
-		var rect = Rect2(ref_sock.position, rect_size)
-		xWireSegm.draw_length(self, rect, Input.is_key_pressed(KEY_SHIFT), Color.YELLOW)
+	# Wire being pulled
+	if was_drag and X.sel_joint != null:
+		var start = X.from_grid(Vector2i(X.coord_joint.x, X.coord_joint.y))
+		var stop = X.to_grid(get_local_mouse_position()).position
+		var rect = Rect2(start, stop - start)
+		xWire.draw_length(self, rect, Input.is_key_pressed(KEY_SHIFT), Color.YELLOW)
+
+
+func _process(delta: float) -> void:
+	pass
 "
 
 [node name="Control" type="ColorRect" unique_id=1374459806]

@@ -1,5 +1,5 @@
 extends xNetConnect
-class_name xWireSegm
+#class_name xWire
 
 enum VERT { ORIGIN, MIDDLE, ENDING }
 enum CORN { NULL = -1, TOPLEFT, BOTLEFT, TOPRIGHT, BOTRIGHT }
@@ -14,6 +14,12 @@ var color := Color.GOLDENROD
 var alt_color := Color.GOLD
 
 #region Instance Information
+func get_dijkstra_connections(origin:DijkstraNode) -> Dictionary[DijkstraNode, int]:
+	var conns : Dictionary[DijkstraNode, int]
+	for each in get_connections():
+		conns[each as DijkstraNode] = 1
+	return conns
+
 func get_connections() -> Array[xNetConnect]:
 	return ori_conn + end_conn
 
@@ -147,16 +153,16 @@ func _init(box:Rect2, ori:CORN, mid:CORN, end:CORN) -> void:
 	corners = [ori, mid, end]
 
 ## Get a wire segment knowing the winding direction.
-static func from_chiral(start:Vector2, stop:Vector2, clockwise:bool) -> xWireSegm:
+static func from_chiral(start:Vector2, stop:Vector2, clockwise:bool) -> xWire:
 	var r = Rect2(start, stop - start)
 	var corns = get_corners_chi(r.size, clockwise)
-	return xWireSegm.new(r, corns[0], corns[1], corns[2])
+	return xWire.new(r, corns[0], corns[1], corns[2])
 
 ## Get a wire segment knowing we want the first line to be either the longest or shortest.
-static func from_length(start, stop, short:bool) -> xWireSegm:
+static func from_length(start, stop, short:bool) -> xWire:
 	var box = Rect2(start, stop - start)
 	var corns = get_corners_len(box.size, short)
-	return xWireSegm.new(box, corns[0], corns[1], corns[2])
+	return xWire.new(box, corns[0], corns[1], corns[2])
 
 #endregion
 

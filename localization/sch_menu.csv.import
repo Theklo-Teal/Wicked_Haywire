@@ -1,0 +1,19 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://dt4do1kvs148d"
+
+[deps]
+
+files=["res://localization/sch_menu.en.translation", "res://localization/sch_menu.eo.translation", "res://localization/sch_menu.pt.translation"]
+
+source_file="res://localization/sch_menu.csv"
+dest_files=["res://localization/sch_menu.en.translation", "res://localization/sch_menu.eo.translation", "res://localization/sch_menu.pt.translation"]
+
+[params]
+
+compress=1
+delimiter=0
+unescape_keys=false
+unescape_translations=true
