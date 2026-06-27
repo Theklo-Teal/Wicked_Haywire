@@ -4,68 +4,118 @@ class_name xNetwork
 ## A network is composed of netlists which are isolated graphs. sockets are
 ## connected by Wires and wires refer to a Port where sockets emit to or receive
 ## signals from. Ports shared between Wires mean they have a tunnel between them.
+## NOTE: Changes to the positioning of objects representing graph nodes should be
+## done here to account in indexing Dictionaries and propagate changes throughout
+## the affected network graph.
 
 var netlist := xNetData.new()
 var graphs : Array[xPort]  ## These are not stored and are reconstructed after Dijkstra mapping.
+var changed : Array[xJoint]  ## Joints that have connections changed.
 
+#region Infrastructure Classes
 class xNetData extends Resource:
 	## We have network elements in here, so they can be serialized and interchanged
 	## with loading and saving.
-	@export_storage var vias : Dictionary[StringName, xVia]
-	@export_storage var joints : Dictionary[Vector3i, xJoint]  ## For free standing joints. The key indicates coordinate on the canvas grid, with Z axis being a layer.
-	@export_storage var wires : Array[xWire]  ## Two xJoint associated with a wire.
-	@export_storage var gizmos : Dictionary[Node, int]  ## int is for layer. Other Joints should be stored in these.
+	@export_storage var joints : Dictionary[Vector3i, xJoint]  ## For free standing joints.
+	@export_storage var wires : Dictionary[int, Array]  ## An array of xWire for a given layer.
+	@export_storage var gizmos : Dictionary[int, Array]  ## An array of xGizmo for a given layer.
 
 class xNetNode extends DijkstraNode:
-	## In this variation of a Dijkstra node, [code]connected[/code] tells a
-	## connection without a wire drawn as if this node is the stop of the wire.
-	## [code]wires[/code] stores the drawn link to another node as if this is
-	## the wire start.
-	@export_storage var wired : Dictionary[xJoint, xWire]
-	func get_connections(_source_node:DijkstraNode) -> Array[DijkstraNode]:
-		var conns : Array[DijkstraNode]
-		for joint in wired.keys() + connected:
-			conns.append(joint)
-		return conns
+	pass
 
-func register_gizmo(gizmo:Node, layer:int=0):
-	netlist.gizmos[gizmo] = layer
+class xPort:
+	var value
+	var aggregate : Array
+	
+	## If the port has no values feeding in, what should it be read as?
+	static func default():
+		return 0
+	func integrate():
+		value = aggregate.reduce(func(sum, a):return sum + a, 0)
+	func read():
+		return value
+	func write(val):
+		aggregate.append(val)
 
-func register_joint(where:Vector2i, layer:int, joint:xJoint):
-	netlist.joints[Vector3i(where.x, where.y, layer)] = joint
-	if joint is xVia:
-		netlist.vias[joint.name] = joint
-
-## This registers a connection between two Joints and returns the wire used to
-## represent that connection, which parameters can later be adjusted.
-func join(start:xJoint, stop:xJoint) -> xWire:
-	var wire = xWire.from_chiral(start, stop, false)
-	start.dijkstra.wired[stop] = wire
-	stop.dijkstra.connected.append(start)
-	netlist.wires.append(wire)
-	return wire
-	#var ori = data.joints.find_key(start)
-	#var end = data.joints.find_key(stop)
-	#ori = X.from_grid(Vector2i(ori.x, ori.y))
-	#end = X.from_grid(Vector2i(end.x, end.y))
-	#var wire = xWire.from_chiral(start, stop, false)
-
-
-#region Get things
-#func get_Port(wire:xWire) -> xPort:
-	#return list.get(wire)
-#func get_Wire(port:xPort) -> Array[xWire]:
-	#var found : Array[xWire]
-	#for each in list:
-		#if list[each] == port:
-			#found.append(each)
-	#return found
-#
-### Returns an existing socket or [code]null[/code] if there's none at that coordinate.
-#func get_socket(where:Vector2) -> xSocket:
-	#var cell = X.to_grid(where)
-	#return sockets.get(cell.coord)
+@abstract class xNetConnect extends Resource:
+	#signal propagated(args:Array)  ## Called to handle propagation requests as a coroutine.
+	## Anything that can be connected in a network, like sockets
+	## and wires.
+	@export_storage var dijkstra : xNetNode
+	@export_storage var position : Vector2
+	func _init() -> void:
+		if dijkstra == null:
+			dijkstra = xNetNode.new(self)
+	@abstract func get_rect() -> Rect2
+	## How to draw this object on the [code]canvas[/code].
+	@abstract func draw(canvas:Control, highlight:bool=false)
+	
+	## Called by network propagation to inform of a position change.
+	@warning_ignore("unused_parameter")
+	func update_position(pos:Vector2, from:xNetConnect=null) -> Array:
+		position = pos
+		return [position, self]
 #endregion
+
+#region Cable Management
+## Finds the port of the endpoint joint closest to the wire.
+func get_wire_Port(wire:xWire) -> xPort:
+	var path = search(wire.dijkstra)
+	if path.is_empty(): return null
+	return path.back().port
+
+## Update length and corners of a wire according to a new position for the given end.[br]
+## This preserves chirality of the wire instance.[br]
+## NOTE: When continuously moving, like if dragging with the mouse, only call
+## this function at the end of the operation, once comitting to a position.
+## Meanwhile use the [code]xWire.draw_*()[/code] functions as if operating on
+## a dummy wire to display a preview of the movement operation to the user.
+func move_wire_chi(wire:xWire, ending:xWire.VERT, where:Vector2):
+	var other : xWire.CORN = (wire.corners[ending] + 2) % 3  as xWire.CORN  # Opposite ending.
+	var other_pos = wire.get_verts()[other]
+	var new_vec = other_pos - where
+	wire.length = new_vec.length()
+	var chiral = (wire.corners[0] < wire.corners[2]) != (wire.corners[1] % 2 == 0)
+	wire.corners = xWire.get_corners_chi(new_vec, chiral)
+	
+	var sock = search(wire.dijkstra).back()
+	if sock == null: return
+	propagate(sock.dijkstra, "update_position", sock.position, sock)
+
+## Update length and cornersof a wire according to a new position for the given end.[br]
+## This preserves whether the wire instance starts with a shorter or longer segment.[br]
+## NOTE: When continuously moving, like if dragging with the mouse, only call
+## this function at the end of the operation, once comitting to a position.
+## Meanwhile use the [code]xWire.draw_*()[/code] functions as if operating on
+## a dummy wire to display a preview of the movement operation to the user.
+func move_wire_len(wire:xWire, ending:xWire.VERT, where:Vector2):
+	var other : xWire.CORN = (wire.corners[ending] + 2) % 3  as xWire.CORN  # Opposite ending.
+	var other_pos = wire.get_verts()[other]
+	var new_vec = other_pos - where
+	wire.length = new_vec.length()
+	var short = true if wire.get_leg(false) == xWire.VERT.ORIGIN else false
+	wire.corners = xWire.get_corners_len(new_vec, short)
+	
+	var sock = search(wire.dijkstra).back()
+	if sock == null: return
+	propagate(sock.dijkstra, "update_position", sock.position, sock)
+#endregion
+
+
+#func register_gizmo(gizmo:Node, layer:int=0):
+	#netlist.gizmos.append(gizmo)
+
+## Registers and existing joint as part of this network.
+func register_joint(joint:xJoint, layer:int, coord:Vector2i):
+	netlist.joints[Vector3i(coord.x, coord.y, layer)] = joint
+	joint.position = X.from_grid(coord)
+	#NOTE: xVia are only connected by tunnel when they are wired to something.
+
+func register_wire(wire:xWire, layer:int):
+	var list = netlist.wires.get_or_add(layer, [])
+	list.append(wire)
+	changed.append_array(wire.ori_conn + wire.end_conn)
+
 #region Add Things
 ## Returns an existing socket or creates one if it doesn't exist at the coordinate.
 #func add_socket(where:Vector2) -> xSocket:
@@ -120,42 +170,65 @@ func join(start:xJoint, stop:xJoint) -> xWire:
 #endregion
 
 #region Graph Stuff
+var regenerate : bool
+func graphs_mapped(queries:Array[DijkstraQuery]):
+	super(queries)
+	
+	# Regenerate the simulation network.
+	regenerate = true
+	for graph in find_graphs(queries, true):
+		var port : xPort = null
+		for joint : xJoint in graph:
+			# Update position of relatively positioned objects.
+			if joint.dijkstra.is_target:
+				propagate(joint.dijkstra, "update_position", joint.position)
+			
+			if port == null:
+				# Haven't found a port for the graph yet.
+				port = joint.port
+				if not port in graphs:
+					graphs.append(port)
+			else:
+				# Use an existing port of one of the other nodes in the graph.
+				joint.port = port
+		if port == null:
+			# No port found on any of the joints in the graph.
+			port = xPort.new()
+			for joint : xJoint in graph:
+				joint.port = port
+				graphs.append(port)
 
 #endregion
 
 #region Simulation Stuff
-#func regenerate(...joints):
-	#for query : DijkstraQuery in mapping.callv(joints):
-		#var port = xPort.new()
-		#for dijkstra in query.endpoints:
-			#var joint : xJoint = dijkstra.get_meta("dijkstra_node_owner")
-			#joint.port = port
 
-#func setup_cycle():
-	#var outdated : Array[xJoint]
-	#for wire in wires:
-		#if wires[wire] == true:
-			#outdated.append(wire.ori_conn)
-			#outdated.append(wire.end_conn)
-	#regenerate.callv(outdated)
-#func cycle_update():
-	#for cell in sockets:
-		#var sock = sockets[cell]
-		#sock.prompt()
-#func finish_cycle():
-	#pass
+func setup_cycle():
+	if regenerate:
+		# Clean up the Ports list.
+		regenerate = false
+		var new_graphs : Array[xPort]
+		for port : xPort in graphs:
+			if port.get_reference_count() > 1:
+				# There are more things referencing this port than just in the
+				# graphs array, so they are still in use.
+				new_graphs.append(port)
+		graphs = new_graphs
 
-class xPort:
-	var value
-	var aggregate : Array
+func cycle_update():
+	for layer in netlist.gizmos:
+		for g in netlist.gizmos[layer]:
+			g.update_cycle()
+
+func finish_cycle():
+	for port in graphs:
+		port.integrate()
 	
-	## If the port has no values feeding in, what should it be read as?
-	static func default():
-		return 0
-	func integrate():
-		value = aggregate.reduce(func(sum, a):return sum + a, 0)
-	func read():
-		return value
-	func write(val):
-		aggregate.append(val)
+	var nodes : Array
+	for owner in changed:
+		if owner.dijkstra.is_target:
+			nodes.append(owner.dijkstra)
+	if not nodes.is_empty():
+		mapping(nodes)
+		changed.clear()
+		
 #endregion

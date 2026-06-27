@@ -1,4 +1,4 @@
-extends Resource
+extends xNetwork.xNetConnect
 class_name xWire
 
 ## And object defining the connection between two xJoint and how to draw it visually.
@@ -6,33 +6,60 @@ class_name xWire
 enum VERT { ORIGIN, MIDDLE, ENDING }
 enum CORN { NULL = -1, TOPLEFT, BOTLEFT, TOPRIGHT, BOTRIGHT }
 
-@export_storage var ori_conn : xJoint
-@export_storage var end_conn : xJoint
+#NOTE In this class the "position" isn't an intrisic property, but extrapolated
+# from connections and works as cache that's recomputed regularly.
+@export_storage var length : float  ## This encodes the direction and length of the wire.
+@export_storage var ori_conn : Array[xNetwork.xNetConnect]
+@export_storage var end_conn : Array[xNetwork.xNetConnect]
 @export_storage var corners : Array[CORN]  ## Sequence of corners of the rectangle the wire runs along.
 @export_storage var bend : float = 1  ## From 0 to 1, how far along the shortest end should a diagonal be done cutting the corner.
 
 var color := Color.GOLDENROD
 var alt_color := Color.GOLD
 
+## Find path to a socket and update position from wires along the way.
+func update_position(pos:Vector2, from:xNetConnect=null) -> Array:
+	var verts = all_verts(Rect2(Vector2.ZERO, get_vector()).abs())
+	if from.dijkstra.is_target:
+		position = from.position
+	else:
+		position = pos
+	position += verts[corners[0]]
+	position += get_vector()
+	return [position]
+
+
 #region Instance Information
 
-## Returns whether two xJoint are connected by this wire.[br]
-## Optionally it can be strict about the direction of connection and whether
-## That direction is backwards.
-func connects(start:xJoint, stop:xJoint, directional:=false, reversed:=false) -> bool:
-	var truth = [
-		ori_conn == start,
-		end_conn == stop,
-		ori_conn == stop,
-		end_conn == start
-		]
-	if directional:
-		return truth[2 if reversed else 0] and truth[3 if reversed else 1]
-	else:
-		return truth[0] != truth[2] and truth[1] != truth[3]
+### Returns whether two xJoint are connected by this wire.[br]
+### Optionally it can be strict about the direction of connection and whether
+### That direction is backwards.
+#func connects(start:xJoint, stop:xJoint, directional:=false, reversed:=false) -> bool:
+	#var truth = [
+		#ori_conn == start,
+		#end_conn == stop,
+		#ori_conn == stop,
+		#end_conn == start
+		#]
+	#if directional:
+		#return truth[2 if reversed else 0] and truth[3 if reversed else 1]
+	#else:
+		#return truth[0] != truth[2] and truth[1] != truth[3]
+
+## Returns a directional vector as long as [code]length[/code].
+func get_vector() -> Vector2:
+	return find_vector(corners[0], corners[2], length)
+
+## Can be used to find the direction between each corner, but also the size
+## of a wire with the given length.
+static func find_vector(start:CORN, stop:CORN, leng:float=1.0) -> Vector2:
+	const VEC = [Vector2.ZERO, Vector2.DOWN, Vector2.RIGHT, Vector2(1/sqrt(2),1/sqrt(2))]
+	var direction : Vector2 = VEC[stop] - VEC[start]
+	return direction * leng
 
 func get_rect() -> Rect2:
-	return Rect2(ori_conn.position, end_conn.position - ori_conn.position).abs()
+	return Rect2(position, get_vector()).abs()
+
 
 ## Returns which line coming from an end is either the longest or the shortest.
 func get_leg(longest:bool) -> VERT:
@@ -55,7 +82,7 @@ func get_edge(longest:bool) -> Vector2:
 	var end_axis = is_vertical(corners[1], corners[2]) as int
 	return [ori, end][int(abs(ori[ori_axis]) < abs(end[end_axis]) != longest)]
 
-## Get the positions of corners this wire segment runs along.
+## Get the positions of corners this wire segment runs along in world space.
 func get_verts(with_bend:=false) -> PackedVector2Array:
 	return find_verts(get_rect(), corners[0], corners[1], corners[2], bend if with_bend else -1.0)
 
@@ -136,14 +163,13 @@ func find_point(subratio:float) -> Vector2:
 #endregion
 
 #region Constructors
-func _init(start:xJoint, stop:xJoint, ori:CORN, mid:CORN, end:CORN) -> void:
-	ori_conn = start
-	end_conn = stop
-	var minimum = min(ori_conn.x - end_conn.x, ori_conn.y - end_conn.y)
-	var min_size = X.CELL_RAD - X.CLEARANCE
-	if minimum <= min_size:
-		mid = CORN.NULL
-	
+func _init(start:xNetwork.xNetConnect, stop:xNetwork.xNetConnect, ori:CORN, mid:CORN, end:CORN) -> void:
+	super()
+	start.dijkstra.connected.append(dijkstra)
+	stop.dijkstra.connected.append(dijkstra)
+	ori_conn.append(start)
+	end_conn.append(stop)
+	length = (stop.position - start.position).length()
 	corners = [ori, mid, end]
 
 ## Get a wire segment knowing the winding direction.

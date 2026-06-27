@@ -1,0 +1,19 @@
+KEYS,en,eo,pt
+CHECKS,Logic Gates,Logika Elemento,Guardas
+INPUT,Inputs,Enigaj,Entradas
+MEMORY,Memories,Memoroj,Memorias
+MISC,Misc.,Čiuspeca,Misc.
+PLEXERS,Plexers,Multipleksoro,Plexers
+SHIFTERS,Shifters,Forŝovigo,Deslocadors
+ALL_CHECK,ALL,ČIOM,TODOS
+ANY_CHECK,ANY,AJNA,QUALQUER
+PAR_CHECK,PAR,PARA,PARIDADE
+PUSH_BUTTON,Push Button,Klavo,Botão de Pressão
+BISTABLE,Bistable,Dustabilo,Bi-estável
+MICROCONTROLLER,MCU,Micro-Regilo,Micro-Controlador
+MONOSTABLE,Monostable,Unstabilo,Mono-estável
+SWITCH_RELAY,Switch Relay,Relajso,Comutador
+BIT_COUNTER,Bit Counter,Bito Komptilo,Contador de Bits
+BIT_SELECTOR,Bit Selector,Bito Selekto,Selector de Bits
+COMPARATOR,Comparator,Komparilo,Comparador
+SEQUENCE_GENERATOR,Sequencer,Sekvencilo,Sequenciador

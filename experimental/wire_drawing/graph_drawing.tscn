@@ -11,7 +11,6 @@ script/source = "extends Control
 #TODO Wire join
 #TODO Wire shifting (tentative)
 #TODO Wire merge (tentative)
-#TODO Port management with wires. (Network merge and split)
 
 var net := xNetwork.new()
 
@@ -20,7 +19,7 @@ func _ready() -> void:
 		var coord = Vector2i(1, i + 5)
 		var sock = xSocket.new()
 		sock.mode = xSocket.INPUT if i % 2 == 0 else xSocket.OUTPUT
-		net.register_joint(coord, X.layer, sock)
+		net.register_joint(sock, X.layer, coord)
 
 func _mouse_over_joint(where:Vector2):
 	var cell = X.to_grid(where).coord
@@ -30,7 +29,7 @@ func _mouse_over_joint(where:Vector2):
 
 func _mouse_over_wire(where:Vector2):
 	X.sel_wire = null
-	for wire in net.wires:
+	for wire in net.netlist.wires[X.layer]:
 		X.info_wire = wire.near(where)
 		if not X.info_wire.is_empty():
 			X.sel_wire = wire
@@ -104,13 +103,15 @@ func _gui_input(event: InputEvent) -> void:
 			if was_drag:
 				was_drag = false
 				queue_redraw()
-				#match event.button_index:
-					#MOUSE_BUTTON_LEFT:
-						#var ori_sock = X.sel_joint
-						#if ori_sock != null:
-							## Create wire
-							#X.sel_joint = net.add_socket(event.position)
-							#X.sel_wire = net.add_wire_segm(ori_sock, X.sel_joint, Input.is_key_pressed(KEY_SHIFT))
+				match event.button_index:
+					MOUSE_BUTTON_LEFT:
+						var ori_joint = X.sel_joint
+						if ori_joint != null:
+							# Create wire
+							X.sel_joint = xVia.new()
+							net.register_joint(X.sel_joint, X.layer, X.to_grid(event.position).coord)
+							X.sel_wire = xWire.from_length(ori_joint, X.sel_joint, Input.is_key_pressed(KEY_SHIFT))
+							net.register_wire(X.sel_wire, X.layer)
 					#MOUSE_BUTTON_RIGHT:
 						#if not X.info_wire.is_empty() and floor(X.info_wire.subratio) != 1:
 							#var ori_sock = X.info_wire.socket
@@ -126,8 +127,9 @@ func _draw() -> void:
 		if coord.z != X.layer:
 			continue
 		var joint = net.netlist.joints[coord]
-		joint.draw( self, X.from_grid(Vector2i(coord.x,coord.y)), joint == X.sel_joint)
-	for wire in net.netlist.wires:
+		joint.position = X.from_grid(Vector2i(coord.x, coord.y))
+		joint.draw(self, joint == X.sel_joint)
+	for wire in net.netlist.wires.get(X.layer, []):
 		wire.draw(self, wire == X.sel_wire)
 	
 	## Cell Highlight
@@ -145,8 +147,15 @@ func _draw() -> void:
 		xWire.draw_length(self, rect, Input.is_key_pressed(KEY_SHIFT), Color.YELLOW)
 
 
+var period : float = 0.33
+var _elapsed : float = 0
 func _process(delta: float) -> void:
-	pass
+	_elapsed += delta
+	if _elapsed > period:
+		_elapsed = 0
+		net.setup_cycle()
+		net.setup_cycle()
+		net.finish_cycle()
 "
 
 [node name="Control" type="ColorRect" unique_id=1374459806]

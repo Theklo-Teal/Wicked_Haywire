@@ -1,14 +1,21 @@
 extends RefCounted
 class_name Dijkstra
 
-## A basic pathfinding class that finds the path in a graph. It does this by setting a
-## [code]dijkstra[/code] value of travel cost to graph nodes. The travel cost is the smallest number
-## of connections towards the closest target or endpoint. Many targets are allowed.[br]
-## Generally the connection weight is one, but can be set other values.[br]
-## Anything considered a node of the graph must hold an instance of [code]Dijkstra.DijkstraNode[/code].
-
+## A basic pathfinding class that finds the path in a network. It does this by setting a
+## [code]cost[/code] value of travel on each [code]DijkstraNode[/code]. By default
+## the travel cost is the smallest number of connections towards the closest target
+## or endpoint. Many targets are allowed.[br]
+## The cost can be influenced by setting a [code]weight[/code] to each nodes,
+## which then changes the interpretation of the cost value.
 
 class DijkstraNode extends Resource:
+	## Encapsulated data for node in a graph. This could be better implement if there
+	## was "traits" programming feature.[br]
+	## Each object representing a node in a network, should hold an instance of this
+	## class. Any pathfinding operation will either read or modify this instance.[br]
+	## This class can be extended to affect things like [code]weight[/code] or
+	## how connections are found.
+	
 	var timestamp : int = 0  ## [code]Time.get_ticks_usec()[/code] at the moment of map updating. Allows telling if node is outdated.
 	@export var exclude := false  ## Whether to refuse connections to this node. [code]Dijkstra.mapping()[/code] must be called for changes to take effect. Prefer using [code]set_enabled()[/code].
 	@export var cost : int = 0  ## Cost of travelling from this node to the closest endpoint.
@@ -63,6 +70,19 @@ class DijkstraNode extends Resource:
 	func get_connections(source_node:DijkstraNode) -> Array[DijkstraNode]:
 		return connected
 	
+	## If a node owner contains the method [code]dijkstra_mapped[/code], that
+	## will be called when a mapping operation is finished and the node of
+	## that owner was involved.
+	func _graphs_mapped():
+		var owner : Object = get_meta("dijkstra_node_owner")
+		if owner != null and owner.has_method("dijkstra_mapped"):
+			owner.dijkstra_mapped()
+		graphs_mapped()
+	## What to do when this node was found while mapping a network
+	## and the mapping is finished?
+	func graphs_mapped():
+		pass
+	
 	## If [code]is_target[/code] is [code]true[/code], this function is used to
 	## return a search query object. This can be overriden to use extensions of 
 	## [code]DijkstraQuery[/code].
@@ -96,11 +116,15 @@ class DijkstraQuery:
 	func is_finished() -> bool:
 		return head >= queue.size()
 	
+	func graphs_mapped():
+		for each in queue:
+			each.graphs_mapped()
+	
 	## Performs cost calculation and returns any other targets found.[br]
 	## Target nodes found that are not origin will be stored in
 	## [code]DijkstraQuery.endpoints[/code]. This allows to find isolated networks.[br]
 	## Returns novel targets that weren't initially known.
-	func iterate(timestamp:int, known_targets:Array[DijkstraNode]) -> Array[DijkstraNode]:
+	func iterate(timestamp:int, past_targets:Array[DijkstraNode]) -> Array[DijkstraNode]:
 		if head >= queue.size():
 			printerr("Dijkstra.DijskstraQuery.iterate(): Queue Overflow!")
 			return []
@@ -120,7 +144,7 @@ class DijkstraQuery:
 			if node.is_target:
 				if node not in endpoints:
 					endpoints.append(node)
-				if not (node in novels or node in known_targets):
+				if not (node in novels or node in past_targets):
 					novels.append(node)
 			else:
 				if node.cost < 0:
@@ -138,8 +162,13 @@ func node_exclusion(exclude:bool, ...node):
 		node.exclude = exclude
 	mapping()
 
+## Something to do when a mapping operation is finished.[br]
+## By default it calls similar methods in the given [code]queries[/code].
+func graphs_mapped(queries:Array[DijkstraQuery]):
+	for each in queries:
+		each.graph_mapped()
 
-var known_targets : Array[DijkstraNode]
+var past_targets : Array[DijkstraNode]  ## We keep track of targets used and found in the last iteration, such as we can repeat the same search in the future with hindsight of discoveries.
 ## Run a search from all given targets to calculate the travel cost of any
 ## found nodes in between.[br]
 ## If no target is given, it searches from target nodes found on a past call.[br]
@@ -151,7 +180,7 @@ func mapping(...targets) -> Array[DijkstraQuery]:
 	var networks : Dictionary[DijkstraNode, DijkstraQuery]
 	
 	if targets.is_empty():
-		for each : DijkstraNode in known_targets:
+		for each : DijkstraNode in past_targets:
 			if each.get_reference_count() > 1:
 				# If the only reference to this node is in this list,
 				# it means it was meant to be deleted.
@@ -163,7 +192,7 @@ func mapping(...targets) -> Array[DijkstraQuery]:
 		networks[each] = each.new_dijkstra_network()
 		each.cost = 0
 		each.timestamp = timestamp
-	known_targets = targets
+	past_targets.assign(targets)
 	
 	var finished : int = 0
 	var head : int = 0  ## index of current network being searched
@@ -175,12 +204,13 @@ func mapping(...targets) -> Array[DijkstraQuery]:
 			continue
 		for found in curr.iterate(timestamp, targets):
 			if not found in networks:
+				# Discovered an unmentioned target
 				networks[found] = found.new_query()
-				known_targets.append(found)
+				past_targets.append(found)
 				found.cost = 0
 				found.timestamp = timestamp
 		if curr.is_finished(): finished += 1;
-		
+	graphs_mapped(networks.values())
 	return networks.values()
 
 
@@ -194,7 +224,7 @@ func mapping(...targets) -> Array[DijkstraQuery]:
 ## is not affected by this.[br]
 ## If [code]jitter[/code] is set [code]true[/code] randomly picks nodes with the
 ## same cost, potentially eliminating bias.
-func search(origin:DijkstraNode, partial:=false, jitter:=false) -> Array:
+static func search(origin:DijkstraNode, partial:=false, jitter:=false) -> Array:
 	var curr : DijkstraNode = origin
 	var path : Array[DijkstraNode] = [origin]
 	var options : Array[DijkstraNode]
@@ -221,3 +251,62 @@ func search(origin:DijkstraNode, partial:=false, jitter:=false) -> Array:
 	for node in path:
 		path_owners.append( node.get_meta("dijkstra_node_owner", node) )
 	return path_owners
+
+## Cause propagation of a function call to all owners of nodes in the same
+## graph as [code]endpoint[/code]. The owners have their functions called in
+## sequence of their path from the [code]endpoint[/code].
+## The return value of the function in one node should be an array of arguments needed
+## to relay to the call of the next.[br]
+## The propagation ends once a node is found to have greater proximity to other endpoints.[br]
+## Returns the last arrays of argument values when there are no more nodes to propagate to.
+func propagate(endpoint:DijkstraNode, method:StringName, ...args) -> Array:
+	#TODO Implement multi-threading.
+	var owner = endpoint.get_meta("dijkstra_node_owner")
+	if owner == null: return []
+	if not owner.has_method(method): return []
+	
+	var conns : Array[DijkstraNode] = [endpoint]
+	var costs : PackedInt32Array = [0]
+	var state : Array[Array] = [owner.callv(method, args)]
+	while not conns.is_empty():
+		var new_conns : Array[DijkstraNode]
+		var new_state : Array[Array]
+		var i : int = -1
+		for node : DijkstraNode in conns:
+			i += 1
+			if node.cost > costs[i]: continue
+			# Only propagate in the local minimum region of costs, meaning
+			# the affected nodes share the same endpoint as their closest.
+			owner = node.get_meta("dijkstra_node_owner")
+			if owner == null: continue
+			if not owner.has_method(method): continue
+			new_conns.append(node.connected)
+			new_state.append(owner.callv(method, state[i]))
+		conns = new_conns
+		state = new_state
+	return state
+
+## Produce separate lists for separate graphs with given mapping queries.
+## Each list only contains endpoints.[br]
+## Optionally returns lists of node owners. This excludes objects of nodes without owner.[br]
+## A network can be composed of multiple graphs, each graph being a group of
+## nodes that can find each other through connections.
+func find_graphs(queries:Array[DijkstraQuery], get_owners:=false) -> Array[Array]:
+	var graphs : Array[Array]
+	var accounted : Array[DijkstraNode]
+	for query : DijkstraQuery in queries:
+		for node in query.endpoints:
+			if node in accounted:
+				break
+			graphs.append(query.endpoints)
+			accounted.append_array(query.endpoints)
+	if get_owners:
+		var g : int = -1
+		for graph in graphs.duplicate():
+			g += 1
+			var n : int = -1
+			for node : DijkstraNode in graph:
+				n += 1
+				var owner = node.get_meta("djikstra_node_owner")
+				if owner != null: graphs[g][n] = owner
+	return graphs

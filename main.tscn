@@ -3,7 +3,7 @@
 [ext_resource type="Texture2D" uid="uid://bliggdgfw3v4k" path="res://Wicked_Haywire_Logo.png" id="1_1bvp3"]
 [ext_resource type="PackedScene" uid="uid://bnatph83g21s6" path="res://modules/InfiCanvas/Flowchart/Flowchart.tscn" id="1_ig7tw"]
 [ext_resource type="Texture2D" uid="uid://buorl1ocq0h64" path="res://assets/flags.png" id="1_lquwl"]
-[ext_resource type="Script" uid="uid://ckwx0a4u6y2ce" path="res://styles/flowchart/flowchart_style.gd" id="3_h2yge"]
+[ext_resource type="Resource" uid="uid://ciiv6lsgc672m" path="res://styles/flowchart/Blueprint.tres" id="4_7mycd"]
 [ext_resource type="Script" uid="uid://cf6g8f4qcf6wb" path="res://modules/InfiCanvas/Flowchart/Graphs/flowchart_graph_base.gd" id="4_lquwl"]
 
 [sub_resource type="GDScript" id="GDScript_0xm2m"]
@@ -12,7 +12,6 @@ script/source = "extends Node
 #TODO Mode button switches visibility of Component tray versus Analyser tray, so components can't be placed during simulation mode.
 
 @export_storage var schematic : Schematic
-@export_storage var initial_traytab = 4
 @export_storage var split_container = 180 : 
 	set(val):
 		split_container = val
@@ -21,17 +20,17 @@ script/source = "extends Node
 			%TraySplitter.split_offsets[0] = val
 
 func _ready() -> void:
+	if schematic == null:
+		schematic = Schematic.new()
+	
 	var lang = G.setts.get_value(\"0\", \"language\", \"\")
 	lang = lang if lang in LANG else OS.get_locale_language()
 	lang = lang if lang in LANG else \"en\"
 	TranslationServer.set_locale(lang)
 	%Language.select(LANG.find(lang))
 	
-	if schematic == null:
-		schematic = Schematic.new()
-	
-	%TrayTabBar.current_tab = initial_traytab
-	%Ribbon/TabContainer.current_tab = initial_traytab
+	%TrayTabBar.current_tab = G.setts.get_value(\"0\", \"ribbonbar\", 0)
+	%Ribbon/TabContainer.current_tab = G.setts.get_value(\"0\", \"ribbonbar\", 0)
 	
 	find_flowchart_style()
 	%Cell_Size.value_changed.connect( func(val):%Flowchart.appearance.cell_size = val )
@@ -69,6 +68,7 @@ func find_flowchart_style():
 #region Ribbon/Tray
 
 func _on_tray_tab_bar_tab_changed(tab: int, tabbar: TabBar) -> void:
+	G.setts.set_value(\"0\", \"ribbonbar\", tab)
 	if tab < 0:
 		%Ribbon.hide()
 	else:
@@ -84,7 +84,7 @@ func find_electronics_parts():
 		var open_button := Button.new()
 		parts_categories[dev_category].append(open_button)
 		
-		open_button.text = dev_category.capitalize()
+		open_button.text = tr(dev_category.to_upper())
 		open_button.pressed.connect(_on_part_category_toggle.bind(dev_category, true))
 		
 		%part_categories.add_child(open_button)
@@ -96,7 +96,7 @@ func find_electronics_parts():
 		parts_categories[dev_category].append(box)
 		
 		box.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		close_button.text = dev_category.capitalize()
+		close_button.text = tr(dev_category.to_upper())
 		close_button.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 		innerbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		innerbox.add_theme_constant_override(\"v_separation\", 0)
@@ -114,7 +114,7 @@ func find_electronics_parts():
 			#var part = load(full_path) #TODO load all components at start up.
 			#G.part_pallet.append(part)
 			var dev_button := Button.new()
-			dev_button.text = dev.get_basename().capitalize()
+			dev_button.text = tr(dev.get_basename().to_upper())
 			dev_button.set_meta(\"path\", full_path)
 			#dev_button.set_meta(\"refer\", part)
 			dev_button.flat = true
@@ -138,7 +138,7 @@ func _on_part_category_toggle(category:String, show:bool):
 	parts_categories[category][2].visible = show
 
 func _on_fold_devices_toggled(toggled_on: bool, butt:Button) -> void:
-	butt.text = [\"Unfold All\", \"Fold All\"][int(toggled_on)]
+	butt.text = tr([\"UNFOLD_ALL\", \"FOLD_ALL\"][int(toggled_on)])
 	for category in parts_categories:
 		_on_part_category_toggle(category, toggled_on)
 #endregion
@@ -149,7 +149,7 @@ func _on_sidebar_button_toggled(toggled_on: bool) -> void:
 	%Sidebar.visible = toggled_on
 
 func _on_sim_paused_toggled(toggled_on: bool, butt:Button) -> void:
-	butt.text = [\"Paused\", \"Running\"][int(toggled_on)]
+	butt.text = tr([\"PAUSED\", \"RUNNING\"][int(toggled_on)])
 	butt.modulate = [Color.RED, Color.LIME_GREEN][int(toggled_on)]
 	%Flowchart.call([\"pause_sim\", \"resume_sim\"][int(toggled_on)])
 
@@ -162,7 +162,7 @@ func _on_sim_rate_item_selected(index: int, butt:OptionButton) -> void:
 #region Schematic Layers
 func scheme_add_layer(title:String=\"\"):
 	if title.is_empty():
-		title = \"Layer_\" + str(%Scheme_Layers.tab_count)
+		title = tr(\"LAYER\") + \"_\" + str(%Scheme_Layers.tab_count)
 	%Scheme_Layers.add_tab(title)
 	schematic.graphs[title] = FlowchartGraphElectronics.new()
 
@@ -189,7 +189,7 @@ func scheme_rem_layer(target:String=\"\"):
 		schematic.styles.erase(target)
 	
 	if %Scheme_Layers.tab_count == 0:
-		scheme_add_layer(\"Layer_Zero\")
+		scheme_add_layer(tr(\"LAYER_ZERO\"))
 #endregion
 
 
@@ -448,14 +448,6 @@ func _on_popup_menu_pressed(idx:int, submenu:int) -> void:
 		add_graph_node(popup_devices[press_text])
 "
 
-[sub_resource type="Resource" id="Resource_1bvp3"]
-script = ExtResource("3_h2yge")
-cell_size = 100
-grid_color = Color(0.4758, 0.50040334, 0.61, 1)
-orig_color = Color(0.63, 0.59031004, 0.2331, 1)
-color = Color(0.36299998, 0.39416662, 0.55, 1)
-metadata/_custom_type_script = "uid://ckwx0a4u6y2ce"
-
 [sub_resource type="Resource" id="Resource_lquwl"]
 script = ExtResource("4_lquwl")
 
@@ -626,6 +618,7 @@ corner_detail = 5
 
 [node name="Main" type="Node" unique_id=824492953]
 script = SubResource("GDScript_0xm2m")
+metadata/_edit_vertical_guides_ = [-152.0]
 
 [node name="MarginContainer" type="MarginContainer" parent="." unique_id=1312409171]
 anchors_preset = 15
@@ -646,19 +639,24 @@ size_flags_vertical = 3
 [node name="Sidebar" type="TabContainer" parent="MarginContainer/HBoxContainer" unique_id=1541099510]
 unique_name_in_owner = true
 visible = false
-custom_minimum_size = Vector2(250, 0)
+custom_minimum_size = Vector2(300, 0)
 layout_mode = 2
 tab_alignment = 1
 current_tab = 1
+tab_0/title = "FILES"
+tab_1/title = "SETTINGS"
+tab_2/title = "HELP"
 
 [node name="Files" type="VBoxContainer" parent="MarginContainer/HBoxContainer/Sidebar" unique_id=1592542723]
 visible = false
 layout_mode = 2
 metadata/_tab_index = 0
+metadata/_tab_name = "FILES"
 
 [node name="Settings" type="VBoxContainer" parent="MarginContainer/HBoxContainer/Sidebar" unique_id=188177199]
 layout_mode = 2
 metadata/_tab_index = 1
+metadata/_tab_name = "SETTINGS"
 
 [node name="Language" type="OptionButton" parent="MarginContainer/HBoxContainer/Sidebar/Settings" unique_id=1243842138]
 unique_name_in_owner = true
@@ -679,6 +677,7 @@ popup/item_2/id = 2
 visible = false
 layout_mode = 2
 metadata/_tab_index = 2
+metadata/_tab_name = "HELP"
 
 [node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer/HBoxContainer" unique_id=1077216975]
 layout_mode = 2
@@ -770,7 +769,7 @@ metadata/_tab_name = "SCH_TAB"
 
 [node name="Label" type="Label" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/SCH_TAB" unique_id=2011389897]
 layout_mode = 2
-text = "Title: "
+text = "TITLE"
 
 [node name="LineEdit" type="LineEdit" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/SCH_TAB" unique_id=1757617770]
 custom_minimum_size = Vector2(200, 0)
@@ -779,16 +778,16 @@ text = "My_Schematic"
 
 [node name="Label2" type="Label" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/SCH_TAB" unique_id=181321867]
 layout_mode = 2
-text = "Author: "
+text = "AUTHOR"
 
 [node name="LineEdit2" type="LineEdit" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/SCH_TAB" unique_id=1810392306]
 custom_minimum_size = Vector2(200, 0)
 layout_mode = 2
-text = "Mr. Logician"
+text = "Demiurge"
 
 [node name="Label3" type="Label" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/SCH_TAB" unique_id=1491248201]
 layout_mode = 2
-text = "Date:"
+text = "DATE"
 
 [node name="LineEdit3" type="LineEdit" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/SCH_TAB" unique_id=1066086405]
 custom_minimum_size = Vector2(200, 0)
@@ -805,13 +804,13 @@ layout_mode = 2
 
 [node name="Label" type="Label" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/LAY_TAB/HBoxContainer" unique_id=1091194247]
 layout_mode = 2
-text = "Title: "
+text = "TITLE"
 
 [node name="Layer_Title" type="LineEdit" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/LAY_TAB/HBoxContainer" unique_id=358476146]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(200, 0)
 layout_mode = 2
-text = "Layer_Zero"
+text = "LAYER_ZERO"
 
 [node name="Spacer" type="Control" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/LAY_TAB/HBoxContainer" unique_id=263965334]
 layout_mode = 2
@@ -819,11 +818,11 @@ size_flags_horizontal = 3
 
 [node name="Add_Layer" type="Button" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/LAY_TAB/HBoxContainer" unique_id=1608180689]
 layout_mode = 2
-text = "+Layer"
+text = "ADD_LAY"
 
 [node name="Isolate_Layer" type="Button" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/LAY_TAB/HBoxContainer" unique_id=1393966679]
 layout_mode = 2
-text = "Isolate"
+text = "ISOLATE"
 
 [node name="ThemePicker" type="HBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/LAY_TAB" unique_id=269423435]
 unique_name_in_owner = true
@@ -831,7 +830,7 @@ layout_mode = 2
 
 [node name="Label" type="Label" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/LAY_TAB/ThemePicker" unique_id=965329182]
 layout_mode = 2
-text = "Theme :"
+text = "THEME"
 
 [node name="LineEdit" type="LineEdit" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/LAY_TAB/ThemePicker" unique_id=967858835]
 custom_minimum_size = Vector2(200, 0)
@@ -849,15 +848,15 @@ size_flags_horizontal = 3
 
 [node name="dupl_theme" type="Button" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/LAY_TAB/ThemePicker" unique_id=408443558]
 layout_mode = 2
-text = "Duplicate"
+text = "DUPLICATE"
 
 [node name="rem_theme" type="Button" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/LAY_TAB/ThemePicker" unique_id=357635897]
 layout_mode = 2
-text = "Delete"
+text = "DELETE"
 
 [node name="save_theme" type="Button" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/LAY_TAB/ThemePicker" unique_id=516930966]
 layout_mode = 2
-text = "Save"
+text = "SAVE"
 
 [node name="GridContainer" type="GridContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/LAY_TAB" unique_id=15343888]
 layout_mode = 2
@@ -870,7 +869,7 @@ layout_mode = 2
 [node name="Label" type="Label" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/LAY_TAB/GridContainer/HBoxContainer6" unique_id=353559696]
 layout_mode = 2
 size_flags_horizontal = 3
-text = "Cell Size"
+text = "CELL_SIZE"
 
 [node name="Cell_Size" type="SpinBox" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/LAY_TAB/GridContainer/HBoxContainer6" unique_id=89846456]
 unique_name_in_owner = true
@@ -882,7 +881,7 @@ layout_mode = 2
 [node name="Label" type="Label" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/LAY_TAB/GridContainer/HBoxContainer5" unique_id=1037170165]
 layout_mode = 2
 size_flags_horizontal = 3
-text = "Back Color"
+text = "BG_COLOR"
 
 [node name="Back_Color" type="ColorPickerButton" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/LAY_TAB/GridContainer/HBoxContainer5" unique_id=1938737905]
 unique_name_in_owner = true
@@ -897,7 +896,7 @@ layout_mode = 2
 [node name="Label" type="Label" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/LAY_TAB/GridContainer/HBoxContainer2" unique_id=189272052]
 layout_mode = 2
 size_flags_horizontal = 3
-text = "Origin Thickness"
+text = "ORIGIN_THICK"
 
 [node name="Orig_Thick" type="SpinBox" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/LAY_TAB/GridContainer/HBoxContainer2" unique_id=479772]
 unique_name_in_owner = true
@@ -909,7 +908,7 @@ layout_mode = 2
 [node name="Label" type="Label" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/LAY_TAB/GridContainer/HBoxContainer4" unique_id=421097848]
 layout_mode = 2
 size_flags_horizontal = 3
-text = "Origin Color"
+text = "ORIGIN_COLOR"
 
 [node name="Orig_Color" type="ColorPickerButton" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/LAY_TAB/GridContainer/HBoxContainer4" unique_id=16310371]
 unique_name_in_owner = true
@@ -924,7 +923,7 @@ layout_mode = 2
 [node name="Label" type="Label" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/LAY_TAB/GridContainer/HBoxContainer" unique_id=1982196593]
 layout_mode = 2
 size_flags_horizontal = 3
-text = "Grid Thickness"
+text = "GRID_THICK"
 
 [node name="Grid_Thick" type="SpinBox" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/LAY_TAB/GridContainer/HBoxContainer" unique_id=1129275273]
 unique_name_in_owner = true
@@ -936,7 +935,7 @@ layout_mode = 2
 [node name="Label" type="Label" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/LAY_TAB/GridContainer/HBoxContainer3" unique_id=385043306]
 layout_mode = 2
 size_flags_horizontal = 3
-text = "Grid Color"
+text = "GRID_COLOR"
 
 [node name="Grid_Color" type="ColorPickerButton" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/LAY_TAB/GridContainer/HBoxContainer3" unique_id=198879637]
 unique_name_in_owner = true
@@ -953,7 +952,7 @@ metadata/_tab_name = "SEL_TAB"
 
 [node name="Button" type="Button" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/SEL_TAB" unique_id=636941842]
 layout_mode = 2
-text = "Isolate"
+text = "ISOLATE"
 
 [node name="ANA_TAB" type="VFlowContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer" unique_id=372241032]
 visible = false
@@ -966,7 +965,7 @@ modulate = Color(6.256998e-07, 0.77758634, 0.11925071, 1)
 layout_mode = 2
 toggle_mode = true
 button_pressed = true
-text = "Running"
+text = "RUNNING"
 
 [node name="Sim_Rate" type="OptionButton" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/ANA_TAB" unique_id=1934546772]
 layout_mode = 2
@@ -1004,7 +1003,7 @@ layout_mode = 2
 [node name="fold_devices" type="Button" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/TOY_TAB/VBoxContainer" unique_id=559831295]
 layout_mode = 2
 toggle_mode = true
-text = "Unfold All"
+text = "UNFOLD_ALL"
 
 [node name="ScrollContainer2" type="ScrollContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/TOY_TAB/VBoxContainer" unique_id=1472731615]
 layout_mode = 2
@@ -1044,10 +1043,10 @@ layout_mode = 2
 size_flags_vertical = 3
 color = Color(0.36299998, 0.39416662, 0.55, 1)
 script = SubResource("GDScript_h2yge")
-appearance = SubResource("Resource_1bvp3")
+appearance = ExtResource("4_7mycd")
 update_rate = 0.01
 graph = SubResource("Resource_lquwl")
-cell_size = 50
+cell_size = 100
 grid_color = Color(0.4758, 0.50040334, 0.61, 1)
 orig_color = Color(0.63, 0.59031004, 0.2331, 1)
 chirality = 0
@@ -1078,7 +1077,7 @@ layout_mode = 0
 unique_name_in_owner = true
 layout_mode = 2
 mouse_filter = 1
-text = "Controls"
+text = "CONTROLS"
 
 [node name="ScrollContainer" type="ScrollContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/Flowchart/Human_Interface/Controls_Sidebar/Box" unique_id=975825172]
 layout_mode = 2
@@ -1112,7 +1111,7 @@ layout_mode = 0
 unique_name_in_owner = true
 layout_mode = 2
 mouse_filter = 1
-text = "Indicators"
+text = "INDICATORS"
 
 [node name="ScrollContainer" type="ScrollContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/Flowchart/Human_Interface/Indicators_Sidebar/Box" unique_id=1626965880]
 layout_mode = 2
@@ -1143,11 +1142,11 @@ theme_override_styles/button_highlight = SubResource("StyleBoxFlat_4c57u")
 current_tab = 0
 drag_to_rearrange_enabled = true
 tab_count = 1
-tab_0/title = "Layer_Zero"
+tab_0/title = "LAYER_ZERO"
 
 [node name="Add_Layer" type="Button" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/HBoxContainer" unique_id=229728377]
 layout_mode = 2
-text = "+Layer"
+text = "ADD_LAY"
 
 [node name="Confirm_Rem_Layer" type="ConfirmationDialog" parent="." unique_id=8701006]
 oversampling_override = 1.0

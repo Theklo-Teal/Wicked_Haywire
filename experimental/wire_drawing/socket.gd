@@ -14,8 +14,17 @@ func _init():
 	super()
 	dijkstra.is_target = true
 
-func draw(canvas:Control, position:Vector2, highlight:=false):
-	var rect = get_rect(position)
+## Propagate position from this joint towards network nodes that aren't endpoints.
+func dijkstra_mapped():
+	for each : Dijkstra.DijkstraNode in dijkstra.connected:
+		var owner = each.get_meta("dijkstra_node_owner")
+		if owner != null and not each.is_target:
+			if each.has_method("update_position"):
+				each.update_position(self)
+
+
+func draw(canvas:Control, highlight:=false):
+	var rect = get_rect()
 	var clr : Color = Color.YELLOW if highlight else Color.GOLDENROD
 	match mode:
 		INPUT:

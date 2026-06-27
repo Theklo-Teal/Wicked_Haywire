@@ -26,5 +26,5 @@ X="*uid://bbqatt6vqkjhw"
 
 [internationalization]
 
-locale/translations=PackedStringArray("res://localization/main_menu.en.translation", "res://localization/main_menu.eo.translation", "res://localization/main_menu.pt.translation", "res://localization/sch_menu.en.translation", "res://localization/sch_menu.eo.translation", "res://localization/sch_menu.pt.translation")
+locale/translations=PackedStringArray("res://localization/main_menu.en.translation", "res://localization/main_menu.eo.translation", "res://localization/main_menu.pt.translation", "res://localization/ribbon_menu.en.translation", "res://localization/ribbon_menu.eo.translation", "res://localization/ribbon_menu.pt.translation", "res://localization/toy_tray.en.translation", "res://localization/toy_tray.eo.translation", "res://localization/toy_tray.pt.translation")
 locale/locale_filter_mode=0

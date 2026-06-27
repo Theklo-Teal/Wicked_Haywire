@@ -1,0 +1,19 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://bry03whxu7imf"
+
+[deps]
+
+files=["res://localization/toy_tray.en.translation", "res://localization/toy_tray.eo.translation", "res://localization/toy_tray.pt.translation"]
+
+source_file="res://localization/toy_tray.csv"
+dest_files=["res://localization/toy_tray.en.translation", "res://localization/toy_tray.eo.translation", "res://localization/toy_tray.pt.translation"]
+
+[params]
+
+compress=1
+delimiter=0
+unescape_keys=false
+unescape_translations=true

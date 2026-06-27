@@ -12,3 +12,9 @@ GRID_THICK,Grid Thickness,Krado Dikeco,Espessura da Grelha
 BG_COLOR,Back Color,Ekrana Koloro,Core de Fundo
 ORIGIN_COLOR,Origin Color,Defonta Koloro,Core da Origem
 GRID_COLOR,Grid Color,Krado Koloro,Core da Grelha
+AUTHOR,Author,Aǔtoro,Autor
+DATE,Date,Dato,Data
+RUNNING,Running,Rulas,Correr
+PAUSED,Paused,Paǔzas,Pausa
+UNFOLD_ALL,Unfold All,Čiu Disfaldi,Desdobrar Tudo
+FOLD_ALL,Fold All,Čiu Faldi,Dobrar Tudo

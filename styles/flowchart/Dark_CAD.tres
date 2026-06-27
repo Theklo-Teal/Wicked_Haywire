@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="FlowchartStyle" format=3 uid="uid://bdijsg7e8sloy"]
+
+[ext_resource type="Script" uid="uid://ckwx0a4u6y2ce" path="res://styles/flowchart/flowchart_style.gd" id="1_defxv"]
+
+[resource]
+script = ExtResource("1_defxv")
+grid_color = Color(0.34781694, 0.34781697, 0.3478169, 1)
+orig_color = Color(0.5660922, 1.7688051e-06, 3.3691526e-07, 1)
+color = Color(0.15127608, 0.15127608, 0.15127605, 1)
+metadata/_custom_type_script = "uid://ckwx0a4u6y2ce"
