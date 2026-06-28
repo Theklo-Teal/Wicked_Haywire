@@ -17,6 +17,7 @@ class DijkstraNode extends Resource:
 	## how connections are found.
 	
 	var timestamp : int = 0  ## [code]Time.get_ticks_usec()[/code] at the moment of map updating. Allows telling if node is outdated.
+	var graph_id : int = -1  ## Negative means value is invalid. Unique identifier given to a collection of nodes whenever [code]find_graphs()[/code] is called, distinguishing which nodes are connected in the same graph.
 	@export var exclude := false  ## Whether to refuse connections to this node. [code]Dijkstra.mapping()[/code] must be called for changes to take effect. Prefer using [code]set_enabled()[/code].
 	@export var cost : int = 0  ## Cost of travelling from this node to the closest endpoint.
 	@export var weight : int = 1 ## Cost of connecting to this node
@@ -28,7 +29,7 @@ class DijkstraNode extends Resource:
 	## represents something in a graph.
 	func _init(owner:Object) -> void:
 		set_meta("dijkstra_node_owner", owner)
-		cost = 0 if is_target else -1
+		cost = -1
 	
 	## Connect to [code]other_node[/code].
 	func connect_node(other_node:DijkstraNode, bidirectional:=false):
@@ -131,7 +132,7 @@ class DijkstraQuery:
 		var curr : DijkstraNode = queue[head]
 		head += 1
 		var naibaro = curr.get_connections(queue[0])
-		naibaro = naibaro.filter(func(a): return not a[0].refuse_connection(curr))
+		naibaro = naibaro.filter(func(a): return not a.refuse_connection(curr))
 		var novels : Array[DijkstraNode]
 		for node in naibaro:
 			if not node in queue:
@@ -166,33 +167,34 @@ func node_exclusion(exclude:bool, ...node):
 ## By default it calls similar methods in the given [code]queries[/code].
 func graphs_mapped(queries:Array[DijkstraQuery]):
 	for each in queries:
-		each.graph_mapped()
+		each.graphs_mapped()
 
-var past_targets : Array[DijkstraNode]  ## We keep track of targets used and found in the last iteration, such as we can repeat the same search in the future with hindsight of discoveries.
+var targets : Array[DijkstraNode]  ## We keep track of targets used and found in the last iteration, such as we can repeat the same search in the future with hindsight of discoveries.
 ## Run a search from all given targets to calculate the travel cost of any
 ## found nodes in between.[br]
 ## If no target is given, it searches from target nodes found on a past call.[br]
 ## Any targets discovered along the way initiate further searches.
 ## Returns an array of all [code]DijkstraQuery[/code] generated.
 ## Each one with lists of nodes and endpoints they've found.
-func mapping(...targets) -> Array[DijkstraQuery]:
+func mapping(...these) -> Array[DijkstraQuery]:
+	
 	var timestamp : int = Time.get_ticks_usec()
 	var networks : Dictionary[DijkstraNode, DijkstraQuery]
 	
-	if targets.is_empty():
-		for each : DijkstraNode in past_targets:
+	if these.is_empty():
+		for each : DijkstraNode in targets:
 			if each.get_reference_count() > 1:
 				# If the only reference to this node is in this list,
 				# it means it was meant to be deleted.
-				targets.append(each)
-	for each in targets:
+				these.append(each)
+	for each in these:
 		if not each is DijkstraNode:
 			printerr("Dijkstra.mapping(): Not a DijkstraNode!")
 			continue
-		networks[each] = each.new_dijkstra_network()
+		networks[each] = each.new_query()
 		each.cost = 0
 		each.timestamp = timestamp
-	past_targets.assign(targets)
+	targets.assign(these)
 	
 	var finished : int = 0
 	var head : int = 0  ## index of current network being searched
@@ -206,7 +208,7 @@ func mapping(...targets) -> Array[DijkstraQuery]:
 			if not found in networks:
 				# Discovered an unmentioned target
 				networks[found] = found.new_query()
-				past_targets.append(found)
+				targets.append(found)
 				found.cost = 0
 				found.timestamp = timestamp
 		if curr.is_finished(): finished += 1;
@@ -252,42 +254,138 @@ static func search(origin:DijkstraNode, partial:=false, jitter:=false) -> Array:
 		path_owners.append( node.get_meta("dijkstra_node_owner", node) )
 	return path_owners
 
-## Cause propagation of a function call to all owners of nodes in the same
-## graph as [code]endpoint[/code]. The owners have their functions called in
-## sequence of their path from the [code]endpoint[/code].
-## The return value of the function in one node should be an array of arguments needed
-## to relay to the call of the next.[br]
-## The propagation ends once a node is found to have greater proximity to other endpoints.[br]
-## Returns the last arrays of argument values when there are no more nodes to propagate to.
-func propagate(endpoint:DijkstraNode, method:StringName, ...args) -> Array:
+
+## Finds the shortest path between the two target nodes. If there are one-way
+## connections, it will only return a path coming from [code]start[/code] and
+## entering the region of [code]stop[/code].
+func search_between(start:DijkstraNode, stop:DijkstraNode):
+	var region1 = region_of(start)
+	var region2 = region_of(stop)
+	var bridge1 : DijkstraNode
+	var bridge2 : DijkstraNode
+	var best_cost : int = -1
+	for node1 in region1:
+		for node2 in region2:
+			if node2 in node1.connected:
+				var this_cost = node1.cost + node2.cost
+				if best_cost == -1 or this_cost < best_cost:
+					bridge1 = node1
+					bridge2 = node2
+					best_cost = this_cost
+	return search(bridge1) + search(bridge2)
+
+## Find if the two nodes are in the same region.
+## Nodes of the same regions have a common target node as the closest to them.[br]
+func same_region(node1:DijkstraNode, node2:DijkstraNode) -> bool:
+	var path1 = search(node1)
+	var path2 = search(node2)
+	if path1 == null or path2 == null: return false
+	return path1.back() == path2.back()
+
+## This walks throughout the connections of target node [code]endpoint[/code] until
+## it finds nodes with more proximity to another target node. It returns the nodes
+## at the edges of the jurisdiction of [code]endpoint[/code].[br]
+func region_of(endpoint:DijkstraNode) -> Array[DijkstraNode]:
 	#TODO Implement multi-threading.
-	var owner = endpoint.get_meta("dijkstra_node_owner")
+	var conns : Array[DijkstraNode] = endpoint.connected
+	var costs : Array[int] = [endpoint.cost]
+	var edges : Array[DijkstraNode]
+	while not conns.is_empty():
+		edges = conns
+		var new_conns : Array[DijkstraNode]
+		var new_costs : Array[int]
+		var i : int = -1
+		for node in conns:
+			i += 1
+			for conn in node.connected:
+				if node.cost > costs[i] and node not in new_conns:
+					new_conns.append(node)
+					new_costs.append(node.cost)
+		conns = new_conns
+		costs = new_costs
+	return edges
+
+## Cause propagation of a function call to all owners of nodes with cost above
+## [code]origin.cost[/code] and in the same graph region as [code]origin[/code].[br]
+## Nodes of the same regions have a common target node as the closest to them.[br]
+## The owners of found nodes have their functions called in sequence of their
+## path from the [code]origin[/code].[br]
+## The return value of the method in one node should be an array of arguments needed
+## to relay to the call of the next.[br]
+## The propagation ends once a node is found to have greater proximity to other
+## endpoints, therefore exiting the same region.[br]
+## Returns the last arrays of argument values when there are no more nodes to propagate to.
+func propagate_fore(origin:DijkstraNode, method:StringName, ...args) -> Array:
+	#TODO Implement multi-threading.
+	var owner = origin.get_meta("dijkstra_node_owner")
 	if owner == null: return []
 	if not owner.has_method(method): return []
 	
-	var conns : Array[DijkstraNode] = [endpoint]
-	var costs : PackedInt32Array = [0]
+	var prev : Array[DijkstraNode] = [origin]
+	prev.append_array(origin.connected)
+	var conns : Array[DijkstraNode] = origin.connected
+	var costs : PackedInt32Array = [origin.cost]
 	var state : Array[Array] = [owner.callv(method, args)]
 	while not conns.is_empty():
-		var new_conns : Array[DijkstraNode]
-		var new_state : Array[Array]
+		var new_conns : Array[DijkstraNode] = []
+		var new_state : Array[Array] = []
 		var i : int = -1
 		for node : DijkstraNode in conns:
 			i += 1
-			if node.cost > costs[i]: continue
-			# Only propagate in the local minimum region of costs, meaning
-			# the affected nodes share the same endpoint as their closest.
+			if node.cost < costs[i]: continue
+			# Only propagate towards rising cost. At the edge of a region costs
+			# will start decreasing, so this also catches when exiting a region.
 			owner = node.get_meta("dijkstra_node_owner")
 			if owner == null: continue
 			if not owner.has_method(method): continue
-			new_conns.append(node.connected)
+			for conn in node.connected:
+				if not conn in prev:
+					prev.append(conn)
+					new_conns.append(conn)
 			new_state.append(owner.callv(method, state[i]))
 		conns = new_conns
 		state = new_state
 	return state
 
+## Cause propagation of a function call to all owners of nodes with cost below
+## [code]origin.cost[/code] and in the same graph as [code]origin[/code].[br]
+## Nodes of the same regions have a common target node as the closest to them.[br]
+## The owners of found nodes have their functions called in sequence of their
+## path from the [code]origin[/code].[br]
+## The return value of the method in one node should be an array of arguments needed
+## to relay to the call of the next.[br]
+## The propagation ends once all paths found lead to the same target node.[br]
+## Returns the last arrays of argument values when there are no more nodes to propagate to.
+func propagate_back(origin:DijkstraNode, method:StringName, ...args) -> Array:
+	return []
+
+## Cause propagation of a function call to all owners of nodes in the same graph
+## and region as [code]origin[/code].[br]
+## Nodes of the same regions have a common target node as the closest to them.[br]
+## The owners of found nodes have their functions called in sequence of their
+## path from the [code]origin[/code].[br]
+## The return value of the method in one node should be an array of arguments needed
+## to relay to the call of the next.[br]
+## The propagation ends for nodes that are at the edges of a region.[br]
+## Returns the last arrays of argument values when there are no more nodes to propagate to.
+func propagate_region(origin:DijkstraNode, method:StringName, ...args) -> Array:
+	return []
+
+## Cause propagation of a function call to all owners of nodes in the same graph
+## as [code]origin[/code] regardless of region[br]
+## The owners of found nodes have their functions called in sequence of their
+## path from the [code]origin[/code].[br]
+## The return value of the method in one node should be an array of arguments needed
+## to relay to the call of the next.[br]
+## The propagation ends once all nodes in the same graph have been visited.[br]
+## Returns the last arrays of argument values when there are no more nodes to propagate to.
+func propagate_graph(origin:DijkstraNode, method:StringName, ...args) -> Array:
+	return []
+
 ## Produce separate lists for separate graphs with given mapping queries.
-## Each list only contains endpoints.[br]
+## Each list only contains endpoints. These will have [code]DijkstraNode.graph_id[/code]
+## set to a sequential number. Call [code]graph_propagate()[/code] to set the id
+## of other nodes in the same graph.[br]
 ## Optionally returns lists of node owners. This excludes objects of nodes without owner.[br]
 ## A network can be composed of multiple graphs, each graph being a group of
 ## nodes that can find each other through connections.
@@ -295,18 +393,25 @@ func find_graphs(queries:Array[DijkstraQuery], get_owners:=false) -> Array[Array
 	var graphs : Array[Array]
 	var accounted : Array[DijkstraNode]
 	for query : DijkstraQuery in queries:
-		for node in query.endpoints:
+		var endpoints = query.endpoints + [query.queue[0]]
+		for node in endpoints:
 			if node in accounted:
 				break
-			graphs.append(query.endpoints)
-			accounted.append_array(query.endpoints)
-	if get_owners:
-		var g : int = -1
-		for graph in graphs.duplicate():
-			g += 1
-			var n : int = -1
-			for node : DijkstraNode in graph:
-				n += 1
-				var owner = node.get_meta("djikstra_node_owner")
-				if owner != null: graphs[g][n] = owner
+			graphs.append(endpoints)
+			accounted.append_array(endpoints)
+	var _graphs : Array[Array]
+	var id : int = 0
+	for graph in graphs:
+		var content : Array
+		for node : DijkstraNode in graph:
+			node.graph_id = id
+			if get_owners:
+				var owner = node.get_meta("dijkstra_node_owner")
+				if owner != null: content.append(owner)
+			else:
+				content.append(node)
+		if not content.is_empty():
+			id += 1
+			_graphs.append(content)
+		return _graphs
 	return graphs

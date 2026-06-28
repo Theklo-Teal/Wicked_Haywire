@@ -1,6 +1,8 @@
 extends Dijkstra
 class_name xNetwork
 
+signal connections_changed  ## Whenever the wiring on Joints changes, this is called.
+
 ## A network is composed of netlists which are isolated graphs. sockets are
 ## connected by Wires and wires refer to a Port where sockets emit to or receive
 ## signals from. Ports shared between Wires mean they have a tunnel between them.
@@ -80,7 +82,7 @@ func move_wire_chi(wire:xWire, ending:xWire.VERT, where:Vector2):
 	
 	var sock = search(wire.dijkstra).back()
 	if sock == null: return
-	propagate(sock.dijkstra, "update_position", sock.position, sock)
+	propagate_fore(sock.dijkstra, "update_position", sock.position, sock)
 
 ## Update length and cornersof a wire according to a new position for the given end.[br]
 ## This preserves whether the wire instance starts with a shorter or longer segment.[br]
@@ -98,7 +100,7 @@ func move_wire_len(wire:xWire, ending:xWire.VERT, where:Vector2):
 	
 	var sock = search(wire.dijkstra).back()
 	if sock == null: return
-	propagate(sock.dijkstra, "update_position", sock.position, sock)
+	propagate_fore(sock.dijkstra, "update_position", sock.position, sock)
 #endregion
 
 
@@ -107,9 +109,11 @@ func move_wire_len(wire:xWire, ending:xWire.VERT, where:Vector2):
 
 ## Registers and existing joint as part of this network.
 func register_joint(joint:xJoint, layer:int, coord:Vector2i):
+	if joint.dijkstra.is_target: targets.append(joint)
 	netlist.joints[Vector3i(coord.x, coord.y, layer)] = joint
 	joint.position = X.from_grid(coord)
-	#NOTE: xVia are only connected by tunnel when they are wired to something.
+	#NOTE: xVia are only connected by tunnel when they are wired to something. 
+	# So we don't get their tunnel name at registering.
 
 func register_wire(wire:xWire, layer:int):
 	var list = netlist.wires.get_or_add(layer, [])
@@ -173,7 +177,6 @@ func register_wire(wire:xWire, layer:int):
 var regenerate : bool
 func graphs_mapped(queries:Array[DijkstraQuery]):
 	super(queries)
-	
 	# Regenerate the simulation network.
 	regenerate = true
 	for graph in find_graphs(queries, true):
@@ -181,13 +184,14 @@ func graphs_mapped(queries:Array[DijkstraQuery]):
 		for joint : xJoint in graph:
 			# Update position of relatively positioned objects.
 			if joint.dijkstra.is_target:
-				propagate(joint.dijkstra, "update_position", joint.position)
+				propagate_fore(joint.dijkstra, "update_position", joint.position)
 			
 			if port == null:
 				# Haven't found a port for the graph yet.
 				port = joint.port
-				if not port in graphs:
-					graphs.append(port)
+				if port != null:
+					if not port in graphs:
+						graphs.append(port)
 			else:
 				# Use an existing port of one of the other nodes in the graph.
 				joint.port = port
@@ -223,12 +227,13 @@ func finish_cycle():
 	for port in graphs:
 		port.integrate()
 	
-	var nodes : Array
+	var outdated_endpoints : Array[DijkstraNode]
 	for owner in changed:
 		if owner.dijkstra.is_target:
-			nodes.append(owner.dijkstra)
-	if not nodes.is_empty():
-		mapping(nodes)
+			outdated_endpoints.append(owner.dijkstra)
+	if not changed.is_empty():
+		mapping.callv(outdated_endpoints)
 		changed.clear()
+		connections_changed.emit()
 		
 #endregion

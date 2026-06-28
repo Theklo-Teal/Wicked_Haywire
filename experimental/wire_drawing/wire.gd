@@ -8,7 +8,7 @@ enum CORN { NULL = -1, TOPLEFT, BOTLEFT, TOPRIGHT, BOTRIGHT }
 
 #NOTE In this class the "position" isn't an intrisic property, but extrapolated
 # from connections and works as cache that's recomputed regularly.
-@export_storage var length : float  ## This encodes the direction and length of the wire.
+@export_storage var vector : Vector2  ## Encodes the length and proportions of the wire.
 @export_storage var ori_conn : Array[xNetwork.xNetConnect]
 @export_storage var end_conn : Array[xNetwork.xNetConnect]
 @export_storage var corners : Array[CORN]  ## Sequence of corners of the rectangle the wire runs along.
@@ -19,14 +19,13 @@ var alt_color := Color.GOLD
 
 ## Find path to a socket and update position from wires along the way.
 func update_position(pos:Vector2, from:xNetConnect=null) -> Array:
-	var verts = all_verts(Rect2(Vector2.ZERO, get_vector()).abs())
+	var verts = all_verts(Rect2(Vector2.ZERO, vector).abs())
 	if from.dijkstra.is_target:
 		position = from.position
 	else:
 		position = pos
-	position += verts[corners[0]]
-	position += get_vector()
-	return [position]
+	position += verts[corners[0]]  # Offset the position towards the corner where the wire ends.
+	return [position + vector]
 
 
 #region Instance Information
@@ -46,19 +45,9 @@ func update_position(pos:Vector2, from:xNetConnect=null) -> Array:
 	#else:
 		#return truth[0] != truth[2] and truth[1] != truth[3]
 
-## Returns a directional vector as long as [code]length[/code].
-func get_vector() -> Vector2:
-	return find_vector(corners[0], corners[2], length)
-
-## Can be used to find the direction between each corner, but also the size
-## of a wire with the given length.
-static func find_vector(start:CORN, stop:CORN, leng:float=1.0) -> Vector2:
-	const VEC = [Vector2.ZERO, Vector2.DOWN, Vector2.RIGHT, Vector2(1/sqrt(2),1/sqrt(2))]
-	var direction : Vector2 = VEC[stop] - VEC[start]
-	return direction * leng
 
 func get_rect() -> Rect2:
-	return Rect2(position, get_vector()).abs()
+	return Rect2(position, vector).abs()
 
 
 ## Returns which line coming from an end is either the longest or the shortest.
@@ -167,9 +156,11 @@ func _init(start:xNetwork.xNetConnect, stop:xNetwork.xNetConnect, ori:CORN, mid:
 	super()
 	start.dijkstra.connected.append(dijkstra)
 	stop.dijkstra.connected.append(dijkstra)
+	dijkstra.connected.append(start.dijkstra)
+	dijkstra.connected.append(stop.dijkstra)
 	ori_conn.append(start)
 	end_conn.append(stop)
-	length = (stop.position - start.position).length()
+	vector = stop.position - start.position
 	corners = [ori, mid, end]
 
 ## Get a wire segment knowing the winding direction.
@@ -192,6 +183,11 @@ static func from_length(start:xJoint, stop:xJoint, short:bool) -> xWire:
 ## The index of the array matches [code]CORN[/code] definition.
 static func all_verts(box:Rect2) -> PackedVector2Array:
 	return [ box.position, Vector2(box.position.x, box.end.y), Vector2(box.end.x, box.position.y), box.end ]
+
+## Can be used to find the direction between each corner.
+static func find_vector(start:CORN, stop:CORN) -> Vector2:
+	const VEC = [Vector2.ZERO, Vector2.DOWN, Vector2.RIGHT, Vector2(1/sqrt(2),1/sqrt(2))]
+	return VEC[stop] - VEC[start]
 
 ## For a line between [code]start[/code] and [code]stop[/code],[br]
 ## return whether the line is vertical. It is useful in combination with

@@ -10,6 +10,7 @@ enum {
 
 @export_enum("HIZ INPUT OUTPUT BIDIR",) var mode : int
 
+
 func _init():
 	super()
 	dijkstra.is_target = true
