@@ -84,7 +84,7 @@ func find_electronics_parts():
 		var open_button := Button.new()
 		parts_categories[dev_category].append(open_button)
 		
-		open_button.text = tr(dev_category.to_upper())
+		open_button.text = dev_category.to_upper()
 		open_button.pressed.connect(_on_part_category_toggle.bind(dev_category, true))
 		
 		%part_categories.add_child(open_button)
@@ -96,7 +96,7 @@ func find_electronics_parts():
 		parts_categories[dev_category].append(box)
 		
 		box.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		close_button.text = tr(dev_category.to_upper())
+		close_button.text = dev_category.to_upper()
 		close_button.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 		innerbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		innerbox.add_theme_constant_override(\"v_separation\", 0)
@@ -114,7 +114,7 @@ func find_electronics_parts():
 			#var part = load(full_path) #TODO load all components at start up.
 			#G.part_pallet.append(part)
 			var dev_button := Button.new()
-			dev_button.text = tr(dev.get_basename().to_upper())
+			dev_button.text = dev.get_basename().to_upper()
 			dev_button.set_meta(\"path\", full_path)
 			#dev_button.set_meta(\"refer\", part)
 			dev_button.flat = true
@@ -618,7 +618,6 @@ corner_detail = 5
 
 [node name="Main" type="Node" unique_id=824492953]
 script = SubResource("GDScript_0xm2m")
-metadata/_edit_vertical_guides_ = [-152.0]
 
 [node name="MarginContainer" type="MarginContainer" parent="." unique_id=1312409171]
 anchors_preset = 15

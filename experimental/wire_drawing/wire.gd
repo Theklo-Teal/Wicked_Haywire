@@ -1,4 +1,4 @@
-extends xNetwork.xNetConnect
+extends xNetwork.xConnectable
 class_name xWire
 
 ## And object defining the connection between two xJoint and how to draw it visually.
@@ -9,8 +9,8 @@ enum CORN { NULL = -1, TOPLEFT, BOTLEFT, TOPRIGHT, BOTRIGHT }
 #NOTE In this class the "position" isn't an intrisic property, but extrapolated
 # from connections and works as cache that's recomputed regularly.
 @export_storage var vector : Vector2  ## Encodes the length and proportions of the wire.
-@export_storage var ori_conn : Array[xNetwork.xNetConnect]
-@export_storage var end_conn : Array[xNetwork.xNetConnect]
+@export_storage var ori_conn : Array[xNetwork.xConnectable]
+@export_storage var end_conn : Array[xNetwork.xConnectable]
 @export_storage var corners : Array[CORN]  ## Sequence of corners of the rectangle the wire runs along.
 @export_storage var bend : float = 1  ## From 0 to 1, how far along the shortest end should a diagonal be done cutting the corner.
 
@@ -18,7 +18,7 @@ var color := Color.GOLDENROD
 var alt_color := Color.GOLD
 
 ## Find path to a socket and update position from wires along the way.
-func update_position(pos:Vector2, from:xNetConnect=null) -> Array:
+func update_position(pos:Vector2, from:xConnectable=null) -> Array:
 	var verts = all_verts(Rect2(Vector2.ZERO, vector).abs())
 	if from.dijkstra.is_target:
 		position = from.position
@@ -26,6 +26,32 @@ func update_position(pos:Vector2, from:xNetConnect=null) -> Array:
 		position = pos
 	position += verts[corners[0]]  # Offset the position towards the corner where the wire ends.
 	return [position + vector]
+
+## Disconnects from anything at [code]ori_conn[/code] and returns what was
+## connected there.
+func clear_start_conns() -> Array[xNetwork.xConnectable]:
+	var affected : Array[xNetwork.xConnectable]
+	affected = ori_conn
+	ori_conn.clear()
+	for each in affected:
+		each.dijkstra.connected.erase(dijkstra)
+		if each is xWire:
+			each.ori_conn.erase(self)
+			each.end_conn.erase(self)
+	return affected
+
+## Disconnects from anything at [code]end_conn[/code] and returns what was
+## connected there.
+func clear_stop_conns() -> Array[xNetwork.xConnectable]:
+	var affected : Array[xNetwork.xConnectable]
+	affected = end_conn
+	end_conn.clear()
+	for each in affected:
+		each.dijkstra.connected.erase(dijkstra)
+		if each is xWire:
+			each.ori_conn.erase(self)
+			each.end_conn.erase(self)
+	return affected
 
 
 #region Instance Information
@@ -152,7 +178,7 @@ func find_point(subratio:float) -> Vector2:
 #endregion
 
 #region Constructors
-func _init(start:xNetwork.xNetConnect, stop:xNetwork.xNetConnect, ori:CORN, mid:CORN, end:CORN) -> void:
+func _init(start:xNetwork.xConnectable, stop:xNetwork.xConnectable, ori:CORN, mid:CORN, end:CORN) -> void:
 	super()
 	start.dijkstra.connected.append(dijkstra)
 	stop.dijkstra.connected.append(dijkstra)

@@ -1,4 +1,4 @@
-extends xNetwork.xNetConnect
+extends xNetwork.xConnectable
 class_name xJoint
 
 ## Basic class for nodes in a xNetwork graph. From which specialized sockets are extended.

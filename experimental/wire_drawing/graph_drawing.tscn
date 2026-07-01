@@ -5,12 +5,15 @@ script/source = "extends Control
 
 #TODO Ensure no wires are created where there is already a connection.
 #TODO Allow cycling selection through overlapping wires.
+#TODO Create wire from a socket, to empty space.
+#TODO Create wire from socket to socket.
 #TODO Wire deletion
 #TODO Wire detach
 #TODO Wire split
 #TODO Wire join
 #TODO Wire shifting (tentative)
 #TODO Wire merge (tentative)
+#TODO Check if wires adapt their shape to changes in neighbors
 
 var net := xNetwork.new()
 
@@ -20,7 +23,7 @@ func _ready() -> void:
 		var coord = Vector2i(1, i + 5)
 		var sock = xSocket.new()
 		sock.mode = xSocket.INPUT if i % 2 == 0 else xSocket.OUTPUT
-		net.register_joint(sock, X.layer, coord)
+		net.get_or_add_joint(X.from_grid(coord), X.layer,sock)
 
 func _mouse_over_joint(where:Vector2):
 	var cell = X.to_grid(where).coord
@@ -30,12 +33,10 @@ func _mouse_over_joint(where:Vector2):
 
 func _mouse_over_wire(where:Vector2):
 	X.sel_wire = null
-	for wire in net.netlist.wires[X.layer]:
-		X.info_wire = wire.near(where)
-		if not X.info_wire.is_empty():
-			X.sel_wire = wire
-			X.info_wire[\"bend\"] = X.sel_wire.bend
-			break
+	X.info_wire = net.over_wire(where, X.layer)
+	if not X.info_wire.is_empty():
+		X.sel_wire = X.info_wire.wire
+		X.info_wire[\"bend\"] = X.sel_wire.bend
 
 func _resize_bend(wire:xWire, ini_bend:float, ini_pos:Vector2, end_pos:Vector2):
 		var verts = wire.get_verts()
@@ -109,10 +110,10 @@ func _gui_input(event: InputEvent) -> void:
 						var ori_joint = X.sel_joint
 						if ori_joint != null:
 							# Create wire
-							X.sel_joint = xVia.new()
-							net.register_joint(X.sel_joint, X.layer, X.to_grid(event.position).coord)
+							X.sel_joint = net.get_or_add_joint(event.position, X.layer, xVia.new())
 							X.sel_wire = xWire.from_length(ori_joint, X.sel_joint, Input.is_key_pressed(KEY_SHIFT))
-							net.register_wire(X.sel_wire, X.layer)
+							net.pull_wire(X.sel_wire, ori_joint, X.layer)
+							net.push_wire(X.sel_wire, X.sel_joint, X.layer)
 					#MOUSE_BUTTON_RIGHT:
 						#if not X.info_wire.is_empty() and floor(X.info_wire.subratio) != 1:
 							#var ori_sock = X.info_wire.socket
