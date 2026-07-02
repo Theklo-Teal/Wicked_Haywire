@@ -1,8 +1,8 @@
 extends RefCounted
-class_name Dijkstra
+class_name FlowFetch
 
 ## A basic pathfinding class that finds the path in a network. It does this by associating
-## a [code]cost[/code] value of travel to each [code]DijkstraNode[/code]. By default
+## a [code]cost[/code] value of travel to each [code]FlowNode[/code]. By default
 ## the travel cost is the smallest number of connections towards the closest target
 ## or endpoint. Many targets are allowed.[br]
 ## The cost can be influenced by setting a [code]weight[/code] to each nodes,
@@ -22,8 +22,8 @@ class_name Dijkstra
 #TODO Allow back-tracking in `travel()` and `inverse_travel()`
 
 var timestamp : int = 0  ## [code]Time.get_ticks_usec()[/code] at the moment of map updating. Allows telling when was the last time [code]network[/code] costs were updated.
-@export_storage var network : Dictionary[DijkstraNode, Dictionary]  ## Nodes registered to an instance of this class and associated to [code]timestamp[/code], [code]weight[/code], [code]cost[/code] and [code]graph_id[/code] values independent of variables in [code]DijkstraNode[/code].
-@export_storage var targets : Array[DijkstraNode]  ## The nodes known to be targets since the last call of [code]baking()[/code].
+@export_storage var network : Dictionary[FlowNode, Dictionary]  ## Nodes registered to an instance of this class and associated to [code]timestamp[/code], [code]weight[/code], [code]cost[/code] and [code]graph_id[/code] values independent of variables in [code]FlowNode[/code].
+@export_storage var targets : Array[FlowNode]  ## The nodes known to be targets since the last call of [code]baking()[/code].
 
 enum SEEK {  ## Crawler mode
 	NODES,  ## Return list of where found nodes appear only once.
@@ -31,7 +31,7 @@ enum SEEK {  ## Crawler mode
 }
 
 class Crawler:
-	## From a given endpoint [code]DijkstraNode[/code], finds all nodes in the same
+	## From a given endpoint [code]FlowNode[/code], finds all nodes in the same
 	## graph and only once. Each time [code]iterate()[/code] is called, the search
 	## Advances, returning the iteration's new finds, so they can be analysed.[br]
 	## If something of interest is found, it doesn't need to search any further.[br]
@@ -41,23 +41,23 @@ class Crawler:
 	## connections at the same time, so it might not yet have all links filled in
 	## after all nodes have been found.[br]
 	## You may run all iterations in a single call with [code]all_iterate()[/code].
-
 	
-	var _origin : DijkstraNode
-	var ignore : Array[DijkstraNode]  ## A list of nodes to avoid visiting.
-	var excluded : Array[DijkstraNode]  ## Node with [code]DijkstraNode.exclude[/code] set [code]true[/code].
+	
+	var _origin : FlowNode
+	var ignore : Array[FlowNode]  ## A list of nodes to avoid visiting.
+	var excluded : Array[FlowNode]  ## Node with [code]FlowNode.exclude[/code] set [code]true[/code].
 	var _head : int = 0
-	var _queue : Array[DijkstraNode]  # Visited nodes. Entries ahead of `_head` are yet to be visited.
+	var _queue : Array[FlowNode]  # Visited nodes. Entries ahead of `_head` are yet to be visited.
 	
 	var _nodes_head : int = 0
-	var _prevs : Array[DijkstraNode]
-	var nodes : Array[DijkstraNode]  ## All nodes found.
+	var _prevs : Array[FlowNode]
+	var nodes : Array[FlowNode]  ## All nodes found.
 	
 	var _links_head : int = 0
 	var links : Dictionary[Array, bool]  ## [code][link_start, link_stop] -> bool[/code]; All links found. The Dictionary is being used as a Set and the [code]bool[code] means nothing.
 	
 	## Given a node to search from, set up the Crawler.
-	func _init(source:DijkstraNode, ...to_ignore):
+	func _init(source:FlowNode, ...to_ignore):
 		ignore.assign(to_ignore)
 		if source.exclude: excluded.append(source)
 		_origin = source
@@ -78,7 +78,7 @@ class Crawler:
 	## Go through all iterations in one go and return all finds. If no node is
 	## given to ignore, it uses the current [code]ignore[/code] list. Otherwise
 	## overwrites it.
-	func all_iterate(seek:=SEEK.NODES, to_ignore:Array[DijkstraNode]=[]) -> Array[Array]:
+	func all_iterate(seek:=SEEK.NODES, to_ignore:Array[FlowNode]=[]) -> Array[Array]:
 		reset()
 		if not to_ignore.is_empty():
 			ignore.assign(to_ignore)
@@ -114,7 +114,7 @@ class Crawler:
 	func iterate(seek:=SEEK.NODES) -> Array[Array]:
 		if _head >= _queue.size(): return []
 		var next_head = _queue.size()
-		for node : DijkstraNode in _queue.slice(_head, _queue.size()):
+		for node : FlowNode in _queue.slice(_head, _queue.size()):
 			if node in ignore: continue
 			for conn in node.get_connections(_origin, node):
 				if conn in ignore: continue
@@ -133,7 +133,7 @@ class Crawler:
 		_links_head = links.size()
 		return iter
 
-class DijkstraNode extends Resource:
+class FlowNode extends Resource:
 	## Encapsulated data for node in a graph. This could be better implement if there
 	## was "traits" programming feature.[br]
 	## Each object representing a node in a network, should hold an instance of this
@@ -144,11 +144,11 @@ class DijkstraNode extends Resource:
 	var timestamp : int = 0  ## [code]Time.get_ticks_usec()[/code] at the moment of map updating. Allows telling if nodes were updated at different times, possibly because they are on separate graphs.
 	@export_storage var graph_id : int = -1  ## Negative means value is invalid. Unique identifier given to a collection of nodes whenever [code]find_graphs()[/code] is called, distinguishing which nodes are connected in the same graph.
 	@export_storage var owner : Object
-	@export var exclude := false  ## Whether to refuse connections to this node. [code]Dijkstra.mapping()[/code] must be called for changes to take effect. Prefer using [code]set_enabled()[/code]. The effect of this variable depends on the implementation of [code]refuse_connection()[/code].
+	@export var exclude := false  ## Whether to refuse connections to this node. [code]FlowFetch.mapping()[/code] must be called for changes to take effect. Prefer using [code]set_enabled()[/code]. The effect of this variable depends on the implementation of [code]refuse_connection()[/code].
 	@export var cost : int = -1  ## Cost of travelling from this node to the closest endpoint.
 	@export var weight : int = 1 ## Cost of connecting to this node
 	@export var is_target := false  ## Whether this is an endpoint of the graph.
-	@export_storage var connected : Array[DijkstraNode]  ## List of nodes, representing a one-way connection with them.
+	@export_storage var connected : Array[FlowNode]  ## List of nodes, representing a one-way connection with them.
 	
 	## Include the object [code]associate[/code] to this graph node, which
 	## represents something in a graph. It is stored as [code]owner[/code].
@@ -168,26 +168,26 @@ class DijkstraNode extends Resource:
 	## By default relays [code]exclude[/code], effectively refusing all connections
 	## if set to [code]true[/code].
 	@warning_ignore("unused_parameter")
-	func refuse_connection(origin_node:DijkstraNode=null, source_node:DijkstraNode=null) -> bool:
+	func refuse_connection(origin_node:FlowNode=null, source_node:FlowNode=null) -> bool:
 		return exclude
 	
 	## The cost of the connection from [code]source_node[/code] to this one.
 	@warning_ignore("unused_parameter")
-	func get_weight(origin_node:DijkstraNode=null, source_node:DijkstraNode=null) -> int:
+	func get_weight(origin_node:FlowNode=null, source_node:FlowNode=null) -> int:
 		return weight
 	
 	## By default returns [code]connected[/code], but can be overriden for more
 	## complex behavior.
 	@warning_ignore("unused_parameter")
-	func get_connections(origin_node:DijkstraNode=null, source_node:DijkstraNode=null) -> Array[DijkstraNode]:
+	func get_connections(origin_node:FlowNode=null, source_node:FlowNode=null) -> Array[FlowNode]:
 		return connected
 	
-	## If a node owner contains the method [code]dijkstra_mapped()[/code], that
+	## If a node owner contains the method [code]FlowFetch_mapped()[/code], that
 	## will be called when a mapping operation is finished and the node of
 	## that owner was involved.
 	func _graphs_mapped():
-		if owner != null and owner.has_method("dijkstra_mapped"):
-			owner.dijkstra_mapped()
+		if owner != null and owner.has_method("FlowFetch_mapped"):
+			owner.FlowFetch_mapped()
 		graphs_mapped()
 	## What to do when this node was found while mapping a network
 	## and the mapping is finished?
@@ -199,20 +199,20 @@ class DijkstraNode extends Resource:
 ## [code]find_network_graphs()[/code] is called. It takes the Dictionary 
 ## returned by [code]baking()[/code] or [code]mapping()[/code].[br]
 ## By default it calls similar methods in the nodes of [code]queries[/code].[br]
-## NOTE: [code]find_graphs()[/code] calls [code]DijkstraNode.graphs_mapped()[/code]
+## NOTE: [code]find_graphs()[/code] calls [code]FlowNode.graphs_mapped()[/code]
 ## directly without calling this function, if at all.
-func graphs_mapped(queries:Dictionary[DijkstraNode, Crawler]):
+func graphs_mapped(queries:Dictionary[FlowNode, Crawler]):
 	for endpoint in queries:
 		var all = queries[endpoint].nodes + [endpoint]
 		for node in all:
 			node.graphs_mapped()
 
 
-## Gets the internal data of each [code]DijkstraNode[/code] in [code]network[/code] and
+## Gets the internal data of each [code]FlowNode[/code] in [code]network[/code] and
 ## updates the network with it.[br]
 ## By default updates the whole [code]network[/code] otherwise you can specify
 ## a selection.[br]
-## Usually, the weight of a link is calculated with [code]DijkstraNode.get_weight()[/code]
+## Usually, the weight of a link is calculated with [code]FlowNode.get_weight()[/code]
 ## but weights in the network are static and require an external way to update them
 ## if necessary.
 func to_network(...nodes):
@@ -228,8 +228,8 @@ func to_network(...nodes):
 ## of each corresponding node with it.[br]
 ## By default updates the whole [code]network[/code] otherwise you can specify
 ## a selection.[br]
-## Usually, the weight of a link is calculated with [code]DijkstraNode.get_weight()[/code]
-## but weights in the network are static. This sets [code]DijkstraNode.weight[/code]
+## Usually, the weight of a link is calculated with [code]FlowNode.get_weight()[/code]
+## but weights in the network are static. This sets [code]FlowNode.weight[/code]
 ## directly.
 func from_network(...nodes):
 	if nodes.is_empty(): nodes = network.keys()
@@ -242,7 +242,7 @@ func from_network(...nodes):
 ## delete nodes, that has to be done by dereferrencing them from any variable.[br]
 ## This updates the network mapping, similarly to [code]connect_nodes()[/code].
 ## [code]internal[/code] can be set to [code]true[/code], if to also update the state within
-## [code]DijkstraNode[/code] when mapping.
+## [code]FlowNode[/code] when mapping.
 func unregister(internal:=false, ...nodes):
 	var sieved = sieve_nodes(nodes)
 	var all = sieved[0] + sieved[1]
@@ -255,18 +255,18 @@ func unregister(internal:=false, ...nodes):
 
 
 ## Connect two nodes of each pair together and updates [code]network[/code].[br]
-## NOTE: It's safe to directly change a [code]DijkstraNode.connected[/code] property,
+## NOTE: It's safe to directly change a [code]FlowNode.connected[/code] property,
 ## then call [code]baking()[/code] or [code]mapping()[/code], and it would provide
 ## better ability to control the process, but this function simplifies basic cases.[br]
 ## You may use this function as a reference example on changing connections with
 ## sanitation and proper network management.
 func connect_nodes(pairs:Array[Array], bidirectional:=false, internal:=false):
-	var affected : Array[DijkstraNode]
+	var affected : Array[FlowNode]
 	for pair in pairs:
 		var start = pair[0]
 		var stop = pair[1]
 		if start == null or stop == null: continue
-		if not (start is DijkstraNode and stop is DijkstraNode): continue
+		if not (start is FlowNode and stop is FlowNode): continue
 		
 		if not stop in start.connected:
 			affected.append(start)
@@ -280,18 +280,18 @@ func connect_nodes(pairs:Array[Array], bidirectional:=false, internal:=false):
 ## Disconnect two nodes of each pair and updates [code]network[/code]. If
 ## [code]bidirectional[/code] is true, it will also disconnect one-way connections
 ## in reverse direction.[br]
-## NOTE: It's safe to directly change a [code]DijkstraNode.connected[/code] property,
+## NOTE: It's safe to directly change a [code]FlowNode.connected[/code] property,
 ## then call [code]baking()[/code] or [code]mapping()[/code], and it would provide
 ## better ability to control the process, but this function simplifies basic cases.[br]
 ## You may use this function as a reference example on changing connections with
 ## sanitation and proper network management.
 func disconnect_nodes(pairs:Array[Array], bidirectional:=false, internal:=false):
-	var affected : Array[DijkstraNode]
+	var affected : Array[FlowNode]
 	for pair in pairs:
 		var start = pair[0]
 		var stop = pair[1]
 		if start == null or stop == null: continue
-		if not (start is DijkstraNode and stop is DijkstraNode): continue
+		if not (start is FlowNode and stop is FlowNode): continue
 		
 		affected.append(start)
 		affected.append(stop)
@@ -304,9 +304,9 @@ func disconnect_nodes(pairs:Array[Array], bidirectional:=false, internal:=false)
 
 ## Set whether the given nodes are to be excluded from navigation and updates it
 ## with [code]baking()[/code]. Returns its result.[br]
-## NOTE: The Crawler won't check [code]DijkstraNode.excluded[/code] directly,
-## but call [code]DijkstraNode.refuse_connection()[/code] instead.
-func node_exclusion(exclude:bool, ...these) -> Dictionary[DijkstraNode, Crawler]:
+## NOTE: The Crawler won't check [code]FlowNode.excluded[/code] directly,
+## but call [code]FlowNode.refuse_connection()[/code] instead.
+func node_exclusion(exclude:bool, ...these) -> Dictionary[FlowNode, Crawler]:
 	var sieved = sieve_nodes(these)
 	for node in sieved[0] + sieved[1]:
 		node.exclude = exclude
@@ -318,7 +318,7 @@ func node_exclusion(exclude:bool, ...these) -> Dictionary[DijkstraNode, Crawler]
 ## Other nodes are added to [code]network[/code] if not already there and given a
 ## Dictionary with [code]cost[/code] updated, and [code]graph_id[/code] resetted.[br]
 ## If [code]internal[/code] is [code]true[/code], the weight is found through 
-## [code]DijkstraNode.get_weight()[/code] otherwise the static value in the network.[br]
+## [code]FlowNode.get_weight()[/code] otherwise the static value in the network.[br]
 ## You may choose to also update each node's [code]internal[/code] values, getting
 ## the same behavior as with [code]mapping()[/code].[br]
 ## Use [code]find_network_graphs()[/code] to update the [code]graph_id[/code].[br]
@@ -333,17 +333,17 @@ func node_exclusion(exclude:bool, ...these) -> Dictionary[DijkstraNode, Crawler]
 ## found, the network isn't updated.[br]
 ## This returns a Dictionary where the keys are endpoints and the values are their
 ## Crawler instance with information of connected nodes.
-func baking(internal:bool, ...these) -> Dictionary[DijkstraNode, Crawler]:
+func baking(internal:bool, ...these) -> Dictionary[FlowNode, Crawler]:
 	timestamp = Time.get_ticks_usec()
-	var accounting : Dictionary[DijkstraNode, Crawler]
+	var accounting : Dictionary[FlowNode, Crawler]
 	
 	# Sanitation and categorization
 	var sieved = sieve_nodes.callv(these + targets)
-	for node : DijkstraNode in sieved[0]:  # These are endpoints.
+	for node : FlowNode in sieved[0]:  # These are endpoints.
 		if not node in targets:
 			targets.append(node)
 		network.get_or_add(node, node.to_dict())
-	for node : DijkstraNode in sieved[1]:
+	for node : FlowNode in sieved[1]:
 		# These are valid, but not endpoints. They might have been included in 
 		# the arguments, because their status changed and needs updating.
 		targets.erase(node)
@@ -353,7 +353,7 @@ func baking(internal:bool, ...these) -> Dictionary[DijkstraNode, Crawler]:
 	if targets.is_empty():
 		# Search endpoints in the network
 		var netnodes = network.keys()
-		for node : DijkstraNode in netnodes:
+		for node : FlowNode in netnodes:
 			if node.is_target:
 				targets.append(node)
 		if targets.is_empty():
@@ -369,7 +369,7 @@ func baking(internal:bool, ...these) -> Dictionary[DijkstraNode, Crawler]:
 		# Still no targets? Nothing we can do.
 		return {}
 	
-	for node : DijkstraNode in targets:
+	for node : FlowNode in targets:
 		var tgt = network.get_or_add(node, node.to_dict())
 		tgt.timestamp = timestamp
 		tgt.cost = 0
@@ -384,7 +384,7 @@ func baking(internal:bool, ...these) -> Dictionary[DijkstraNode, Crawler]:
 			var crawl = accounting[orig]
 			var finds : Array[Array] = crawl.iterate(SEEK.LINKS)
 			if not crawl.is_finished():halt = false
-			for pair : Array[DijkstraNode] in finds:
+			for pair : Array[FlowNode] in finds:
 				var start = network[pair[0]]
 				var stop = network.get_or_add(pair[1], pair[1].to_dict())
 				
@@ -424,9 +424,9 @@ func baking(internal:bool, ...these) -> Dictionary[DijkstraNode, Crawler]:
 ## owners of the nodes included in the graph. If there's no owner the node itself
 ## is added.[br]
 ## Optionally also update the node's [code]internal[/code] value.
-func find_network_graphs(queries:Dictionary[DijkstraNode, Crawler], internal:=false) -> Array[Array]:
+func find_network_graphs(queries:Dictionary[FlowNode, Crawler], internal:=false) -> Array[Array]:
 	var graphs :  Array[Array]
-	var accounted : Array[DijkstraNode]
+	var accounted : Array[FlowNode]
 	for endpoint in queries:
 		var all = queries[endpoint].nodes + [endpoint]
 		for node in all:
@@ -446,28 +446,28 @@ func find_network_graphs(queries:Dictionary[DijkstraNode, Crawler], internal:=fa
 
 
 ## Run a search through all connections in target nodes in [code]these[/code].
-## If they aren't endpoints, meaning that [code]DijkstraNode.is_target[/code] is
+## If they aren't endpoints, meaning that [code]FlowNode.is_target[/code] is
 ## [code]false[/code], then It first searches an endpoint leading to them, which
 ## will slowdown the opeartion.[br]
 ## Novel endpoints discovered along the way initiate further searches, but from
 ## the time of discovery, rather than at beginning of the call.[br]
-## Use [code]find_graphs()[/code] to update [code]DijkstraNode.graph_id[/code].[br]
+## Use [code]find_graphs()[/code] to update [code]FlowNode.graph_id[/code].[br]
 ## This returns a Dictionary where the keys are endpoints and the values are their
 ## Crawler instances, with information of found nodes.
-static func mapping(...these) -> Dictionary[DijkstraNode, Crawler]:
+static func mapping(...these) -> Dictionary[FlowNode, Crawler]:
 	@warning_ignore("shadowed_variable")
 	var timestamp : int = Time.get_ticks_usec()
-	var accounting : Dictionary[DijkstraNode, Crawler]
+	var accounting : Dictionary[FlowNode, Crawler]
 	
 	# Sanitation and categorization
 	var sieved = sieve_nodes.callv(these)
 	
-	for node : DijkstraNode in sieved[0]:
+	for node : FlowNode in sieved[0]:
 		node.timestamp = timestamp
 		node.cost = 0
 		node.graph_id = -1
 		accounting[node] = Crawler.new(node)
-	for node : DijkstraNode in seek_endpoints(sieved[1]):
+	for node : FlowNode in seek_endpoints(sieved[1]):
 		if not node in accounting:
 			node.timestamp = timestamp
 			node.cost = 0
@@ -482,7 +482,7 @@ static func mapping(...these) -> Dictionary[DijkstraNode, Crawler]:
 		for orig in accounting:
 			var crawl = accounting[orig]
 			if not crawl.is_finished(): halt = false
-			for pair : Array[DijkstraNode] in crawl.iterate(SEEK.LINKS):
+			for pair : Array[FlowNode] in crawl.iterate(SEEK.LINKS):
 				if pair[1].timestamp != timestamp:
 					pair[1].timestamp = timestamp
 					pair[1].cost = -1
@@ -503,14 +503,14 @@ static func mapping(...these) -> Dictionary[DijkstraNode, Crawler]:
 ## Updates [code]graph_id[/code] in [code]DijsktraNode[/code] to distinguish each node's
 ## graph. It uses the dictionary returned by [code]mapping()[/code] and if
 ## [code]notify_mapped[/code] is [code]true[/code], will call
-## [code]DijkstraNode.graphs_mapped()[/code] on each node.[br]
+## [code]FlowNode.graphs_mapped()[/code] on each node.[br]
 ## Graphs are interconnected nodes in a network, disconnected from nodes of another graph.[br]
 ## It returns an array of node lists, each list representing a graph, with all
 ## owners of the nodes included in the graph. If there's no owner the node itself
 ## is added.[br]
-static func find_graphs(queries:Dictionary[DijkstraNode, Crawler], notify_mapped:=true) -> Array[Array]:
+static func find_graphs(queries:Dictionary[FlowNode, Crawler], notify_mapped:=true) -> Array[Array]:
 	var graphs :  Array[Array]
-	var accounted : Array[DijkstraNode]
+	var accounted : Array[FlowNode]
 	for endpoint in queries:
 		var all = queries[endpoint].nodes + [endpoint]
 		for node in all:
@@ -533,12 +533,12 @@ static func find_graphs(queries:Dictionary[DijkstraNode, Crawler], notify_mapped
 ## It returns an array containing endpoints at index 0 and one containing
 ## valid non-endpoint nodes at index 1.
 static func sieve_nodes(...these) -> Array[Array]:
-	var endpoints : Array[DijkstraNode]
-	var other : Array[DijkstraNode]
+	var endpoints : Array[FlowNode]
+	var other : Array[FlowNode]
 	for node in these:
 		if node == null:
 			continue
-		if not node is DijkstraNode:
+		if not node is FlowNode:
 			continue
 		if node.is_target:
 			if not node in endpoints:
@@ -555,12 +555,12 @@ static func sieve_nodes(...these) -> Array[Array]:
 ## This makes it robust against outdated or indeterminate graphs.[br]
 ## Use [code]search()[/code] to find the endpoint leading to a node using the
 ## pre-computed costs in mapping, which is a faster operation.
-static func seek_endpoints(...these) -> Array[DijkstraNode]:
+static func seek_endpoints(...these) -> Array[FlowNode]:
 	var sieved = sieve_nodes.callv(these)
-	var endpoints : Array[DijkstraNode] = sieved[0]
+	var endpoints : Array[FlowNode] = sieved[0]
 	for endpoint in sieved[1]:
 		var finds = Crawler.new(endpoint).all_iterate(SEEK.NODES, sieved[0])
-		for node : DijkstraNode in finds[1]:
+		for node : FlowNode in finds[1]:
 			if node.is_target and not node in endpoints:
 				endpoints.append(node)
 	return endpoints
@@ -574,9 +574,9 @@ static func seek_endpoints(...these) -> Array[DijkstraNode]:
 ## If the target can't be found, returns partial path, if told to.[br]
 ## Nodes that refuse connection during [code]mapping()[/code] will be avoided,
 ## but [code]from[/code] node is not affected by this.[br]
-static func travel(from:DijkstraNode, partial:=false) -> Array:
-	var curr : DijkstraNode = from
-	var path : Array[DijkstraNode] = [from]
+static func travel(from:FlowNode, partial:=false) -> Array:
+	var curr : FlowNode = from
+	var path : Array[FlowNode] = [from]
 	while not curr.is_target:
 		var naibaro = curr.get_connections(null, curr)
 		naibaro = naibaro.filter(func(a): return a.cost >= 0 and not a in path)
@@ -596,9 +596,9 @@ static func travel(from:DijkstraNode, partial:=false) -> Array:
 ## Finds a path away from the closest node until the edge of a
 ## region is found. Regions are sets of nodes in a graph, with a common endpoint
 ## as their closest.
-static func inverse_travel(from:DijkstraNode) -> Array:
-	var curr : DijkstraNode = from
-	var path : Array[DijkstraNode] = [from]
+static func inverse_travel(from:FlowNode) -> Array:
+	var curr : FlowNode = from
+	var path : Array[FlowNode] = [from]
 	while not curr.is_target:
 		var naibaro = curr.get_connections(null, curr)
 		naibaro = naibaro.filter(func(a): return a.cost >= 0 and a.cost >= curr.cost and not a in path)
@@ -616,11 +616,11 @@ static func inverse_travel(from:DijkstraNode) -> Array:
 ## Finds the shortest path between the two target nodes. If there are one-way
 ## connections, it will only return a path coming from [code]start[/code] and
 ## entering the region of [code]stop[/code].
-static func search_between(start:DijkstraNode, stop:DijkstraNode):
+static func search_between(start:FlowNode, stop:FlowNode):
 	var region1 = region_of(start)
 	var region2 = region_of(stop)
-	var bridge1 : DijkstraNode
-	var bridge2 : DijkstraNode
+	var bridge1 : FlowNode
+	var bridge2 : FlowNode
 	var best_cost : int = -1
 	for node1 in region1:
 		for node2 in region2:
@@ -636,7 +636,7 @@ static func search_between(start:DijkstraNode, stop:DijkstraNode):
 
 ## Find if the two nodes are in the same region.
 ## Nodes of the same regions have a common target node as the closest to them.[br]
-static func same_region(node1:DijkstraNode, node2:DijkstraNode) -> bool:
+static func same_region(node1:FlowNode, node2:FlowNode) -> bool:
 	var path1 = travel(node1)
 	var path2 = travel(node2)
 	if path1 == null or path2 == null: return false
@@ -645,14 +645,14 @@ static func same_region(node1:DijkstraNode, node2:DijkstraNode) -> bool:
 ## This walks throughout the connections of target node [code]endpoint[/code] until
 ## it finds nodes with more proximity to another target node. It returns the nodes
 ## at the edges of the jurisdiction of [code]endpoint[/code].[br]
-static func region_of(endpoint:DijkstraNode) -> Array[DijkstraNode]:
+static func region_of(endpoint:FlowNode) -> Array[FlowNode]:
 	#TODO Implement multi-threading.
-	var conns : Array[DijkstraNode] = endpoint.connected
+	var conns : Array[FlowNode] = endpoint.connected
 	var costs : Array[int] = [endpoint.cost]
-	var edges : Array[DijkstraNode]
+	var edges : Array[FlowNode]
 	while not conns.is_empty():
 		edges = conns
-		var new_conns : Array[DijkstraNode]
+		var new_conns : Array[FlowNode]
 		var new_costs : Array[int]
 		var i : int = -1
 		for node in conns:
@@ -666,7 +666,7 @@ static func region_of(endpoint:DijkstraNode) -> Array[DijkstraNode]:
 	return edges
 
 ## Returns a list of owners of the given nodes. Ignores those without a owner
-## or not [code]DijkstraNode[/code]
+## or not [code]FlowNode[/code]
 static func get_owners(...nodes) -> Array:
 	var owners : Array
 	var sieved = sieve_nodes.callv(nodes)
@@ -676,12 +676,12 @@ static func get_owners(...nodes) -> Array:
 	return owners
 
 ## Returns a list of [code]property[/code] values in owners of the given nodes.
-## Ignores those without a owner or not [code]DijkstraNode[/code].[br]
+## Ignores those without a owner or not [code]FlowNode[/code].[br]
 ## If the given property doesn't exist, uses [code]default[/code].
-static func get_owners_property(nodes:Array[DijkstraNode], property:StringName, default=null) -> Array:
+static func get_owners_property(nodes:Array[FlowNode], property:StringName, default=null) -> Array:
 	var owners : Array
 	var sieved = sieve_nodes.callv(nodes)
-	for node : DijkstraNode in sieved[0] + sieved[1]:
+	for node : FlowNode in sieved[0] + sieved[1]:
 		if node.owner != null:
 			if property in node.owner:
 				owners.append(node.owner.get(property))
@@ -690,12 +690,12 @@ static func get_owners_property(nodes:Array[DijkstraNode], property:StringName, 
 	return owners
 
 ## Returns a list of [code]method[/code] return values in owners of the given nodes.
-## Ignores those without a owner or not [code]DijkstraNode[/code][br]
+## Ignores those without a owner or not [code]FlowNode[/code][br]
 ## If the given method doesn't exist, uses [code]default[/code].
-static func get_owners_method(nodes:Array[DijkstraNode], method:StringName, default=null, ...args) -> Array:
+static func get_owners_method(nodes:Array[FlowNode], method:StringName, default=null, ...args) -> Array:
 	var owners : Array
 	var sieved = sieve_nodes.callv(nodes)
-	for node : DijkstraNode in sieved[0] + sieved[1]:
+	for node : FlowNode in sieved[0] + sieved[1]:
 		if node.owner != null:
 			if node.owner.has_method(method):
 				owners.append(node.owner.callv(method, args))
@@ -714,21 +714,21 @@ static func get_owners_method(nodes:Array[DijkstraNode], method:StringName, defa
 ## The propagation ends once a node is found to have greater proximity to other
 ## endpoints, therefore exiting the same region.[br]
 ## Returns the last arrays of argument values when there are no more nodes to propagate to.
-static func propagate_fore(origin:DijkstraNode, method:StringName, ...args) -> Array:
+static func propagate_fore(origin:FlowNode, method:StringName, ...args) -> Array:
 	#TODO Implement multi-threading.
 	if origin.owner == null: return []
 	if not origin.owner.has_method(method): return []
 	
-	var prev : Array[DijkstraNode] = [origin]
+	var prev : Array[FlowNode] = [origin]
 	prev.append_array(origin.connected)
-	var conns : Array[DijkstraNode] = origin.connected
+	var conns : Array[FlowNode] = origin.connected
 	var costs : PackedInt32Array = [origin.cost]
 	var state : Array[Array] = [origin.owner.callv(method, args)]
 	while not conns.is_empty():
-		var new_conns : Array[DijkstraNode] = []
+		var new_conns : Array[FlowNode] = []
 		var new_state : Array[Array] = []
 		var i : int = -1
-		for node : DijkstraNode in conns:
+		for node : FlowNode in conns:
 			i += 1
 			if node.cost > costs[i]: continue
 			# Only propagate towards rising cost. At the edge of a region costs
@@ -753,21 +753,21 @@ static func propagate_fore(origin:DijkstraNode, method:StringName, ...args) -> A
 ## to relay to the call of the next.[br]
 ## The propagation ends once all paths found lead to the same target node.[br]
 ## Returns the last arrays of argument values when there are no more nodes to propagate to.
-static func propagate_back(origin:DijkstraNode, method:StringName, ...args) -> Array:
+static func propagate_back(origin:FlowNode, method:StringName, ...args) -> Array:
 	#TODO Implement multi-threading.
 	if origin.owner == null: return []
 	if not origin.owner.has_method(method): return []
 	
-	var prev : Array[DijkstraNode] = [origin]
+	var prev : Array[FlowNode] = [origin]
 	prev.append_array(origin.connected)
-	var conns : Array[DijkstraNode] = origin.connected
+	var conns : Array[FlowNode] = origin.connected
 	var costs : PackedInt32Array = [origin.cost]
 	var state : Array[Array] = [origin.owner.callv(method, args)]
 	while not conns.is_empty():
-		var new_conns : Array[DijkstraNode] = []
+		var new_conns : Array[FlowNode] = []
 		var new_state : Array[Array] = []
 		var i : int = -1
-		for node : DijkstraNode in conns:
+		for node : FlowNode in conns:
 			i += 1
 			if node.cost < costs[i] and node.cost > 0 : continue
 			# Only propagate towards lowering cost. We stop propagating at cost
@@ -793,7 +793,7 @@ static func propagate_back(origin:DijkstraNode, method:StringName, ...args) -> A
 ## to relay to the call of the next.[br]
 ## The propagation ends for nodes that are at the edges of a region.[br]
 ## Returns the last arrays of argument values when there are no more nodes to propagate to.
-#func propagate_region(origin:DijkstraNode, method:StringName, ...args) -> Array:
+#func propagate_region(origin:FlowNode, method:StringName, ...args) -> Array:
 #	return []
 
 ## Cause propagation of a function call to all owners of nodes in the same graph
@@ -804,5 +804,5 @@ static func propagate_back(origin:DijkstraNode, method:StringName, ...args) -> A
 ## to relay to the call of the next.[br]
 ## The propagation ends once all nodes in the same graph have been visited.[br]
 ## Returns the last arrays of argument values when there are no more nodes to propagate to.
-#func propagate_graph(origin:DijkstraNode, method:StringName, ...args) -> Array:
+#func propagate_graph(origin:FlowNode, method:StringName, ...args) -> Array:
 #	return []

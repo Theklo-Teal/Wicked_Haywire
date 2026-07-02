@@ -755,45 +755,101 @@ layout_mode = 2
 layout_mode = 2
 size_flags_vertical = 3
 theme_override_styles/panel = SubResource("StyleBoxFlat_d13ii")
-current_tab = 1
+current_tab = 0
 tabs_position = 1
 tabs_visible = false
 
-[node name="SCH_TAB" type="GridContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer" unique_id=1430983416]
-visible = false
+[node name="SCH_TAB" type="HBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer" unique_id=1932010936]
 layout_mode = 2
-columns = 2
 metadata/_tab_index = 0
 metadata/_tab_name = "SCH_TAB"
 
-[node name="Label" type="Label" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/SCH_TAB" unique_id=2011389897]
+[node name="GridContainer" type="GridContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/SCH_TAB" unique_id=1782626663]
+layout_mode = 2
+columns = 2
+
+[node name="Label" type="Label" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/SCH_TAB/GridContainer" unique_id=2011389897]
 layout_mode = 2
 text = "TITLE"
 
-[node name="LineEdit" type="LineEdit" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/SCH_TAB" unique_id=1757617770]
+[node name="LineEdit" type="LineEdit" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/SCH_TAB/GridContainer" unique_id=1757617770]
 custom_minimum_size = Vector2(200, 0)
 layout_mode = 2
 text = "My_Schematic"
 
-[node name="Label2" type="Label" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/SCH_TAB" unique_id=181321867]
+[node name="Label2" type="Label" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/SCH_TAB/GridContainer" unique_id=181321867]
 layout_mode = 2
 text = "AUTHOR"
 
-[node name="LineEdit2" type="LineEdit" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/SCH_TAB" unique_id=1810392306]
+[node name="LineEdit2" type="LineEdit" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/SCH_TAB/GridContainer" unique_id=1810392306]
 custom_minimum_size = Vector2(200, 0)
 layout_mode = 2
 text = "Demiurge"
 
-[node name="Label3" type="Label" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/SCH_TAB" unique_id=1491248201]
+[node name="Label3" type="Label" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/SCH_TAB/GridContainer" unique_id=1491248201]
 layout_mode = 2
 text = "DATE"
 
-[node name="LineEdit3" type="LineEdit" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/SCH_TAB" unique_id=1066086405]
+[node name="LineEdit3" type="LineEdit" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/SCH_TAB/GridContainer" unique_id=1066086405]
 custom_minimum_size = Vector2(200, 0)
 layout_mode = 2
 text = "01/01/2000"
 
+[node name="Tags" type="VBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/SCH_TAB" unique_id=506840027]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Label" type="Label" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/SCH_TAB/Tags" unique_id=1559767361]
+layout_mode = 2
+text = "TAGS_LIST"
+horizontal_alignment = 1
+
+[node name="HFlowContainer" type="HFlowContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/SCH_TAB/Tags" unique_id=1238240604]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="Button" type="Button" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/SCH_TAB/Tags/HFlowContainer" unique_id=1508642382]
+layout_mode = 2
+text = "UNTAGGED"
+
+[node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/SCH_TAB" unique_id=782973453]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="HBoxContainer2" type="HBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/SCH_TAB/VBoxContainer" unique_id=421793786]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/SCH_TAB/VBoxContainer/HBoxContainer2" unique_id=1296339442]
+layout_mode = 2
+text = "VIAS_LIST"
+
+[node name="TextEdit" type="TextEdit" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/SCH_TAB/VBoxContainer/HBoxContainer2" unique_id=733243729]
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Rename Selected Via"
+
+[node name="HBoxContainer" type="HBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/SCH_TAB/VBoxContainer" unique_id=163599888]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="Via_Name" type="ItemList" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/SCH_TAB/VBoxContainer/HBoxContainer" unique_id=1204953086]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+item_count = 1
+item_0/text = "Dummy_Via"
+
+[node name="Via_Node" type="ItemList" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/SCH_TAB/VBoxContainer/HBoxContainer" unique_id=2042417473]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+item_count = 3
+item_0/text = "Layer1/joint2"
+item_1/text = "Layer1/joint7"
+item_2/text = "Layer3/joint0"
+
 [node name="LAY_TAB" type="VBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer" unique_id=74805143]
+visible = false
 layout_mode = 2
 metadata/_tab_index = 1
 metadata/_tab_name = "LAY_TAB"

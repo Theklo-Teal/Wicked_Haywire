@@ -1,4 +1,4 @@
-extends xJoint
+extends xNetwork.xJoint
 class_name xSocket
 
 enum {
@@ -9,19 +9,6 @@ enum {
 }
 
 @export_enum("HIZ INPUT OUTPUT BIDIR",) var mode : int
-
-
-func _init():
-	super()
-	dijkstra.is_target = true
-
-## Propagate position from this joint towards network nodes that aren't endpoints.
-func dijkstra_mapped():
-	for each : Dijkstra.DijkstraNode in dijkstra.connected:
-		var owner = each.get_meta("dijkstra_node_owner")
-		if owner != null and not each.is_target:
-			if each.has_method("update_position"):
-				each.update_position(self)
 
 
 func draw(canvas:Control, highlight:=false):
@@ -40,3 +27,22 @@ func draw(canvas:Control, highlight:=false):
 			rect = rect.grow(-X.CLEARANCE  / 2.0)
 			canvas.draw_rect(rect, clr, false, 2)
 			canvas.draw_circle(position, X.CELL_RAD, clr, false, 2)
+
+#region Simulation Fuctions
+#func emit(val):
+	#var port = get_port()
+	#if port != null:
+		#port.write(val)
+#
+#func query():
+	#var port = get_port()
+	#if port == null:
+		#return xNetwork.xPort.default
+	#else:
+		#return port.read()
+
+## Called during simulation update. Override this to call to [code]emit()[/code]
+## and [code]query()[code] as necessary.
+#func prompt():
+#	return
+#endregion

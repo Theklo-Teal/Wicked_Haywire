@@ -38,7 +38,7 @@ func _mouse_over_wire(where:Vector2):
 		X.sel_wire = X.info_wire.wire
 		X.info_wire[\"bend\"] = X.sel_wire.bend
 
-func _resize_bend(wire:xWire, ini_bend:float, ini_pos:Vector2, end_pos:Vector2):
+func _resize_bend(wire:xNetBase.xWire, ini_bend:float, ini_pos:Vector2, end_pos:Vector2):
 		var verts = wire.get_verts()
 		var short_vert = wire.get_leg(false)
 		var rect = wire.get_rect()
@@ -110,8 +110,8 @@ func _gui_input(event: InputEvent) -> void:
 						var ori_joint = X.sel_joint
 						if ori_joint != null:
 							# Create wire
-							X.sel_joint = net.get_or_add_joint(event.position, X.layer, xVia.new())
-							X.sel_wire = xWire.from_length(ori_joint, X.sel_joint, Input.is_key_pressed(KEY_SHIFT))
+							X.sel_joint = net.get_or_add_joint(event.position, X.layer, xNetBase.xVia.new())
+							X.sel_wire = xNetBase.xWire.from_length(ori_joint, X.sel_joint, Input.is_key_pressed(KEY_SHIFT))
 							net.pull_wire(X.sel_wire, ori_joint, X.layer)
 							net.push_wire(X.sel_wire, X.sel_joint, X.layer)
 					#MOUSE_BUTTON_RIGHT:
@@ -146,7 +146,7 @@ func _draw() -> void:
 		var start = X.from_grid(Vector2i(X.coord_joint.x, X.coord_joint.y))
 		var stop = X.to_grid(get_local_mouse_position()).position
 		var rect = Rect2(start, stop - start)
-		xWire.draw_length(self, rect, Input.is_key_pressed(KEY_SHIFT), Color.YELLOW)
+		xNetBase.xWire.draw_length(self, rect, Input.is_key_pressed(KEY_SHIFT), Color.YELLOW)
 
 
 var period : float = 0.33

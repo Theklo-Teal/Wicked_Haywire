@@ -11,9 +11,9 @@ const CLEARANCE = 4  ## Minimum distance between wires or sockets, so they don't
 var CELL_SPACING = CELL_RAD + CLEARANCE + (WIRE_THICK / 2.0)
 
 var layer : int = 0  ## Which layer is visible.
-var sel_joint : xJoint
+var sel_joint : xNetBase.xJoint
 var coord_joint : Vector3i  ## Grid coordinate of sel_joint at time of selecting it.
-var sel_wire : xWire
+var sel_wire : xNetBase.xWire
 var info_wire : Dictionary  ## Information about the sel_wire at the time of selecting it.
 
 ## Returns the actual space position snapped to the grid from a grid coordinate.
