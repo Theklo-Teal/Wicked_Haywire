@@ -321,7 +321,18 @@ class xWire extends xNetNode:
 		if not solved:
 			return {}
 		var ratio = inverse_lerp(0, total, accum)
-		var joint : xJoint = [ori_conn, end_conn][int(ratio < 0.5)]
+		var joint : xJoint = null
+		if ratio < 0.5:
+			for each in ori_conn:
+				if each is xJoint:
+					joint = each
+					break
+		else:
+			for each in end_conn:
+				if each is xJoint:
+					joint = each
+					break
+			
 		return {
 			"distance": accum,
 			"length": total,

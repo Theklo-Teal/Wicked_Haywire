@@ -40,7 +40,7 @@ func _mouse_over_wire(where:Vector2):
 
 func _resize_bend(wire:xNetBase.xWire, ini_bend:float, ini_pos:Vector2, end_pos:Vector2):
 		var verts = wire.get_verts()
-		var short_vert = wire.get_leg(false)
+		var short_vert = wire.get_segment_is(false)
 		var rect = wire.get_rect()
 		var axis = rect.size.min_axis_index()
 		var dir = 1 if ini_pos[axis] > verts[short_vert][axis] else -1
@@ -73,7 +73,7 @@ func _gui_input(event: InputEvent) -> void:
 		if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
 			was_drag = true
 			queue_redraw()
-		if Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) and X.sel_wire != null:
+		if Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) and not X.info_wire.is_empty():
 			if floor(X.info_wire.subratio) == 1:  # Clicked on Bend
 				_resize_bend(X.sel_wire, X.info_wire.bend, start_drag, event.position)
 			#else:
@@ -88,20 +88,19 @@ func _gui_input(event: InputEvent) -> void:
 			queue_redraw()
 			start_drag = event.position
 			_mouse_over_joint(event.position)
-			#if net.get_socket(event.position) == null:
-				## If not pressing over a socket, select a wire.
-				#_mouse_over_wire(event.position)
-			#if X.sel_wire == null and event.button_index == MOUSE_BUTTON_LEFT:
-				## If no wire is pressed on, add a socket, if it doesn't exit at that place.
-				#X.sel_joint = net.add_socket(event.position)
-			#elif X.sel_wire != null:  # A segment was found and selected
-				#if event.button_index == MOUSE_BUTTON_LEFT:
-					## Split wire
-					#pass
-				#elif event.button_index == MOUSE_BUTTON_RIGHT:
-					## Detach wire
-					#if floor(X.info_wire.subratio) != 1:  # Not clicking on a bend.
+			if X.sel_joint == null:
+				# If not pressing over a socket, select a wire.
+				_mouse_over_wire(event.position)
+				#FIXME Somehow this is setting X.sel_wire, but with an empty X.info_wire
+			if X.sel_wire != null:  # A segment was found and selected
+				if event.button_index == MOUSE_BUTTON_LEFT:
+					# Split wire
+					pass
+				elif event.button_index == MOUSE_BUTTON_RIGHT:
+					# Detach wire
+					if floor(X.info_wire.subratio) != 1:  # Not clicking on a bend.
 						#X.sel_joint = X.info_wire.socket
+						pass
 		elif event.is_released():
 			if was_drag:
 				was_drag = false
