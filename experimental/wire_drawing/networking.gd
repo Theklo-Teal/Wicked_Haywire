@@ -101,7 +101,7 @@ class xCrawler:
 			if conn in queue: continue
 			var accepted = not node_accept.is_valid or node_accept.call(conn)
 			if not node_find.is_valid() or node_find.call(conn):
-				if not (find_also_accept and not accepted):  # Have you heard about "imply" boolean operators? This one example.
+				if not (find_also_accept and not accepted):  # Have you heard about "imply" boolean operators? This is one example.
 					finds.append(conn)
 			if accepted:
 				queue.append(conn)
@@ -130,7 +130,7 @@ class xCrawler:
 				var accepted = not node_accept.is_valid() or node_accept.call(conn)
 				history[conn] = node  # We keep track of the nodes in the path towards a find of interest, not just finds of interest.
 				if not node_find.is_valid() or node_find.call(conn):
-					if not (find_also_accept and not accepted):  # Have you heard about "imply" boolean operators? This one example.
+					if not (find_also_accept and not accepted):  # Have you heard about "imply" boolean operators? This is one example.
 						finds.append(conn)
 				if accepted and not conn in queue:
 					queue.append(conn)
@@ -262,15 +262,12 @@ func over_wire(where:Vector2, layer:int) -> Dictionary:
 ## Returns any nodes that were disturbed by the modification of a wire.[br]
 ## By default changes both ends of a wire, but one end my be specified
 func _register_wire(wire:xWire, layer:int, ending:=xWire.VERT.MIDDLE) -> Array[xNetNode]:
-	var affected : Array[xNetNode]
+	var affected : Array[xNetNode] = [wire]
 	if netlist.wires.has(wire.layer):
 		if wire in netlist.wires[wire.layer]:
 			# Already existing wire.
 			netlist.wires.erase(wire)
-			if ending == xWire.VERT.MIDDLE or ending == xWire.VERT.ORIGIN:
-				affected.append_array(wire.clear_start_conns())
-			if ending == xWire.VERT.MIDDLE or ending == xWire.VERT.ENDING:
-				affected.append_array(wire.clear_stop_conns())
+			affected.append_array(wire.clear_connections(ending))
 	var wire_list = netlist.wires.get_or_add(layer,[])
 	wire_list.append(wire)
 	wire.layer = layer
@@ -278,16 +275,24 @@ func _register_wire(wire:xWire, layer:int, ending:=xWire.VERT.MIDDLE) -> Array[x
 
 ## Connects the Origin of [code]wire[/code] to a joint.[br]
 func pull_wire(wire:xWire, start:xJoint, layer:int):
+	var old_conns = _register_wire(wire, layer, xWire.VERT.ORIGIN)
 	var affected : Array[xNetNode] = [wire]
-	affected.append_array( _register_wire(wire, layer, xWire.VERT.ORIGIN) )
+	affected.append_array(old_conns)
 	wire.layer = layer
 	wire.ori_conn.append(start)
+	start.connected.append(wire)
 	_update_nodes.callv(affected)
 
 ## Connects the Ending of [code]wire[/code] to a joint.[br]
 ## If using an existing wire, it clears its connections and reconnects to new targets.
 func push_wire(wire: xWire, stop:xJoint, layer:int):
-	pass
+	var old_conns = _register_wire(wire, layer, xWire.VERT.ENDING)
+	var affected : Array[xNetNode] = [wire]
+	affected.append_array(old_conns)
+	wire.layer = layer
+	wire.end_conn.append(stop)
+	stop.connected.append(wire)
+	_update_nodes.callv(affected)
 
 ## Add new wire to the end of another
 func extend_wire(from: xWire, to:xWire):

@@ -69,9 +69,10 @@ func _gui_input(event: InputEvent) -> void:
 					pass
 	
 	if event is InputEventMouseMotion:
-		queue_redraw()  # Redraw to show cell indicator
+		
 		if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
 			was_drag = true
+			queue_redraw()
 		if Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) and X.sel_wire != null:
 			if floor(X.info_wire.subratio) == 1:  # Clicked on Bend
 				_resize_bend(X.sel_wire, X.info_wire.bend, start_drag, event.position)
@@ -111,7 +112,7 @@ func _gui_input(event: InputEvent) -> void:
 						if ori_joint != null:
 							# Create wire
 							X.sel_joint = net.get_or_add_joint(event.position, X.layer, xNetBase.xVia.new())
-							X.sel_wire = xNetBase.xWire.from_length(ori_joint, X.sel_joint, Input.is_key_pressed(KEY_SHIFT))
+							X.sel_wire = xNetBase.xWire.from_length(ori_joint.position, X.sel_joint.position, Input.is_key_pressed(KEY_SHIFT))
 							net.pull_wire(X.sel_wire, ori_joint, X.layer)
 							net.push_wire(X.sel_wire, X.sel_joint, X.layer)
 					#MOUSE_BUTTON_RIGHT:
@@ -134,13 +135,6 @@ func _draw() -> void:
 	for wire in net.netlist.wires.get(X.layer, []):
 		wire.draw(self, wire == X.sel_wire)
 	
-	## Cell Highlight
-	if not was_drag:
-		var clr = Color.WHITE
-		clr.a = 0.3
-		var grid = X.to_grid(get_local_mouse_position())
-		draw_circle(grid.position, X.CELL_RAD, clr)
-	
 	# Wire being pulled
 	if was_drag and X.sel_joint != null:
 		var start = X.from_grid(Vector2i(X.coord_joint.x, X.coord_joint.y))
@@ -160,6 +154,20 @@ func _process(delta: float) -> void:
 		net.finish_cycle()
 "
 
+[sub_resource type="GDScript" id="GDScript_08qwr"]
+script/source = "extends Control
+
+func _gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseMotion: queue_redraw()
+
+func _draw() -> void:
+	# Cell Highlight
+	var clr = Color.WHITE
+	clr.a = 0.3
+	var grid = X.to_grid(get_local_mouse_position())
+	draw_circle(grid.position, X.CELL_RAD, clr)
+"
+
 [node name="Control" type="ColorRect" unique_id=1374459806]
 anchors_preset = 15
 anchor_right = 1.0
@@ -168,3 +176,13 @@ grow_horizontal = 2
 grow_vertical = 2
 color = Color(0.17903998, 0.36, 0.15120001, 1)
 script = SubResource("GDScript_u6phq")
+
+[node name="Control" type="Control" parent="." unique_id=1374362918]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+script = SubResource("GDScript_08qwr")
