@@ -1,0 +1,19 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://c5ny4nwtcbmjm"
+
+[deps]
+
+files=["res://localization/gizmos.en.translation", "res://localization/gizmos.eo.translation", "res://localization/gizmos.pt.translation"]
+
+source_file="res://localization/gizmos.csv"
+dest_files=["res://localization/gizmos.en.translation", "res://localization/gizmos.eo.translation", "res://localization/gizmos.pt.translation"]
+
+[params]
+
+compress=1
+delimiter=0
+unescape_keys=false
+unescape_translations=true

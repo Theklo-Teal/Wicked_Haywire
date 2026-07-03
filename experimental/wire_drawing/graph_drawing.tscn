@@ -45,7 +45,7 @@ func _resize_bend(wire:xNetBase.xWire, ini_bend:float, ini_pos:Vector2, end_pos:
 		var axis = rect.size.min_axis_index()
 		var dir = 1 if ini_pos[axis] > verts[short_vert][axis] else -1
 		var delta = end_pos - ini_pos
-		var dist : float = delta.length() * delta.sign()[axis] * dir
+		var dist : float = delta.length() * delta.sign()[axis] * dir * 2
 		dist /= rect.size[axis]
 		wire.bend = clamp(ini_bend + dist, 0, 1) 
 
@@ -112,8 +112,12 @@ func _gui_input(event: InputEvent) -> void:
 							# Create wire
 							X.sel_joint = net.get_or_add_joint(event.position, X.layer, xNetBase.xVia.new())
 							X.sel_wire = xNetBase.xWire.from_length(ori_joint.position, X.sel_joint.position, Input.is_key_pressed(KEY_SHIFT))
-							net.pull_wire(X.sel_wire, ori_joint, X.layer)
-							net.push_wire(X.sel_wire, X.sel_joint, X.layer)
+							if ori_joint is xNetBase.xVia and ori_joint.connected.size() == 1:
+								var ori_wire : xNetBase.xWire = ori_joint.connected[0]
+								net.extend_wire(ori_wire, X.sel_wire, ori_wire.get_ending(ori_joint), xNetBase.xWire.VERT.ORIGIN)
+							else:
+								net.plug_wire(X.sel_wire, ori_joint, xNetBase.xWire.VERT.ORIGIN, X.layer)
+							net.plug_wire(X.sel_wire, X.sel_joint, xNetBase.xWire.VERT.ENDING, X.layer)
 					#MOUSE_BUTTON_RIGHT:
 						#if not X.info_wire.is_empty() and floor(X.info_wire.subratio) != 1:
 							#var ori_sock = X.info_wire.socket

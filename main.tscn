@@ -5,6 +5,8 @@
 [ext_resource type="Texture2D" uid="uid://buorl1ocq0h64" path="res://assets/flags.png" id="1_lquwl"]
 [ext_resource type="Resource" uid="uid://ciiv6lsgc672m" path="res://styles/flowchart/Blueprint.tres" id="4_7mycd"]
 [ext_resource type="Script" uid="uid://cf6g8f4qcf6wb" path="res://modules/InfiCanvas/Flowchart/Graphs/flowchart_graph_base.gd" id="4_lquwl"]
+[ext_resource type="Script" uid="uid://b07ljhmg8l7ne" path="res://modules/Sidebar.gd" id="6_7mycd"]
+[ext_resource type="Shader" uid="uid://d1gg4mr8iu7ia" path="res://modules/SidebarTray_Glass.gdshader" id="6_272bh"]
 
 [sub_resource type="GDScript" id="GDScript_0xm2m"]
 script/source = "extends Node
@@ -363,7 +365,7 @@ content_margin_left = 0.0
 content_margin_top = 0.0
 content_margin_right = 0.0
 content_margin_bottom = 0.0
-bg_color = Color(0.1, 0.1, 0.1, 0.6)
+bg_color = Color(0.18039216, 0.18039216, 0.18039216, 1)
 corner_radius_top_left = 8
 corner_radius_top_right = 8
 corner_detail = 5
@@ -448,71 +450,53 @@ func _on_popup_menu_pressed(idx:int, submenu:int) -> void:
 		add_graph_node(popup_devices[press_text])
 "
 
-[sub_resource type="Resource" id="Resource_lquwl"]
+[sub_resource type="Resource" id="Resource_272bh"]
 script = ExtResource("4_lquwl")
 
-[sub_resource type="GDScript" id="GDScript_1bvp3"]
-script/source = "extends HBoxContainer
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_7mycd"]
+shader = ExtResource("6_272bh")
+shader_parameter/blur_lod = 0.90000004275
 
-@export var minimum_width = 32
-
-func _ready() -> void:
-	%Controls_Sidebar/Box.hide()
-	%Indicators_Sidebar/Box.hide()
-	%Controls_Sidebar.custom_minimum_size.x = minimum_width
-	%Indicators_Sidebar.custom_minimum_size.x = minimum_width
-
-
-func _on_controls_sidebar_mouse_entered() -> void:
-	var final_size = %Controls_Sidebar/Box.size.x
-	%Controls_Sidebar/Box.show()
-	var tween = create_tween()
-	tween.set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
-	tween.tween_property(%Controls_Sidebar, \"custom_minimum_size:x\", final_size, 1).from_current()
-func _on_controls_sidebar_mouse_exited() -> void:
-	if not %Controls_Check.button_pressed:
-		var tween = create_tween()
-		tween.set_trans(Tween.TRANS_EXPO)
-		tween.tween_property(%Controls_Sidebar, \"custom_minimum_size:x\", minimum_width, 0.5).from_current()
-		tween.chain().tween_callback(%Controls_Sidebar/Box.hide)
-
-
-func _on_indicators_sidebar_mouse_entered() -> void:
-	var final_size = %Indicators_Sidebar/Box.size.x
-	%Indicators_Sidebar/Box.show()
-	var tween = create_tween()
-	tween.set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
-	tween.tween_property(%Indicators_Sidebar, \"custom_minimum_size:x\", final_size, 1).from_current()
-func _on_indicators_sidebar_mouse_exited() -> void:
-	if not %Indicators_Check.button_pressed:
-		var tween = create_tween()
-		tween.set_trans(Tween.TRANS_EXPO)
-		tween.tween_property(%Indicators_Sidebar, \"custom_minimum_size:x\", minimum_width, 0.5).from_current()
-		tween.chain().tween_callback(%Indicators_Sidebar/Box.hide)
-"
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_h2yge"]
-content_margin_left = 0.0
-content_margin_top = 0.0
-content_margin_right = 0.0
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_1u8w0"]
+content_margin_left = 6.0
+content_margin_top = 12.0
+content_margin_right = 6.0
 content_margin_bottom = 0.0
-bg_color = Color(0.1, 0.1, 0.1, 0.6)
-border_width_right = 4
+bg_color = Color(0, 0, 0, 0.24705882)
+border_width_top = 8
+border_color = Color(1, 1, 1, 0.38039216)
 border_blend = true
-corner_radius_top_right = 20
-corner_radius_bottom_right = 20
+corner_radius_top_right = 6
+corner_radius_bottom_right = 12
 corner_detail = 5
+shadow_color = Color(0, 0, 0, 0.2901961)
+shadow_size = 6
+shadow_offset = Vector2(3, 4)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_074og"]
+content_margin_left = 6.0
+content_margin_top = 12.0
+content_margin_right = 6.0
+content_margin_bottom = 0.0
+bg_color = Color(0, 0, 0, 0.24705882)
+border_width_top = 8
+border_color = Color(1, 1, 1, 0.38039216)
+border_blend = true
+corner_radius_top_left = 6
+corner_radius_bottom_left = 12
+corner_detail = 5
+shadow_color = Color(0, 0, 0, 0.2901961)
+shadow_size = 6
+shadow_offset = Vector2(-3, 4)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_0odxb"]
 content_margin_left = 0.0
 content_margin_top = 0.0
 content_margin_right = 0.0
 content_margin_bottom = 0.0
-bg_color = Color(0.1, 0.1, 0.1, 0.6)
-border_width_left = 4
-border_blend = true
-corner_radius_top_left = 20
-corner_radius_bottom_left = 20
+bg_color = Color(0.18039216, 0.18039216, 0.18039216, 1)
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
 corner_detail = 5
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_1bvp3"]
@@ -527,7 +511,6 @@ border_color = Color(0.175, 0.175, 0.175, 1)
 corner_radius_top_left = 6
 corner_radius_top_right = 20
 corner_detail = 5
-expand_margin_bottom = 4.0
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_lquwl"]
 content_margin_left = 10.0
@@ -554,8 +537,6 @@ border_color = Color(1, 1, 1, 0.75)
 corner_radius_bottom_right = 18
 corner_radius_bottom_left = 6
 corner_detail = 5
-expand_margin_top = 4.0
-expand_margin_bottom = 4.0
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_272bh"]
 content_margin_left = 10.0
@@ -823,10 +804,10 @@ layout_mode = 2
 layout_mode = 2
 text = "VIAS_LIST"
 
-[node name="TextEdit" type="TextEdit" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/SCH_TAB/VBoxContainer/HBoxContainer2" unique_id=733243729]
+[node name="LineEdit" type="LineEdit" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/SCH_TAB/VBoxContainer/HBoxContainer2" unique_id=893300154]
 layout_mode = 2
 size_flags_horizontal = 3
-placeholder_text = "Rename Selected Via"
+placeholder_text = "RENAME_VIA"
 
 [node name="HBoxContainer" type="HBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/SCH_TAB/VBoxContainer" unique_id=163599888]
 layout_mode = 2
@@ -1090,6 +1071,7 @@ theme_override_constants/separation = 2
 [node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter" unique_id=1856936374]
 layout_mode = 2
 size_flags_vertical = 3
+theme_override_constants/separation = 0
 
 [node name="Flowchart" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer" unique_id=1802454809 instance=ExtResource("1_ig7tw")]
 unique_name_in_owner = true
@@ -1100,13 +1082,13 @@ color = Color(0.36299998, 0.39416662, 0.55, 1)
 script = SubResource("GDScript_h2yge")
 appearance = ExtResource("4_7mycd")
 update_rate = 0.01
-graph = SubResource("Resource_lquwl")
+graph = SubResource("Resource_272bh")
 cell_size = 100
 grid_color = Color(0.4758, 0.50040334, 0.61, 1)
 orig_color = Color(0.63, 0.59031004, 0.2331, 1)
 chirality = 0
 
-[node name="Human_Interface" type="HBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/Flowchart" unique_id=1102069590]
+[node name="MarginContainer" type="MarginContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/Flowchart" unique_id=1137236957]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -1114,73 +1096,37 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-alignment = 1
-script = SubResource("GDScript_1bvp3")
+theme_override_constants/margin_top = 4
+theme_override_constants/margin_bottom = 12
 
-[node name="Controls_Sidebar" type="Panel" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/Flowchart/Human_Interface" unique_id=162312974]
-unique_name_in_owner = true
-clip_contents = true
-custom_minimum_size = Vector2(32, 0)
+[node name="CONTROLS" type="PanelContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/Flowchart/MarginContainer" unique_id=1073816571]
+material = SubResource("ShaderMaterial_7mycd")
+custom_minimum_size = Vector2(100, 0)
 layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_h2yge")
+size_flags_horizontal = 0
+theme_override_styles/panel = SubResource("StyleBoxFlat_1u8w0")
+script = ExtResource("6_7mycd")
+metadata/_custom_type_script = "uid://b07ljhmg8l7ne"
 
-[node name="Box" type="VBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/Flowchart/Human_Interface/Controls_Sidebar" unique_id=2119130911]
-visible = false
-layout_mode = 0
-
-[node name="Controls_Check" type="CheckButton" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/Flowchart/Human_Interface/Controls_Sidebar/Box" unique_id=801766613]
-unique_name_in_owner = true
+[node name="INDICATORS" type="PanelContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/Flowchart/MarginContainer" unique_id=487804779]
+material = SubResource("ShaderMaterial_7mycd")
+custom_minimum_size = Vector2(100, 0)
 layout_mode = 2
-mouse_filter = 1
-text = "CONTROLS"
-
-[node name="ScrollContainer" type="ScrollContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/Flowchart/Human_Interface/Controls_Sidebar/Box" unique_id=975825172]
-layout_mode = 2
-size_flags_vertical = 3
-horizontal_scroll_mode = 0
-vertical_scroll_mode = 4
-
-[node name="Controls" type="VBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/Flowchart/Human_Interface/Controls_Sidebar/Box/ScrollContainer" unique_id=1416305988]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
-
-[node name="Spacer" type="Control" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/Flowchart/Human_Interface" unique_id=1561482346]
-layout_mode = 2
-size_flags_horizontal = 3
-mouse_filter = 2
-
-[node name="Indicators_Sidebar" type="Panel" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/Flowchart/Human_Interface" unique_id=688939817]
-unique_name_in_owner = true
-clip_contents = true
-custom_minimum_size = Vector2(32, 0)
-layout_mode = 2
+size_flags_horizontal = 8
 theme_override_styles/panel = SubResource("StyleBoxFlat_074og")
+script = ExtResource("6_7mycd")
+metadata/_custom_type_script = "uid://b07ljhmg8l7ne"
 
-[node name="Box" type="VBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/Flowchart/Human_Interface/Indicators_Sidebar" unique_id=67923909]
-visible = false
-layout_mode = 0
-
-[node name="Indicators_Check" type="CheckButton" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/Flowchart/Human_Interface/Indicators_Sidebar/Box" unique_id=721532446]
-unique_name_in_owner = true
+[node name="Panel" type="Panel" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer" unique_id=788468832]
+custom_minimum_size = Vector2(0, 8)
 layout_mode = 2
-mouse_filter = 1
-text = "INDICATORS"
-
-[node name="ScrollContainer" type="ScrollContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/Flowchart/Human_Interface/Indicators_Sidebar/Box" unique_id=1626965880]
-layout_mode = 2
-size_flags_vertical = 3
-horizontal_scroll_mode = 0
-vertical_scroll_mode = 4
-
-[node name="Indicators" type="VBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/Flowchart/Human_Interface/Indicators_Sidebar/Box/ScrollContainer" unique_id=291306961]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_0odxb")
 
 [node name="HBoxContainer" type="HBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer" unique_id=1817591134]
+layout_mode = 2
+
+[node name="Spacer" type="Control" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/HBoxContainer" unique_id=2019618259]
+custom_minimum_size = Vector2(3, 0)
 layout_mode = 2
 
 [node name="Scheme_Layers" type="TabBar" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/HBoxContainer" unique_id=62690760]
@@ -1203,6 +1149,10 @@ tab_0/title = "LAYER_ZERO"
 layout_mode = 2
 text = "ADD_LAY"
 
+[node name="Spacer2" type="Control" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/HBoxContainer" unique_id=1482457554]
+custom_minimum_size = Vector2(3, 0)
+layout_mode = 2
+
 [node name="Confirm_Rem_Layer" type="ConfirmationDialog" parent="." unique_id=8701006]
 oversampling_override = 1.0
 title = "Deleting a Layer"
@@ -1221,9 +1171,5 @@ cancel_button_text = "What? No!"
 [connection signal="toggled" from="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/ANA_TAB/Sim_Paused" to="." method="_on_sim_paused_toggled" flags=18]
 [connection signal="item_selected" from="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/ANA_TAB/Sim_Rate" to="." method="_on_sim_rate_item_selected" flags=18]
 [connection signal="toggled" from="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/TOY_TAB/VBoxContainer/fold_devices" to="." method="_on_fold_devices_toggled" flags=18]
-[connection signal="mouse_entered" from="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/Flowchart/Human_Interface/Controls_Sidebar" to="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/Flowchart/Human_Interface" method="_on_controls_sidebar_mouse_entered"]
-[connection signal="mouse_exited" from="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/Flowchart/Human_Interface/Controls_Sidebar" to="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/Flowchart/Human_Interface" method="_on_controls_sidebar_mouse_exited"]
-[connection signal="mouse_entered" from="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/Flowchart/Human_Interface/Indicators_Sidebar" to="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/Flowchart/Human_Interface" method="_on_indicators_sidebar_mouse_entered"]
-[connection signal="mouse_exited" from="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/Flowchart/Human_Interface/Indicators_Sidebar" to="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/Flowchart/Human_Interface" method="_on_indicators_sidebar_mouse_exited"]
 [connection signal="tab_close_pressed" from="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/HBoxContainer/Scheme_Layers" to="." method="_on_scheme_layers_tab_close_pressed"]
 [connection signal="confirmed" from="Confirm_Rem_Layer" to="." method="scheme_rem_layer"]

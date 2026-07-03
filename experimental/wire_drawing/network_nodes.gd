@@ -135,7 +135,8 @@ class xWire extends xNetNode:
 			ending.erase(each)
 	
 	## Disconnects all nodes from the given ending. Returns those nodes.[br]
-	## If ending is [code]VERT.MIDDLE[/code] it disconnects both endings.
+	## If ending is [code]VERT.MIDDLE[/code] it disconnects both endings.[br]
+	## Also removes connections of other xNetNode to this one.
 	func clear_connections(ending:=VERT.MIDDLE) -> Array[xNetNode]:
 		var conns : Array[xNetNode]
 		match ending:
@@ -149,11 +150,19 @@ class xWire extends xNetNode:
 				conns = ori_conn + end_conn
 				ori_conn.clear()
 				end_conn.clear()
-		
 		for each : xNetNode in conns:
 			each.disconnection(self,false)
 		return conns
 	
+	## Adds the xNetNode in [code]what[/code] to the indicated ending.[br]
+	## This doesn't add this instance to the connections of those in [code]what[/code].
+	func connect_ending(ending:VERT, ...what):
+		var these : Array[xNetNode]
+		these.assign(what)
+		match ending:
+			VERT.ORIGIN: ori_conn.append_array(these)
+			VERT.ENDING: end_conn.append_array(these)
+			VERT.MIDDLE: return
 	
 	@export_storage var vector : Vector2  ## Encodes the length and proportions of the wire. It's always positive.
 	@export_storage var corners : Array[CORN]  ## Sequence of corners of the rectangle the wire runs along.

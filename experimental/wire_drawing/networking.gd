@@ -22,6 +22,23 @@ class xNetData extends Resource:
 	@export_storage var wires : Dictionary[int, Array]  ## An array of xWire for a given layer.
 	@export_storage var gizmos : Dictionary[int, Array]  ## An array of xGizmo for a given layer.
 
+class Crawfish extends xNetNode:
+	## Used to test the crawler.
+	
+	var name := "Craw1"
+	var connected : Array[xNetNode]
+	func _init() -> void:
+		super()
+		name = "Craw" + str(randf_range(0, 100))
+	func get_connections(_from:xNetNode) -> Array[xNetNode]:
+		print(name, ": ", position)
+		return connected
+	func get_rect() -> Rect2:
+		return Rect2(Vector2.ZERO, Vector2.ONE)
+	func draw(_canvas:Control, _highlight:bool=false):
+		return
+	
+
 
 #region Simulation Stuff
 
@@ -51,6 +68,13 @@ func finish_cycle():
 
 #region Graph Stuff
 class xCrawler:
+	## Travels through the network in steps, returning things of interest that it finds.[br]
+	## It starts travel from all given [code]origins[/code] in parallel and can
+	## travel by Breadth-First Search and Depth-First Search.
+	
+	#TODO Stop iteration at graph region borders.
+	#TODO Check if after `reset()` elements in history don't stop search from reaching nodes.
+	
 	var orig : Array[xNetNode]
 	var history : Dictionary[xNetNode, xNetNode]  ## Nodes from which a node in the keys was found from.
 	var queue : Array[xNetNode]  ## The traversal queue or stack, where nodes to visit are placed.
@@ -94,6 +118,8 @@ class xCrawler:
 	## Returns empty if there are not more nodes to search.
 	## You may stop iterating early if a desired end object has been found.
 	func depth_search(node_accept:=Callable(), node_find:=Callable(), find_also_accept:=false) -> Array[xNetNode]:
+		#TODO Check if this works.
+		#TODO Check if "prev" is always a node that connected to "curr".
 		if queue.is_empty(): return []
 		var curr = queue.pop_back()
 		var prev = history[curr]
@@ -149,7 +175,8 @@ func update_wiring(wires:Array[xWire], timestamp:int=-1):
 	for wire in wires:
 		# Find the closest Joint to each wire.
 		var crawl := xCrawler.new([wire as xNetNode])
-		while crawl.breadth_search(Callable(), search_joint).is_empty() and not crawl.is_finished():
+		var i : int = 0
+		while not (crawl.breadth_search(Callable(), search_joint).is_empty() or crawl.is_finished()):
 			#NOTE This is fine to do, because the loop will stop once something
 			# is found and we want whatever is found first.
 			continue
@@ -205,6 +232,7 @@ func update_joints(joints:Array[xJoint], timestamp:int=-1):
 					chain_pos = node.update_position(chain_pos, conn_ending)
 
 func _update_nodes(...changed):
+	#FIXME This is causing endless looping.
 	var timestamp = Time.get_ticks_usec()
 	var endnodes : Array[xJoint]  # Joints that were modified
 	var wires : Array[xWire]  # Wires that were modified
@@ -253,8 +281,9 @@ func over_wire(where:Vector2, layer:int) -> Dictionary:
 	for wire : xWire in netlist.wires[layer]:
 		if wire.get_rect().has_point(where):
 			var info = wire.near(where)
-			info["wire"] = wire
-			return info
+			if not info.is_empty():
+				info["wire"] = wire
+				return info
 	return {}
 
 ## Sets a new wire, or updates an existing one by it clearing its connections
@@ -266,39 +295,40 @@ func _register_wire(wire:xWire, layer:int, ending:=xWire.VERT.MIDDLE) -> Array[x
 	if netlist.wires.has(wire.layer):
 		if wire in netlist.wires[wire.layer]:
 			# Already existing wire.
-			netlist.wires.erase(wire)
+			netlist.wires[wire.layer].erase(wire)
 			affected.append_array(wire.clear_connections(ending))
 	var wire_list = netlist.wires.get_or_add(layer,[])
-	wire_list.append(wire)
+	if not wire in wire_list: wire_list.append(wire)
 	wire.layer = layer
 	return affected
 
-## Connects the Origin of [code]wire[/code] to a joint.[br]
-func pull_wire(wire:xWire, start:xJoint, layer:int):
-	var old_conns = _register_wire(wire, layer, xWire.VERT.ORIGIN)
+## Connects the given [code]ending[/code] of [code]wire[/code] to a xJoint.[br]
+func plug_wire(wire:xWire, start:xJoint, ending:xWire.VERT, layer:int):
+	var old_conns = _register_wire(wire, layer, ending)
 	var affected : Array[xNetNode] = [wire]
 	affected.append_array(old_conns)
-	wire.layer = layer
-	wire.ori_conn.append(start)
+	wire.connect_ending(ending, start)
 	start.connected.append(wire)
 	_update_nodes.callv(affected)
 
-## Connects the Ending of [code]wire[/code] to a joint.[br]
-## If using an existing wire, it clears its connections and reconnects to new targets.
-func push_wire(wire: xWire, stop:xJoint, layer:int):
-	var old_conns = _register_wire(wire, layer, xWire.VERT.ENDING)
-	var affected : Array[xNetNode] = [wire]
-	affected.append_array(old_conns)
-	wire.layer = layer
-	wire.end_conn.append(stop)
-	stop.connected.append(wire)
+## Adds [code]to[/code] to [code]from[/code] at the given endings. This preserves any
+## connected wires, but not others.
+func extend_wire(from: xWire, to:xWire, from_ending:xWire.VERT, to_ending:xWire.VERT):
+	var from_preserve : Array[xNetNode] = [to]
+	var to_preserve : Array[xNetNode] = [from]
+	var affected : Array[xNetNode] = [from, to]
+	var from_conns = _register_wire(from, from.layer, from_ending)
+	var to_conns = _register_wire(to, from.layer, to_ending)
+	affected.append_array(from_conns + to_conns)
+	for each in from_conns:
+		if each is xWire: from_preserve.append(each)
+	for each in to_conns:
+		if each is xWire: to_preserve.append(each)
+	from.connect_ending.callv([from_ending] + from_preserve)
+	to.connect_ending.callv([to_ending] + to_preserve)
 	_update_nodes.callv(affected)
 
-## Add new wire to the end of another
-func extend_wire(from: xWire, to:xWire):
-	pass
 
-## Add new wire to the start of another
 func join_wire(from: xWire, to:xWire):
 	pass
 
