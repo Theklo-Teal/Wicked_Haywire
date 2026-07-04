@@ -244,8 +244,8 @@ func _update_nodes(...changed):
 		elif node is xWire:
 			wires.append(node)
 	
-	update_wiring(wires, timestamp)
-	update_joints(endnodes, timestamp)
+	#update_wiring(wires, timestamp)
+	#update_joints(endnodes, timestamp)
 #endregion
 
 #region Handling Joints
@@ -303,12 +303,14 @@ func _register_wire(wire:xWire, layer:int, ending:=xWire.VERT.MIDDLE) -> Array[x
 	return affected
 
 ## Connects the given [code]ending[/code] of [code]wire[/code] to a xJoint.[br]
-func plug_wire(wire:xWire, start:xJoint, ending:xWire.VERT, layer:int):
+func plug_wire(wire:xWire, joint:xJoint, ending:xWire.VERT, layer:int):
 	var old_conns = _register_wire(wire, layer, ending)
 	var affected : Array[xNetNode] = [wire]
 	affected.append_array(old_conns)
-	wire.connect_ending(ending, start)
-	start.connected.append(wire)
+	wire.connect_ending(ending, joint)
+	wire.distan = 1
+	wire.endnode = joint
+	joint.connected.append(wire)
 	_update_nodes.callv(affected)
 
 ## Adds [code]to[/code] to [code]from[/code] at the given endings. This preserves any
@@ -320,6 +322,7 @@ func extend_wire(from: xWire, to:xWire, from_ending:xWire.VERT, to_ending:xWire.
 	var from_conns = _register_wire(from, from.layer, from_ending)
 	var to_conns = _register_wire(to, from.layer, to_ending)
 	affected.append_array(from_conns + to_conns)
+	to.endnode = from.endnode
 	for each in from_conns:
 		if each is xWire: from_preserve.append(each)
 	for each in to_conns:

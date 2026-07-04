@@ -51,6 +51,10 @@ class xJoint extends xNetNode:
 	
 	@export_storage var text : String  ## A label or the connection name for vias.
 	
+	func _init() -> void:
+		super()
+		text = str(hash(self))
+	
 	@export_storage var connected : Array[xWire]
 	func get_connections(from:xNetNode) -> Array[xNetNode]:
 		var connections : Array[xNetNode]
@@ -80,7 +84,9 @@ class xJoint extends xNetNode:
 		var clr : Color = colors[1] if highlight else colors[2]
 		canvas.draw_circle(position, X.CELL_RAD, clr)
 		if not text.is_empty():
-			canvas.draw_string(SystemFont.new(), position + X.CELL_RAD, text)
+			canvas.draw_string(SystemFont.new(), position + Vector2.ONE * X.CELL_RAD, text)
+		var txt = str(port)
+		canvas.draw_string(SystemFont.new(), position + Vector2.ONE * X.CELL_DIA, txt)
 
 	#region Simulation Fuctions
 	#func emit(val):
@@ -203,6 +209,8 @@ class xWire extends xNetNode:
 	## Draws this wire segment on canvas.
 	func draw(canvas:Control, highlight:bool=false):
 		draw_along(canvas, get_rect(), corners[0], corners[1], corners[2], bend, colors[1] if highlight else colors[2])
+		var txt = str(endnode) + " : " + str(distan)
+		canvas.draw_string(SystemFont.new(), get_vertex_position(VERT.ORIGIN), txt)
 	
 	## Given a rectangle with positive size, draw a wire.
 	static func draw_along(canvas:Control, box:Rect2, ori:CORN, mid:CORN, end:CORN, ratio:float=1, clr:=Color.GOLDENROD):
