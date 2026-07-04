@@ -22,23 +22,6 @@ class xNetData extends Resource:
 	@export_storage var wires : Dictionary[int, Array]  ## An array of xWire for a given layer.
 	@export_storage var gizmos : Dictionary[int, Array]  ## An array of xGizmo for a given layer.
 
-class Crawfish extends xNetNode:
-	## Used to test the crawler.
-	
-	var name := "Craw1"
-	var connected : Array[xNetNode]
-	func _init() -> void:
-		super()
-		name = "Craw" + str(randf_range(0, 100))
-	func get_connections(_from:xNetNode) -> Array[xNetNode]:
-		print(name, ": ", position)
-		return connected
-	func get_rect() -> Rect2:
-		return Rect2(Vector2.ZERO, Vector2.ONE)
-	func draw(_canvas:Control, _highlight:bool=false):
-		return
-	
-
 
 #region Simulation Stuff
 
@@ -73,29 +56,33 @@ class xCrawler:
 	## travel by Breadth-First Search and Depth-First Search.
 	
 	#TODO Stop iteration at graph region borders.
-	#TODO Check if after `reset()` elements in history don't stop search from reaching nodes.
-	
+	#region boilerplate
 	var orig : Array[xNetNode]
 	var history : Dictionary[xNetNode, xNetNode]  ## Nodes from which a node in the keys was found from.
-	var queue : Array[xNetNode]  ## The traversal queue or stack, where nodes to visit are placed.
+	var visited : Dictionary[xNetNode, Array]  ## Tracking connections already checked. Given a node as key, it returns nodes that which connections to we've explored.
+	var all_visited : Array[xNetNode]  ## Nodes which all acceptable connections have been visited.
+	var queue : Array[xNetNode]  ## The traversal queue, where nodes to visit are placed.
 	var finds : Array[xNetNode]  ## The items of interest found along the search. It might have duplicates, if the same finding is repeated.
 	var iter_finds : Array[xNetNode]  ## The items of interest found on the last search iteration.
 	var _head : int  # Pointer of `queue`: nodes behind can't be visited again, ahead are yet to visit.
-	var _iter : int  # Pointer of `finds`: Ahead are finds of the last iteration which haven't been returned yet.
 	func _init(origins:Array[xNetNode]) -> void:
 		orig.assign(origins)
 		queue = orig.duplicate()
+		for each in origins:
+			history[each] = null
 	
 	## In case you want to a search anew, without losing finds so far. It won't clear
 	## previous finds, nor history, but it will be overwritten with further iterations.[br]
 	## NOTE: This will allow previously visited nodes to be visited again.
 	func reset():
+		visited.clear()
+		all_visited.clear()
 		queue = orig.duplicate()
 		_head = 0
 	
 	## Returns whether there are nodes to search, even if they aren't what's being searched.
 	func is_finished() -> bool:
-		return queue.is_empty() or _head == queue.size() - 1
+		return queue.is_empty() or _head >= queue.size()
 	
 	## From a node in [code]finds[/code], return the chain of nodes back
 	## into its search origin. Both the origin and [code]from[/code] are included.
@@ -106,63 +93,55 @@ class xCrawler:
 			source = history[chain.back()]
 			chain.append(chain)
 		return chain
+	#endregion
 	
-	## Perform one iteration of the traversal through the graph in
-	## depth-first search, returns any novel xNetNode that made
-	## [code]node_find()[/code] return true.[br]
-	## Provide a [code]node_accept()[/code] function that takes a node and tells
-	## whether to continue search from that node. An invalid callable is interpreted
-	## as accepting and finding anything.[br]
-	## By default "found" nodes might not be "accepted", but you can control that
-	## by setting [code]find_also_accept[/code] to [code]true[/code].[br]
-	## Returns empty if there are not more nodes to search.
-	## You may stop iterating early if a desired end object has been found.
-	func depth_search(node_accept:=Callable(), node_find:=Callable(), find_also_accept:=false) -> Array[xNetNode]:
-		#TODO Check if this works.
-		#TODO Check if "prev" is always a node that connected to "curr".
+	## Returns whether the [code]next[/code] node is of interest to visit.
+	func _conn_accept(curr:xNetNode, next:xNetNode, node_accept:=Callable()) -> bool:
+		if next in queue: return false  # Already accounted for visiting later.
+		if next in all_visited: return false  # Nothing more to explore in this node.
+		if next in visited.get(curr, []): return false  # Connection already tried.
+		if not node_accept.is_valid() or node_accept.call(curr, next): return true
+		return false  # Failed the `node_accept` test.
+
+	func depth_search(node_accept:=Callable(), node_find:=Callable()) -> Array[xNetNode]:
+		iter_finds.clear()
 		if queue.is_empty(): return []
-		var curr = queue.pop_back()
-		var prev = history[curr]
-		for conn in curr.get_connections(prev):
-			if conn in queue: continue
-			var accepted = not node_accept.is_valid or node_accept.call(conn)
-			if not node_find.is_valid() or node_find.call(conn):
-				if not (find_also_accept and not accepted):  # Have you heard about "imply" boolean operators? This is one example.
-					finds.append(conn)
-			if accepted:
-				queue.append(conn)
-				history[conn] = prev
-				break
 		
-		iter_finds = finds.slice(_iter, finds.size())
-		_iter = finds.size()
+		var curr = queue.back()
+		var prev = history[curr]
+		for next in curr.get_connections(prev):
+			if _conn_accept(curr, next, node_accept):
+				visited.get_or_add(curr, []).append(next)
+				history[next] = curr
+				queue.push_back(next)
+				if not node_find.is_valid() or node_find.call(curr, next):
+					# Is item of interest to return. Because we are only taking one node from all connections, we can't wait to pick other connections for finds.
+					iter_finds.append(next)
+				break  # In depth first search we only care about the first valid connection we find. At a later time we explore alternatives.
+		
+		if iter_finds.is_empty():
+			all_visited.append(queue.pop_back())
+		finds.append_array(iter_finds)
 		return iter_finds
 	
-	## Perform one iteration of the traversal through the graph in
-	## breadth-first search, returns any novel xNetNode that made
-	## [code]node_find()[/code] return true.[br]
-	## Provide a [code]node_accept()[/code] function that takes a node and tells
-	## whether to continue search from that node. An invalid callable is interpreted
-	## as accepting and finding anything.[br]
-	## By default "found" nodes might not be "accepted", but you can control that
-	## by setting [code]find_also_accept[/code] to [code]true[/code].[br]
-	## Returns empty if there are not more nodes to search.
-	## You may stop iterating early if a desired end object has been found.
-	func breadth_search(node_accept:=Callable(), node_find:=Callable(), find_also_accept:=false) -> Array[xNetNode]:
-		var endstop = queue.size()
-		for node in queue.slice(_head, endstop):
-			for conn in node.get_connections(node):
-				if conn in queue: continue
-				var accepted = not node_accept.is_valid() or node_accept.call(conn)
-				history[conn] = node  # We keep track of the nodes in the path towards a find of interest, not just finds of interest.
-				if not node_find.is_valid() or node_find.call(conn):
-					if not (find_also_accept and not accepted):  # Have you heard about "imply" boolean operators? This is one example.
-						finds.append(conn)
-				if accepted and not conn in queue:
-					queue.append(conn)
-		_head = endstop
-		iter_finds = finds.slice(_iter, finds.size())
-		_iter = finds.size()
+	func breadth_search(node_accept:=Callable(), node_find:=Callable()) -> Array[xNetNode]:
+		iter_finds.clear()
+		for curr in queue.slice(_head, queue.size()):
+			_head += 1
+			all_visited.append(curr)
+			var prev = history[curr]
+			for next in curr.get_connections(prev):
+				if not node_find.is_valid() or node_find.call(curr, next):
+					# Is item of interest to return, doesn't mean it's an item we want to visit.
+					if not next in queue and not next in finds:
+						iter_finds.append(next)
+						history[next] = curr
+				if _conn_accept(curr, next, node_accept):
+					history[next] = curr
+					visited.get_or_add(next, []).append(curr)
+					queue.push_back(next)
+		
+		finds.append_array(iter_finds)
 		return iter_finds
 
 

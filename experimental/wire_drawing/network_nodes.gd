@@ -209,7 +209,7 @@ class xWire extends xNetNode:
 	## Draws this wire segment on canvas.
 	func draw(canvas:Control, highlight:bool=false):
 		draw_along(canvas, get_rect(), corners[0], corners[1], corners[2], bend, colors[1] if highlight else colors[2])
-		var txt = str(endnode) + " : " + str(distan)
+		var txt = str(endnode.text) + " : " + str(distan)
 		canvas.draw_string(SystemFont.new(), get_vertex_position(VERT.ORIGIN), txt)
 	
 	## Given a rectangle with positive size, draw a wire.
