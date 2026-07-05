@@ -10,6 +10,7 @@ class xCrawler:
 	## travel by Breadth-First Search and Depth-First Search.
 	
 	var orig : Array[xNetNode]
+	var root : Dictionary[xNetNode, xNetNode]  ## The node in [code]orig[/code] that originated a path towards finding any other given node. Origin nodes point to themselves.
 	var history : Dictionary[xNetNode, xNetNode]  ## Nodes from which a node in the keys was found from.
 	var visited : Dictionary[xNetNode, Array]  ## Tracking connections already checked. Given a node as key, it returns nodes that which connections to we've explored.
 	var all_visited : Array[xNetNode]  ## Nodes which all acceptable connections have been visited.
@@ -21,6 +22,7 @@ class xCrawler:
 		orig.assign(origins)
 		queue = orig.duplicate()
 		for each in origins:
+			root[each] = each
 			history[each] = null
 	
 	## In case you want to a search anew, without losing finds so far. It won't clear
@@ -96,10 +98,12 @@ class xCrawler:
 				if not node_find.is_valid() or node_find.call(curr, next):
 					# Is item of interest to return, doesn't mean it's an item we want to visit.
 					if not next in queue and not next in finds:
-						iter_finds.append(next)
 						history[next] = curr
+						root[next] = root[curr]
+						iter_finds.append(next)
 				if _conn_accept(curr, next, node_accept):
 					history[next] = curr
+					root[next] = root[curr]
 					visited.get_or_add(next, []).append(curr)
 					queue.push_back(next)
 		
@@ -107,32 +111,55 @@ class xCrawler:
 		return iter_finds
 
 
+## Finds the closest graph target to a given node and sets its [code]xNetNode.endnode[/code].
+func seek_endnode(from:xNetNode) -> xJoint:
+	if from is xJoint:
+		from.endnode = null
+		return from
+	var crawl = xCrawler.new([from])
+	while crawl.breadth_traverse(Callable(), func(_curr,next): return next is xJoint).is_empty() and not crawl.is_finished():
+		continue
+	from.endnode = crawl.finds.back()
+	return from.endnode
+
 ## Traverse the whole graphs connected to [code]origins[/code], setting
-## [code]xNetNode.dist[/code] of nodes found along the way.[br]
+## [code]xNetNode.distan[/code] and [code]xNetNode.endnode[/code] of nodes found
+## along the way.[br]
 ## Returns all the xCrawlers used to map the network that can be fed into
 ## [code]find_graphs()[/code] to discriminate distinct graphs of isolated nodes.
 func build_flow_field(...origins) -> Array[xCrawler]:
+	var timestamp = Time.get_ticks_usec()
 	var crawls : Array[xCrawler]
-	var more_crawls : Array[xNetNode]
-	more_crawls.assign(origins)
+	var add_crawls : Array[xNetNode]
+	for node in origins:
+		if node is xJoint:
+			node.timestamp = timestamp
+			node.endnode = null
+			add_crawls.append(node)
+		else:
+			var endnode = seek_endnode(node)
+			if endnode != null: add_crawls.append(endnode)
 	var finished = false
 	while not finished:
-		if not more_crawls.is_empty():
-			crawls.append(xCrawler.new(more_crawls))
-			more_crawls.clear()
+		if not add_crawls.is_empty():
+			crawls.append(xCrawler.new(add_crawls))
+			add_crawls.clear()
 		for craw in crawls:
 			if craw.is_finished():
 				finished = true
 			for node in craw.breadth_traverse():
-				if node.pin:
-					node.dist = 0
+				node.timestamp = timestamp
+				if node is xJoint:
+					node.distan = 0
+					node.endnode = null
 					if not node in origins:
 						origins.append(node)
-						more_crawls.append(node)
+						add_crawls.append(node)
 				else:
-					var dist = craw.history[node].dist + 1
-					if node.dist <= 0: node.dist = dist
-					else: node.dist = min(node.dist, dist)
+					var dist = craw.history[node].distan + 1
+					node.endnode = craw.root[node]
+					if node.distan <= 0: node.distan = dist
+					else: node.distan = min(node.distan, dist)
 	return crawls
 
 
@@ -151,44 +178,56 @@ func find_graphs(...crawlers) -> Array[Array]:
 	return graphs
 
 
-## Traverse the given nodes in [code]paths[/code], updating the [code]xNetNode.dist[/code], assuming the
-## first elements of each array have correct values and further elements are nodes of raising distance.[br]
-## The traversal along some path will quit early if it can't lower the cost at some point.
+## Traverse the given nodes in [code]paths[/code], updating the
+## [code]xNetNode.distan[/code] and [code]xNetNode.endnode[/code], assuming the
+## first elements of each array have correct values and further elements are
+## nodes of raising distance.[br]
+## The traversal along some path will quit early if it can't lower the cost at
+## some point.
 func update_flow_field(paths:Array[Array]):
+	var timestamp = Time.get_ticks_usec()
 	var last : Array[int]  # The distance of the last node updated
+	var firsts : Array[xNetNode]
 	for each in paths:
 		each.reverse()
-		last.append(each.pop_back().dist)
+		var firstnode = each.pop_back()
+		firstnode.timestamp = timestamp
+		firsts.append(firstnode)
+		last.append(firstnode.distan)
 	while not paths.is_empty():
 		var p : int = 0
 		for each in paths.size():
 			var node : xNetNode = paths[p].pop_back()
-			var dist = last[p] + 1
-			if node.dist <= 0 or node.pin == true:
-				if node.pin == true: node.dist = 0
-				else: node.dist = dist
+			node.timestamp = timestamp
+			if node is xJoint:
+				node.endnode = null
+				node.distan = 0
 			else:
-				node.dist = min(last[p] + 1, node.dist)
+				var dist = last[p] + 1
+				node.endnode = firsts[p]
+				if node.distan <= 0:
+					node.distan = dist
+				else:
+					node.distan = min(last[p] + 1, node.distan)
 				
-			if node.dist < last[p] or paths[p].is_empty():
+			if node.distan < last[p] or paths[p].is_empty():
 				paths.remove_at(p)
 				last.remove_at(p)
 			else:
-				last[p] = node.dist
+				last[p] = node.distan
 				p += 1
 
 
-## Follows the flow field to find a node with [code]xNetNode.pin[/code] set
-## [code]true[/code], then returns the path of nodes found along the way.[br]
-## NOTE, this search can explore out of [code]from[/code] if its [code]xNetNode.dist[/code]
+## Follows the flow field to find a node that is [code]xJoint[/code], then returns 
+## the path of nodes found along the way.[br]
+## If an xJoint can't be found, it returns a partial path.
+## NOTE, this search can explore out of [code]from[/code] if its [code]xNetNode.distan[/code]
 ## is negative, but won't continue past further nodes of negative value.
 func flow_search(from:xNetNode) -> Array[xNetNode]:
-	var rule = Callable(func(curr, next): return (curr.dist == -1 or curr.dist > next.dist) and next.dist >= 0)
+	var rule = Callable(func(curr, next): return (curr.distan == -1 or curr.distan > next.distan) and next.distan >= 0)
 	var crawl := xCrawler.new([from])
-	while not crawl.is_finished():
-		crawl.depth_traverse(rule, rule)
-		var last = crawl.finds.back()
-		if last != null and last.pin == true: break
+	while crawl.breadth_traverse(rule, func(_curr, next):return next is xJoint).is_empty() and not crawl.is_finished():
+		continue
 	if crawl.finds.is_empty():
 		return [from]
-	return crawl.search_path(crawl.finds.back())
+	return crawl.search_path(crawl.finds.back())  # If multiple joints are found, we just care about one of them.

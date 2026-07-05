@@ -11,9 +11,19 @@ class_name xNetwork
 @warning_ignore("unused_signal")
 signal connections_changed  ## Whenever the wiring on Joints changes, this is called.
 
-var netlist := xNetData.new()
+var netlist : xNetData :
+	set(val):
+		netlist = val
+		if val != null and not val.is_empty():
+			# Update network flow fields to ensure integrity.
+			build_flow_field(val.joints.values())
+
 var ports : Array[xPort]  ## Known Ports
 #var changed : Array[xJoint]  ## Joints that have connections changed.
+
+func _init() -> void:
+	if netlist == null:
+		netlist = xNetData.new()
 
 class xNetData extends Resource:
 	## We have network elements in here, so they can be serialized and interchanged
@@ -21,6 +31,9 @@ class xNetData extends Resource:
 	@export_storage var joints : Dictionary[Vector3i, xJoint]  ## For free standing joints.
 	@export_storage var wires : Dictionary[int, Array]  ## An array of xWire for a given layer.
 	@export_storage var gizmos : Dictionary[int, Array]  ## An array of xGizmo for a given layer.
+	
+	func is_empty() -> bool:
+		return joints.is_empty() and wires.is_empty()
 
 
 #region Simulation Stuff
@@ -50,86 +63,41 @@ func finish_cycle():
 
 
 #region Graph Editing Stuff
-## Updates the positioning and shape of wires if they were modified.
-func update_wiring(wires:Array[xWire], timestamp:int=-1):
-	timestamp = Time.get_ticks_usec() if timestamp < 0 else timestamp
-	var search_joint = func(a): return a is xJoint
-	var search_wire = func(a): return a is xWire and a.timestamp != timestamp
-	
+## Updates the positioning and shape of wires in the path of this one.
+func update_wiring(wires:Array[xWire]):
+	var accept := Callable(func(curr, next, back): return curr != back and next.distan > curr.distan and next is xWire)
 	for wire in wires:
-		# Find the closest Joint to each wire.
-		var crawl := xCrawler.new([wire as xNetNode])
-		var i : int = 0
-		while not (crawl.breadth_search(Callable(), search_joint).is_empty() or crawl.is_finished()):
-			#NOTE This is fine to do, because the loop will stop once something
-			# is found and we want whatever is found first.
-			continue
-		if crawl.finds.size() <= 1:
-			# Nothing was found.
-			continue
-		# Update positions up to "wire".
-		var path = crawl.path(crawl.finds[0])  # If there happen to be multiple xJoints, select just one of them to avoid competing paths to the same wire target.
-		var last = path.pop_back()  # The first path element should be an xJoint.
-		var port : xPort = last.port
-		var chain_pos = last.position
-		var conn_ending = path.back().get_ending(last)  # Ending where the connection happens.
-		while not path.is_empty():
-			if conn_ending == xWire.VERT.MIDDLE: break  # Some funny connection that can't be replicated.
-			var conn = path.back()
-			conn.port = port
-			chain_pos = conn.update_position(chain_pos, conn_ending)
-			conn_ending = conn.get_ending(last)
-			last = path.pop_back()
-		
-		# Update positions from wire onwards
-		crawl.reset()
-		var wire_pos = wire.get_vertex_position(wire.get_ending(last, true))  # Keep track of the position of the forward ending of "wire" because we'll be reusing it for the chain of each connection in that direction.
-		while not crawl.depth_search(search_wire).is_empty() and not crawl.is_finished():
-			for node in crawl.iter_finds:
-				node.timestamp = timestamp
-				node.port = port
-				if node is xWire:
-					if conn_ending == xWire.VERT.MIDDLE: break  # Some funny connection that can't be replicated.
-					if node in wire.ori_conn + wire.end_conn:
-						# Reset chain position when switching to another fork on the road.
-						chain_pos = wire_pos
-					chain_pos = node.update_position(chain_pos, conn_ending)
-					conn_ending = node.get_ending(last)
-					last = node
+		var orig_path = flow_search(wire)
+		var back_neigh : xNetNode
+		var last_pos : Vector2
+		if orig_path.size() > 1:
+			back_neigh = orig_path[-2]
+			if back_neigh is xJoint: last_pos = back_neigh.position
+			elif back_neigh is xWire:
+				var ending = back_neigh.get_ending(wire)
+				last_pos = back_neigh.get_vertex_position(ending)
+			wire.update_position(last_pos, wire.get_ending(back_neigh))
+		var fore_crawl = xCrawler.new([wire as xNetNode])
+		while not fore_crawl.is_finished():
+			for node : xWire in fore_crawl.depth_traverse(accept.bind(back_neigh), accept.bind(back_neigh)):
+				last_pos = node.update_position(last_pos, node.get_ending(fore_crawl.history[node]))	
 
-## Updates the positioning and shape of wires that connect to modified sockets.
-func update_joints(joints:Array[xJoint], timestamp:int=-1):
-	timestamp = Time.get_ticks_usec() if timestamp < 0 else timestamp
-	var search_wire = func(a): return a is xWire and a.timestamp != timestamp
-	
-	for joint in joints:
-		var crawl = xCrawler.new([joint as xNetNode])
-		var chain_pos = joint.position
-		var last = joint
-		var conn_ending : xWire.VERT
-		while not crawl.breadth_search(search_wire).is_empty():
-			for node in crawl.iter_finds:
-				node.timestamp = timestamp
-				node.port = joint.port
-				if node is xWire:
-					conn_ending = node.get_ending(last, true)
-					chain_pos = node.update_position(chain_pos, conn_ending)
+## Updates the positioning and shape of wires that connect to the given joints.
+func update_joints(joints:Array[xJoint]):
+	pass
 
 func _update_nodes(...changed):
-	#FIXME This is causing endless looping.
-	var timestamp = Time.get_ticks_usec()
 	var endnodes : Array[xJoint]  # Joints that were modified
 	var wires : Array[xWire]  # Wires that were modified
 	
 	for node in changed:
-		node.timestamp = timestamp
 		if node is xJoint:
 			endnodes.append(node)
 		elif node is xWire:
 			wires.append(node)
 	
-	#update_wiring(wires, timestamp)
-	#update_joints(endnodes, timestamp)
+	update_wiring(wires)
+	update_joints(endnodes)
 #endregion
 
 #region Handling Joints
@@ -256,63 +224,4 @@ func move_wire_len(wire:xWire, ending:xWire.VERT, where:Vector2):
 	var short = true if wire.get_leg(false) == xWire.VERT.ORIGIN else false
 	wire.corners = xWire.get_corners_len(new_vec, short)
 
-#endregion
-
-
-
-
-#region Add Things
-#func register_gizmo(gizmo:Node, layer:int=0):
-	#netlist.gizmos.append(gizmo)
-
-## Returns an existing socket or creates one if it doesn't exist at the coordinate.
-#func add_socket(where:Vector2) -> xSocket:
-	#var cell = X.to_grid(where)
-	#return xSocket.new()
-
-#func add_wire(from:xSocket, to:xSocket, short_first:bool=false) -> xWire:
-	#var wire = xWire.from_length(from, to, short_first)
-	#return wire
-	#for query : DijkstraQuery in dijkstra_mapping(from, to):
-	#	for socket : xSocket in query.endpoints:
-	#		socket in 
-	
-	#var wire : xWire = from.wire
-	#if wire == null:
-		#wire = to.wire
-	#if wire == null:
-		#wire = xWire.new()
-		#from.wire = wire
-		#to.wire = wire
-		#list[wire] = xPort.new()
-	#else:
-		#from.wire = wire
-	#
-	#var segm = xWireSegm.from_length(from.position, to.position, short_first)
-	#segm.ori_conn.append(from)
-	#segm.end_conn.append(to)
-	#segm.wire = wire
-	#wire.segms.append(segm)
-	#wire.rect = wire.rect.merge(segm.get_rect())
-	#return segm
-#endregion
-#region Remove Things
-#func delete_sock(s:xSocket) -> Error:
-	#var cell = sockets.find_key(s)
-	#sockets.erase(cell)
-	#return OK
-#
-#func delete_segm(w:xWire, s:xWireSegm) -> Error:
-	### Removes a wire segment from this wire. If the segment isn't found, returns
-	### [code]ERR_DOES_NOT_EXIST[/code]. If the wire runs out of segments, it returns
-	### [code]ERR_TIMEOUT[/code] and deletes its [code]Port[/code] as a sign to
-	### update and eventual deletion of the wire itself.
-	#if not s in w.segms:
-		#return ERR_DOES_NOT_EXIST
-	#w.segms.erase(s)
-	#if w.segms.is_empty():
-		## Mark for deletion of the wire in the network.
-		#list[w] = null
-		#return ERR_TIMEOUT
-	#return OK
 #endregion

@@ -23,18 +23,18 @@ class xPort:
 @abstract class xNetNode extends Resource:
 	## Anything that can be connected in a network, like sockets
 	## and wires.
-	var timestamp : int = 0  # When crawling the graph this allows to tell whether the node has been found before.
+	var timestamp : int = 0  # The time when this node was last updated by the crawler.
 	@export_storage var endnode : xJoint  # The closest joint in the graph
 	@export_storage var distan : int = 0  # The number of nodes towards the endnode
-	@export_storage var port : xPort  # The port of the endnode
 	@export_storage var position : Vector2
 	@export_storage var layer : int
 	
 	var colors : Array[Color] = [Color.YELLOW, Color.GOLD, Color.GOLDENROD]
 	
-	func _init() -> void:
-		if port == null:
-			port = xPort.new()
+	func get_port() -> xPort:
+		if endnode != null:
+			return endnode.port
+		return null
 	
 	## Select which connections to return if a crawler comes from the given node.
 	@abstract func get_connections(from:xNetNode) -> Array[xNetNode]
@@ -51,10 +51,12 @@ class xJoint extends xNetNode:
 	## Basic class for nodes in a xNetwork graph. From which specialized sockets are extended.
 	## It also serves a world anchor to xWire and possesses a Dijkstra node.
 	
+	@export_storage var port : xPort
 	@export_storage var text : String  ## A label or the connection name for vias.
 	
 	func _init() -> void:
-		super()
+		if port == null:
+			port = xPort.new()
 		text = str(hash(self))
 	
 	@export_storage var connected : Array[xWire]
@@ -232,7 +234,6 @@ class xWire extends xNetNode:
 	
 	#region Constructors
 	func _init(start:Vector2, stop:Vector2, ori:CORN, mid:CORN, end:CORN) -> void:
-		super()
 		vector = (stop - start).abs()
 		corners = [ori, mid, end]
 
