@@ -1,15 +1,15 @@
-extends xNetBase
+extends xNetAnalysis
 class_name xNetwork
-
-@warning_ignore("unused_signal")
-signal connections_changed  ## Whenever the wiring on Joints changes, this is called.
 
 ## A network is composed of netlists which are isolated graphs. sockets are
 ## connected by Wires and wires refer to a Port where sockets emit to or receive
 ## signals from. Ports shared between Wires mean they have a tunnel between them.
 ## NOTE: Changes to the positioning of objects representing graph nodes should be
 ## done here to account in indexing Dictionaries and propagate changes throughout
-## the affected network graph.
+## the affected network graphs.
+
+@warning_ignore("unused_signal")
+signal connections_changed  ## Whenever the wiring on Joints changes, this is called.
 
 var netlist := xNetData.new()
 var ports : Array[xPort]  ## Known Ports
@@ -49,102 +49,7 @@ func finish_cycle():
 #endregion
 
 
-#region Graph Stuff
-class xCrawler:
-	## Travels through the network in steps, returning things of interest that it finds.[br]
-	## It starts travel from all given [code]origins[/code] in parallel and can
-	## travel by Breadth-First Search and Depth-First Search.
-	
-	#TODO Stop iteration at graph region borders.
-	#region boilerplate
-	var orig : Array[xNetNode]
-	var history : Dictionary[xNetNode, xNetNode]  ## Nodes from which a node in the keys was found from.
-	var visited : Dictionary[xNetNode, Array]  ## Tracking connections already checked. Given a node as key, it returns nodes that which connections to we've explored.
-	var all_visited : Array[xNetNode]  ## Nodes which all acceptable connections have been visited.
-	var queue : Array[xNetNode]  ## The traversal queue, where nodes to visit are placed.
-	var finds : Array[xNetNode]  ## The items of interest found along the search. It might have duplicates, if the same finding is repeated.
-	var iter_finds : Array[xNetNode]  ## The items of interest found on the last search iteration.
-	var _head : int  # Pointer of `queue`: nodes behind can't be visited again, ahead are yet to visit.
-	func _init(origins:Array[xNetNode]) -> void:
-		orig.assign(origins)
-		queue = orig.duplicate()
-		for each in origins:
-			history[each] = null
-	
-	## In case you want to a search anew, without losing finds so far. It won't clear
-	## previous finds, nor history, but it will be overwritten with further iterations.[br]
-	## NOTE: This will allow previously visited nodes to be visited again.
-	func reset():
-		visited.clear()
-		all_visited.clear()
-		queue = orig.duplicate()
-		_head = 0
-	
-	## Returns whether there are nodes to search, even if they aren't what's being searched.
-	func is_finished() -> bool:
-		return queue.is_empty() or _head >= queue.size()
-	
-	## From a node in [code]finds[/code], return the chain of nodes back
-	## into its search origin. Both the origin and [code]from[/code] are included.
-	func path(from:xNetNode) -> Array[xNetNode]:
-		var chain : Array[xNetNode] = [from]
-		var source = history[from]
-		while not source in orig:
-			source = history[chain.back()]
-			chain.append(chain)
-		return chain
-	#endregion
-	
-	## Returns whether the [code]next[/code] node is of interest to visit.
-	func _conn_accept(curr:xNetNode, next:xNetNode, node_accept:=Callable()) -> bool:
-		if next in queue: return false  # Already accounted for visiting later.
-		if next in all_visited: return false  # Nothing more to explore in this node.
-		if next in visited.get(curr, []): return false  # Connection already tried.
-		if not node_accept.is_valid() or node_accept.call(curr, next): return true
-		return false  # Failed the `node_accept` test.
-
-	func depth_search(node_accept:=Callable(), node_find:=Callable()) -> Array[xNetNode]:
-		iter_finds.clear()
-		if queue.is_empty(): return []
-		
-		var curr = queue.back()
-		var prev = history[curr]
-		for next in curr.get_connections(prev):
-			if _conn_accept(curr, next, node_accept):
-				visited.get_or_add(curr, []).append(next)
-				history[next] = curr
-				queue.push_back(next)
-				if not node_find.is_valid() or node_find.call(curr, next):
-					# Is item of interest to return. Because we are only taking one node from all connections, we can't wait to pick other connections for finds.
-					iter_finds.append(next)
-				break  # In depth first search we only care about the first valid connection we find. At a later time we explore alternatives.
-		
-		if iter_finds.is_empty():
-			all_visited.append(queue.pop_back())
-		finds.append_array(iter_finds)
-		return iter_finds
-	
-	func breadth_search(node_accept:=Callable(), node_find:=Callable()) -> Array[xNetNode]:
-		iter_finds.clear()
-		for curr in queue.slice(_head, queue.size()):
-			_head += 1
-			all_visited.append(curr)
-			var prev = history[curr]
-			for next in curr.get_connections(prev):
-				if not node_find.is_valid() or node_find.call(curr, next):
-					# Is item of interest to return, doesn't mean it's an item we want to visit.
-					if not next in queue and not next in finds:
-						iter_finds.append(next)
-						history[next] = curr
-				if _conn_accept(curr, next, node_accept):
-					history[next] = curr
-					visited.get_or_add(next, []).append(curr)
-					queue.push_back(next)
-		
-		finds.append_array(iter_finds)
-		return iter_finds
-
-
+#region Graph Editing Stuff
 ## Updates the positioning and shape of wires if they were modified.
 func update_wiring(wires:Array[xWire], timestamp:int=-1):
 	timestamp = Time.get_ticks_usec() if timestamp < 0 else timestamp

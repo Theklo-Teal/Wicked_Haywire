@@ -1,6 +1,8 @@
 extends RefCounted
 class_name xNetBase
 
+## Definition of classes necessary to build a network.
+
 class xPort:
 	## Target for signals being conveyed during simulation using an Observer Pattern.
 	
