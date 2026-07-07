@@ -15,6 +15,7 @@ var sel_joint : xNetBase.xJoint
 var coord_joint : Vector3i  ## Grid coordinate of sel_joint at time of selecting it.
 var sel_wire : xNetBase.xWire
 var info_wire : Dictionary  ## Information about the sel_wire at the time of selecting it.
+var detach_wire := false
 
 ## Returns the actual space position snapped to the grid from a grid coordinate.
 func from_grid(coord:Vector2i) -> Vector2:

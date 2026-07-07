@@ -63,28 +63,55 @@ func finish_cycle():
 
 
 #region Graph Editing Stuff
-## Updates the positioning and shape of wires in the path of this one.
-func update_wiring(wires:Array[xWire]):
-	var accept := Callable(func(curr, next, back): return curr != back and next.distan > curr.distan and next is xWire)
+## Updates the positioning and shape of wires adjacent to the given ones.
+func update_wiring(wires:Array[xWire], timestamp:int):
 	for wire in wires:
-		var orig_path = flow_search(wire)
-		var back_neigh : xNetNode
-		var last_pos : Vector2
-		if orig_path.size() > 1:
-			back_neigh = orig_path[-2]
-			if back_neigh is xJoint: last_pos = back_neigh.position
-			elif back_neigh is xWire:
-				var ending = back_neigh.get_ending(wire)
-				last_pos = back_neigh.get_vertex_position(ending)
-			wire.update_position(last_pos, wire.get_ending(back_neigh))
-		var fore_crawl = xCrawler.new([wire as xNetNode])
-		while not fore_crawl.is_finished():
-			for node : xWire in fore_crawl.depth_traverse(accept.bind(back_neigh), accept.bind(back_neigh)):
-				last_pos = node.update_position(last_pos, node.get_ending(fore_crawl.history[node]))	
+		wire.timestamp = timestamp
+		for each in wire.ori_conn + wire.end_conn:
+			var ending = wire.get_ending(each)
+			if each.timestamp == timestamp: continue
+			if each.distan < wire.distan: continue
+			each.timestamp = timestamp
+			if each is xJoint: 
+				wire.update_position(each.position, ending)
+				continue
+			if each is xWire:
+				var pos = wire.get_vertex_position(ending)
+				ending = each.get_ending(wire)
+				each.update_position(pos, ending)
 
-## Updates the positioning and shape of wires that connect to the given joints.
-func update_joints(joints:Array[xJoint]):
-	pass
+func _joint_wire_accept(curr:xNetNode, next:xNetNode, timestamp:int) -> bool:
+	if timestamp == next.timestamp: return false
+	if not next is xWire: return false
+	if next.distan > 0 and next.distan < curr.distan: return false
+	return true
+
+## Updates the positioning and shape of wires that connect to the given joints
+## and are within its region.
+func update_joints(joints:Array[xJoint], timestamp:int):
+	for joint in joints:
+		joint.timestamp = timestamp
+		var crawl := xCrawler.new([joint])
+		while not crawl.is_finished():
+			for wire : xWire in crawl.depth_traverse(_joint_wire_accept.bind(timestamp)):
+				wire.timestamp = timestamp
+				
+				var prev = crawl.history[wire as xNetNode]
+				wire.endnode = crawl.root[prev]
+				
+				var wire_ending = wire.get_ending(prev)
+				if prev is xJoint:
+					wire.update_position(prev.position, wire_ending)
+				else:
+					var vert_pos = wire.get_vertex_position(wire_ending)
+					wire.update_position(vert_pos, wire_ending)
+				
+				var next_dist = prev.distan + 1
+				if wire.distan <= 0:
+					wire.distan = next_dist
+				else:
+					wire.distan = min(next_dist + 1, wire.distan)
+
 
 func _update_nodes(...changed):
 	var endnodes : Array[xJoint]  # Joints that were modified
@@ -96,8 +123,9 @@ func _update_nodes(...changed):
 		elif node is xWire:
 			wires.append(node)
 	
-	update_wiring(wires)
-	update_joints(endnodes)
+	var timestamp = Time.get_ticks_usec()
+	update_wiring(wires, timestamp)
+	update_joints(endnodes, timestamp)
 #endregion
 
 #region Handling Joints
@@ -114,13 +142,13 @@ func get_or_add_joint(where:Vector2, layer:int, added_joint:xJoint) -> xJoint:
 
 func move_joint(joint:xJoint, where:Vector2) -> Error:
 	var from = X.to_grid(joint.position)
-	var cell_from = Vector3i(from.x, from.y, joint.layer)
+	var cell_from = Vector3i(from.coord.x, from.coord.y, joint.layer)
 	var to = X.to_grid(where)
-	var cell_to = Vector3i(to.x, to.y, joint.layer)
-	netlist.joints.erase(cell_from)
+	var cell_to = Vector3i(to.coord.x, to.coord.y, joint.layer)
 	if cell_to in netlist.joints:
 		return ERR_ALREADY_IN_USE
-	joint.position = where
+	netlist.joints.erase(cell_from)
+	joint.position = to.position
 	netlist.joints[cell_to] = joint
 	return OK
 #endregion
@@ -130,7 +158,7 @@ func move_joint(joint:xJoint, where:Vector2) -> Error:
 ## Returns info on the wire under the point [code]where[/code]. The key [code]wire[/code]
 ## is the wire instance. Refer to [code]xWire.near()[/code] to know other keys.
 func over_wire(where:Vector2, layer:int) -> Dictionary:
-	for wire : xWire in netlist.wires[layer]:
+	for wire : xWire in netlist.wires.get(layer, []):
 		if wire.get_rect().has_point(where):
 			var info = wire.near(where)
 			if not info.is_empty():
@@ -138,8 +166,8 @@ func over_wire(where:Vector2, layer:int) -> Dictionary:
 				return info
 	return {}
 
-## Sets a new wire, or updates an existing one by it clearing its connections
-## and reconnect to new targets.[br]
+## Sets a new wire, or updates an existing one by clearing its connections
+## at the specified ending, then setting its layer[br]
 ## Returns any nodes that were disturbed by the modification of a wire.[br]
 ## By default changes both ends of a wire, but one end my be specified
 func _register_wire(wire:xWire, layer:int, ending:=xWire.VERT.MIDDLE) -> Array[xNetNode]:
@@ -148,53 +176,69 @@ func _register_wire(wire:xWire, layer:int, ending:=xWire.VERT.MIDDLE) -> Array[x
 		if wire in netlist.wires[wire.layer]:
 			# Already existing wire.
 			netlist.wires[wire.layer].erase(wire)
-			affected.append_array(wire.clear_connections(ending))
+			affected.append_array(wire.clear_connections(ending).keys())
 	var wire_list = netlist.wires.get_or_add(layer,[])
 	if not wire in wire_list: wire_list.append(wire)
 	wire.layer = layer
 	return affected
 
-## Connects the given [code]ending[/code] of [code]wire[/code] to a xJoint.[br]
-func plug_wire(wire:xWire, joint:xJoint, ending:xWire.VERT, layer:int):
-	var old_conns = _register_wire(wire, layer, ending)
-	var affected : Array[xNetNode] = [wire]
-	affected.append_array(old_conns)
+
+## Connects the given [code]ending[/code] of [code]wire[/code] to a xJoint.
+## Anything connected to [code]wire[/code] there will be cleared[br]
+func plug_wire(wire:xWire, joint:xJoint, ending:xWire.VERT):
+	var old_conns = _register_wire(wire, ending)
+	for each in old_conns:
+		each.disconnection(wire, true)
+	
+	netlist.wires.get_or_add(joint.layer, []).append(wire)
 	wire.connect_ending(ending, joint)
-	wire.distan = 1
-	wire.endnode = joint
 	joint.connected.append(wire)
-	_update_nodes.callv(affected)
+	#_update_nodes.call_deferred.callv(old_conns)
+
 
 ## Adds [code]to[/code] to [code]from[/code] at the given endings. This preserves any
-## connected wires, but not others.
+## connected wires, but not other node types.
 func extend_wire(from: xWire, to:xWire, from_ending:xWire.VERT, to_ending:xWire.VERT):
-	var from_preserve : Array[xNetNode] = [to]
-	var to_preserve : Array[xNetNode] = [from]
-	var affected : Array[xNetNode] = [from, to]
 	var from_conns = _register_wire(from, from.layer, from_ending)
 	var to_conns = _register_wire(to, from.layer, to_ending)
-	affected.append_array(from_conns + to_conns)
-	to.endnode = from.endnode
-	for each in from_conns:
-		if each is xWire: from_preserve.append(each)
-	for each in to_conns:
-		if each is xWire: to_preserve.append(each)
-	from.connect_ending.callv([from_ending] + from_preserve)
-	to.connect_ending.callv([to_ending] + to_preserve)
-	_update_nodes.callv(affected)
+	var new_from_conns = from_conns.filter(func(a): return a is xWire)
+	var new_to_conns = to_conns.filter(func(a): return a is xWire)
+	new_from_conns.append(to)
+	new_to_conns.append(from)
+	netlist.wires.get_or_add(from.layer, []).append(to)
+	from.connect_ending.callv([from_ending] + new_from_conns)
+	to.connect_ending([to_ending] + new_to_conns)
+	#_update_nodes.call_deferred.callv(from_conns + to_conns)
 
-
-func join_wire(from: xWire, to:xWire):
-	pass
-
-## Break a wire in two and add the start of a new wire to the meeting point.
-func split_wire(from: xWire, to:xWire):
-	pass
-
-## Break a wire in two and add the stop of a new wire to the meeting point.
-func incise_wire(from: xWire, to:xWire):
-	pass
-
+## Break a [code]wire[/code] in two connected wires. The original will still exist,
+## but shortened.
+func split_wire(wire: xWire, ratio:float, subratio:float):
+	var ending = xWire.VERT.ORIGIN if ratio < 0.5 else xWire.VERT.ENDING
+	var short = wire.get_segment_is(false) == ending
+	var fixed_vert = wire.get_vertex_position((ending + 2) % 4)
+	var old_vert = wire.get_vertex_position(ending)
+	var split_vert = wire.find_point(subratio)
+	var split_conns = wire.clear_connections(ending)
+	
+	var new_wire = xWire.new()
+	new_wire.set_length(split_vert, old_vert, short)
+	new_wire.ori_conn.append(wire)
+	for each in split_conns:
+		new_wire.connect_ending(xWire.VERT.ENDING, each)
+		var each_ending = split_conns[each]
+		if each_ending == xWire.VERT.MIDDLE:
+			each.connected.append(new_wire)
+		else:
+			each.connect_ending(each_ending, new_wire)
+	
+	if ending == xWire.VERT.ORIGIN:
+		wire.set_length(split_vert, fixed_vert, short)
+		wire.ori_conn.append(new_wire)
+	elif ending == xWire.VERT.ENDING:
+		wire.set_length(fixed_vert, split_vert, short)
+		wire.end_conn.append(new_wire)
+	
+	#_update_nodes.call_deferred.callv([wire, new_wire] + split_conns)
 
 ## Update length and corners of a wire according to a new position for the given end.[br]
 ## This preserves chirality of the wire instance.[br]

@@ -85,12 +85,15 @@ class xJoint extends xNetNode:
 		return [position, self]
 	
 	func draw(canvas:Control, highlight:=false):
-		var clr : Color = colors[1] if highlight else colors[2]
-		canvas.draw_circle(position, X.CELL_RAD, clr)
+		draw_at(canvas, position, colors[1] if highlight else colors[2])
+		var font = SystemFont.new()
+		#font.font_names = ["Monospace"]
 		if not text.is_empty():
-			canvas.draw_string(SystemFont.new(), position + Vector2.ONE * X.CELL_RAD, text)
-		var txt = str(port)
-		canvas.draw_string(SystemFont.new(), position + Vector2.ONE * X.CELL_DIA, txt)
+			canvas.draw_string(font, position + Vector2.ONE * X.CELL_RAD, "hash:\t\t" + text)
+		var txt = str("port:\t\t", hash(port))
+		canvas.draw_string(font, position + Vector2(1, 2.5) * X.CELL_RAD, txt)
+	static func draw_at(canvas:Control, where:Vector2, color:=Color.GOLD):
+		canvas.draw_circle(where, X.CELL_RAD, color)
 
 	#region Simulation Fuctions
 	#func emit(val):
@@ -113,10 +116,10 @@ class xVia extends xJoint:
 	
 	func draw(canvas:Control, highlight:=false):
 		if connected.size() != 2 or not text.is_empty():
-			## Only draw if the via is non-trivial
-			var thick = (X.CELL_RAD - X.VIA_RAD) # Find the thickness that produces a hole of constant size.
-			var clr : Color = colors[1] if highlight else colors[2]
-			canvas.draw_circle(position, X.CELL_RAD - thick / 2.0 - X.CLEARANCE, clr, false, thick)
+			super(canvas, highlight)
+	static func draw_at(canvas:Control, where:Vector2, color:=Color.GOLD):
+		var thick = (X.CELL_RAD - X.VIA_RAD) # Find the thickness that produces a hole of constant size.
+		canvas.draw_circle(where, X.CELL_RAD - thick / 2.0 - X.CLEARANCE, color, false, thick)
 
 class xWire extends xNetNode:
 	## And object that forms a net graph between xJoints and how to draw it visually.
@@ -129,39 +132,48 @@ class xWire extends xNetNode:
 	# from connections and works as cache that's recomputed regularly.
 	@export_storage var ori_conn : Array[xNetNode]
 	@export_storage var end_conn : Array[xNetNode]
-	func get_connections(from:xNetNode) -> Array[xNetNode]:
+	
+	## Get nodes connected to this wire, in the ending where [code]from[/code] is
+	## attached. By default it actually gets the [code]opposite[/code] end
+	## connections, but that can be specified.
+	func get_connections(from:xNetNode, opposite:=true) -> Array[xNetNode]:
 		if from in ori_conn:
-			return end_conn
-		return ori_conn
+			return [ori_conn, end_conn][opposite as int]
+		elif from in end_conn:
+			return [end_conn, ori_conn][opposite as int]
+		else:
+			return []
+	
+	## Returns the nodes connected at the specified [code]ending[/code]. If it's
+	## [code]VERT.MIDDLE[/code] it returns both endings' connections.
+	func get_connections_at(ending:VERT) -> Array[xNetNode]:
+		match ending:
+			VERT.ORIGIN:
+				return ori_conn
+			VERT.ENDING:
+				return end_conn
+			VERT.MIDDLE:
+				return ori_conn + end_conn
+			_:
+				return []
 	
 	func disconnection(from:xNetNode, both_ways:=true):
-		var ending : Array[xNetNode]
-		if from in ori_conn:
-			ending = end_conn
-		else:
-			ending = ori_conn
-		for each in ending:
-			super(each, both_ways)
-			ending.erase(each)
+		super(from, both_ways)
+		var conns = get_connections_at(get_ending(from))
+		conns.erase(from)
 	
 	## Disconnects all nodes from the given ending. Returns those nodes.[br]
 	## If ending is [code]VERT.MIDDLE[/code] it disconnects both endings.[br]
 	## Also removes connections of other xNetNode to this one.
-	func clear_connections(ending:=VERT.MIDDLE) -> Array[xNetNode]:
-		var conns : Array[xNetNode]
-		match ending:
-			VERT.ORIGIN:
-				conns = ori_conn.duplicate()
-				ori_conn.clear()
-			VERT.ENDING:
-				conns = end_conn.duplicate()
-				end_conn.clear()
-			VERT.MIDDLE:
-				conns = ori_conn + end_conn
-				ori_conn.clear()
-				end_conn.clear()
+	func clear_connections(ending:=VERT.MIDDLE) -> Dictionary[xNetNode, VERT]:
+		var conns : Dictionary[xNetNode, VERT]
+		for each in get_connections_at(ending):
+			if each is xWire:
+				conns[each] = each.get_ending(self, false)
+			else:
+				conns[each] = VERT.MIDDLE
 		for each : xNetNode in conns:
-			each.disconnection(self,false)
+			each.disconnection(self,true)
 		return conns
 	
 	## Adds the xNetNode in [code]what[/code] to the indicated ending.[br]
@@ -174,35 +186,32 @@ class xWire extends xNetNode:
 			VERT.ENDING: end_conn.append_array(these)
 			VERT.MIDDLE: return
 	
-	@export_storage var vector : Vector2  ## Encodes the length and proportions of the wire. It's always positive.
+	@export_storage var vector : Vector2  ## Encodes the length and proportions of the wire. It might not be positive, so it encodes direction of a rectangle's position.
 	@export_storage var corners : Array[CORN]  ## Sequence of corners of the rectangle the wire runs along.
 	@export_storage var bend : float = 1  ## From 0 to 1, how far along the shortest end should a diagonal be done cutting the corner.
 	
-	## This returns a rectangle with [code]Rect2.size[/code] of [code]vector[/code] and positioned in world space.
+	## This returns a rectangle with [code]Rect2.size[/code] of [code]vector[/code] and positioned in world space.[br]
+	## The vector and position are updated if there's a xJoint, to track its position.
 	func get_rect() -> Rect2:
-		#TODO find the coordinates reflecting the position of a single xJoint ending to update position and vector.
-		var start : xJoint = null
-		var stop : xJoint = null
+		#WARNING Can't use `get_verts()` in here. It relies on this function, so causes infinite recursion.
+		var verts = find_verts(Rect2(position, vector.abs()), corners[0], corners[1], corners[2])
+		var start : Vector2 = verts[0]
+		var stop : Vector2 = verts[2]
 		for each in ori_conn:
 			if each is xJoint:
-				start = each
+				start = each.position
 				break
 		for each in end_conn:
 			if each is xJoint:
-				stop = each
+				stop = each.position
 				break
-		if start != null and stop != null:
-			#TODO What if only start or stop are null?
-			var vec = stop.position - start.position
-			vector = vec.abs()
-			return Rect2(start.position, vec).abs()
-		elif start != null:
-			pass
-		elif stop != null:
-			pass
-		return Rect2(position, vector)
+		
+		vector = stop - start
+		position = start + vector
+		
+		return Rect2(position, vector).abs()
 	
-	## Set position relative to [code]from[/from] and return the resulting
+	## Set position relative to [code]from[/code] and return the resulting
 	## position of the opposite wire ending
 	func update_position(from:Vector2, ending:=VERT.ORIGIN) -> Vector2:
 		var verts = all_verts(Rect2(Vector2.ZERO, vector))
@@ -213,8 +222,9 @@ class xWire extends xNetNode:
 	## Draws this wire segment on canvas.
 	func draw(canvas:Control, highlight:bool=false):
 		draw_along(canvas, get_rect(), corners[0], corners[1], corners[2], bend, colors[1] if highlight else colors[2])
-		var txt = str(endnode.text) + " : " + str(distan)
-		canvas.draw_string(SystemFont.new(), get_vertex_position(VERT.ORIGIN), txt)
+		if endnode != null:
+			var txt = str(endnode.text) + " : " + str(distan)
+			canvas.draw_string(SystemFont.new(), get_vertex_position(VERT.ENDING), txt)
 	
 	## Given a rectangle with positive size, draw a wire.
 	static func draw_along(canvas:Control, box:Rect2, ori:CORN, mid:CORN, end:CORN, ratio:float=1, clr:=Color.GOLDENROD):
@@ -233,22 +243,44 @@ class xWire extends xNetNode:
 	#endregion
 	
 	#region Constructors
-	func _init(start:Vector2, stop:Vector2, ori:CORN, mid:CORN, end:CORN) -> void:
-		vector = (stop - start).abs()
-		corners = [ori, mid, end]
-
+	static func from_corners(start:Vector2, stop:Vector2, ori:CORN, mid:CORN, end:CORN) -> xWire:
+		#TODO Set position
+		var wire = xWire.new()
+		wire.vector = stop - start
+		wire.corners = [ori, mid, end]
+		return wire
+	
 	## Get a wire segment knowing the winding direction.
 	static func from_chiral(start:Vector2, stop:Vector2, clockwise:bool) -> xWire:
-		var vec = Vector2(stop - start)
+		#TODO Set position
+		var vec = stop - start
 		var corns = get_corners_chi(vec, clockwise)
-		return xWire.new(start, stop, corns[0], corns[1], corns[2])
-
+		return from_corners(start, stop, corns[0], corns[1], corns[2])
+	
 	## Get a wire segment knowing we want the first line to be either the longest or shortest.
 	static func from_length(start:Vector2, stop:Vector2, short:bool) -> xWire:
-		var vec = Vector2(stop - start)
+		#TODO Set position
+		var vec = stop - start
 		var corns = get_corners_len(vec, short)
-		return xWire.new(start, stop, corns[0], corns[1], corns[2])
-
+		return xWire.from_corners(start, stop, corns[0], corns[1], corns[2])
+	
+	func set_corners(ori:CORN, mid:CORN, end:CORN):
+		corners = [ori, mid, end]
+	
+	func set_endings(start:Vector2, stop:Vector2):
+		#TODO Set position
+		vector = stop - start
+		corners = get_corners_chi(vector, get_chirality(true))
+	
+	func set_chiral(start:Vector2, stop:Vector2, clockwise:bool):
+		#TODO Set position
+		vector = stop - start
+		corners = get_corners_chi( stop - start, clockwise)
+	
+	func set_length(start:Vector2, stop:Vector2, short:bool):
+		#TODO Set position
+		vector = stop - start
+		corners = get_corners_len( stop - start, short)
 	#endregion
 	
 	#region Instance Information
@@ -260,7 +292,7 @@ class xWire extends xNetNode:
 	## Returns the position of vertex of the wire.
 	func get_vertex_position(ending:=VERT.ENDING) -> Vector2:
 		var verts = get_verts()
-		return verts[ending]
+		return verts[min(ending, verts.size() - 1)]
 	
 	## Returns the ending where a given xNetNode is found, optionally returns
 	## the opposite ending.[br]
@@ -269,6 +301,13 @@ class xWire extends xNetNode:
 		if (from in ori_conn) != opposite:
 			return VERT.ORIGIN
 		return VERT.ENDING
+	
+	## Returns whether the wire winds in given direction around its rectangle.
+	## Straight lines always return [code]false[/code].
+	func get_chirality(clockwise:bool) -> bool:
+		if corners[1] == CORN.NULL: return false
+		var endings = corners[0] < corners[2]
+		return [[false,true],[true,false]][endings as int][(corners[1] in [1,3]) != clockwise as int]
 	
 	## Returns which line coming from an end is either the longest or the shortest.
 	func get_segment_is(longest:bool) -> VERT:
@@ -405,7 +444,7 @@ class xWire extends xNetNode:
 
 	## Get the winding direction such as the the first line is either longest or shortest.
 	## [code]box_size[/code] must be positive ([code]abs()[/code] applied).
-	static func get_chirality(short_first:bool, end:CORN, box_size:Vector2) -> bool:
+	static func get_chirality_len(short_first:bool, end:CORN, box_size:Vector2) -> bool:
 		var axis = bool(box_size.min_axis_index()) != short_first
 		return [true,false,false,true][end] != axis
 
@@ -415,7 +454,7 @@ class xWire extends xNetNode:
 		var x = int(raw_size.x > 0)
 		var y = int(raw_size.y > 0)
 		var end = ((x << 1) | y ) as CORN
-		var chi = get_chirality(shortest, end, raw_size.abs())
+		var chi = get_chirality_len(shortest, end, raw_size.abs())
 		return get_corners_chi(raw_size, chi)
 
 	## With the size of a Rect2 without [code]abs()[/code], get the order of corners the wire runs along.[br]
@@ -456,6 +495,7 @@ class xWire extends xNetNode:
 			
 		if mid == CORN.NULL:
 			# Skip finding the bend corner, if there's no mid point
+			verts.append(box_verts[end])  # Pad the middle, so it matchs VERT indexes.
 			return verts
 		
 		if abs(ratio - 0.5) > 0.5:
