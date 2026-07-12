@@ -190,7 +190,6 @@ func plug_wire(wire:xWire, joint:xJoint, ending:xWire.VERT):
 	for each in old_conns:
 		each.disconnection(wire, true)
 	
-	netlist.wires.get_or_add(joint.layer, []).append(wire)
 	wire.connect_ending(ending, joint)
 	joint.connected.append(wire)
 	#_update_nodes.call_deferred.callv(old_conns)

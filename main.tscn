@@ -3,7 +3,7 @@
 [ext_resource type="Texture2D" uid="uid://bliggdgfw3v4k" path="res://Wicked_Haywire_Logo.png" id="1_1bvp3"]
 [ext_resource type="PackedScene" uid="uid://bnatph83g21s6" path="res://modules/InfiCanvas/Flowchart/Flowchart.tscn" id="1_ig7tw"]
 [ext_resource type="Texture2D" uid="uid://buorl1ocq0h64" path="res://assets/flags.png" id="1_lquwl"]
-[ext_resource type="Resource" uid="uid://ciiv6lsgc672m" path="res://styles/flowchart/Blueprint.tres" id="4_7mycd"]
+[ext_resource type="Resource" uid="uid://o8gsvfmhpdpa" path="res://styles/flowchart/Blueprint.tres" id="4_7mycd"]
 [ext_resource type="Script" uid="uid://cf6g8f4qcf6wb" path="res://modules/InfiCanvas/Flowchart/Graphs/flowchart_graph_base.gd" id="4_lquwl"]
 [ext_resource type="Script" uid="uid://b07ljhmg8l7ne" path="res://modules/Sidebar.gd" id="6_7mycd"]
 [ext_resource type="Shader" uid="uid://d1gg4mr8iu7ia" path="res://modules/SidebarTray_Glass.gdshader" id="6_272bh"]
@@ -34,14 +34,7 @@ func _ready() -> void:
 	%TrayTabBar.current_tab = G.setts.get_value(\"0\", \"ribbonbar\", 0)
 	%Ribbon/TabContainer.current_tab = G.setts.get_value(\"0\", \"ribbonbar\", 0)
 	
-	find_flowchart_style()
-	%Cell_Size.value_changed.connect( func(val):%Flowchart.appearance.cell_size = val )
-	%Grid_Thick.value_changed.connect( func(val):%Flowchart.appearance.grid_thick = val )
-	%Orig_Thick.value_changed.connect( func(val):%Flowchart.appearance.orig_thick = val )
-	%Grid_Color.color_changed.connect( func(val):%Flowchart.appearance.grid_color = val )
-	%Orig_Color.color_changed.connect( func(val):%Flowchart.appearance.orig_color = val )
-	%Back_Color.color_changed.connect( func(val):%Flowchart.appearance.color = val )
-	
+	find_flowchart_themes()
 	find_electronics_parts()
 
 func _input(event: InputEvent) -> void:
@@ -55,18 +48,6 @@ func _input(event: InputEvent) -> void:
 					grab_part.button_pressed = false
 					return
 
-
-#region Flowchart Style Management
-func find_flowchart_style():
-	%Cell_Size.value = %Flowchart.cell_size
-	%Grid_Thick.value = %Flowchart.grid_thick
-	%Orig_Thick.value = %Flowchart.orig_thick
-	%Grid_Color.color = %Flowchart.grid_color
-	%Orig_Color.color = %Flowchart.orig_color
-	%Back_Color.color = %Flowchart.color
-
-#endregion
-
 #region Ribbon/Tray
 
 func _on_tray_tab_bar_tab_changed(tab: int, tabbar: TabBar) -> void:
@@ -77,6 +58,73 @@ func _on_tray_tab_bar_tab_changed(tab: int, tabbar: TabBar) -> void:
 		%Ribbon.show()
 		var tabtitle = tabbar.get_tab_title(tab)
 		%Ribbon/TabContainer.find_child(tabtitle, false).show()
+
+#region Layer Options
+func _on_add_layer_pressed() -> void:
+	%Scheme_Layers.add_tab(%Layer_Title.text)
+
+const THEME_PATH = \"res://styles/flowchart/\"
+@onready var theme_list : PopupMenu = %Theme_Select.get_popup()
+var theme_ids : Dictionary[String, int]
+func find_flowchart_themes():
+	theme_list.clear()
+	if not theme_list.index_pressed.is_connected(_on_flowchart_theme_picked):
+		theme_list.index_pressed.connect(_on_flowchart_theme_picked)
+	for each in DirAccess.get_files_at(THEME_PATH):
+		if each.get_extension() != \"tres\":
+			continue
+		var id = hash(THEME_PATH + each)
+		theme_list.add_item(each.get_basename(), id)
+		var idx = theme_list.get_item_index(id)
+		theme_list.set_item_metadata(idx, THEME_PATH + each)
+		theme_ids[each.get_basename()] = id
+	_on_flowchart_theme_picked(0)
+
+func _on_flowchart_theme_picked(idx:int):
+	%Theme_Title.text = theme_list.get_item_text(idx)
+	var theme : FlowchartStyle = load(theme_list.get_item_metadata(idx))
+	%Flowchart.appearance = theme
+	%Cell_Size.value = theme.cell_size
+	%Back_Color.color = theme.color
+	%Orig_Thick.value = theme.orig_thick
+	%Orig_Color.color = theme.orig_color
+	%Grid_Thick.value = theme.grid_thick
+	%Grid_Color.color = theme.grid_color
+
+func _on_save_theme_pressed() -> void:
+	var idx = theme_list.get_item_index(theme_ids[%Theme_Title.text])
+	ResourceSaver.save(%Flowchart.appearance, theme_list.get_item_metadata(idx))
+
+func _on_rem_theme_pressed() -> void:
+	var title = %Theme_Title.text
+	if title in [\"Blueprint\", \"Dark_CAD\"]:
+		# Don't delete the default themes
+		return
+	var idx = theme_list.get_item_index(theme_ids[title])
+	var path = theme_list.get_item_metadata(idx)
+	var error = DirAccess.remove_absolute(path)
+	if error != OK:
+		printerr(\"Main/_on_rem_theme_pressed: Problem removing theme! Error: \" + error_string(error) + \"; Theme: \" + path)
+	theme_list.remove_item(idx)
+	_on_flowchart_theme_picked(0)
+	
+func _on_dupl_theme_pressed() -> void:
+	pass
+
+func _on_cell_size_value_changed(value: float) -> void:
+	%Flowchart.appearance.cell_size = value
+func _on_back_color_color_changed(color: Color) -> void:
+	%Flowchart.appearance.color = color
+func _on_orig_thick_value_changed(value: float) -> void:
+	%Flowchart.appearance.orig_thick = value
+func _on_orig_color_color_changed(color: Color) -> void:
+	%Flowchart.appearance.orig_color = color
+func _on_grid_thick_value_changed(value: float) -> void:
+	%Flowchart.appearance.grid_thick = value
+func _on_grid_color_color_changed(color: Color) -> void:
+	%Flowchart.appearance.grid_color = color
+
+#endregion
 
 #region Electronics Components Tray
 
@@ -530,8 +578,8 @@ bg_color = Color(0, 0, 0, 0.6)
 border_width_left = 1
 border_width_right = 1
 border_color = Color(0.175, 0.175, 0.175, 1)
-corner_radius_top_left = 6
-corner_radius_top_right = 20
+corner_radius_bottom_right = 20
+corner_radius_bottom_left = 6
 corner_detail = 5
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_lquwl"]
@@ -543,8 +591,8 @@ bg_color = Color(0.1, 0.1, 0.1, 0.3)
 border_width_left = 1
 border_width_right = 1
 border_color = Color(0.175, 0.175, 0.175, 1)
-corner_radius_top_left = 6
-corner_radius_top_right = 20
+corner_radius_bottom_right = 20
+corner_radius_bottom_left = 6
 corner_detail = 5
 expand_margin_bottom = 4.0
 
@@ -759,7 +807,7 @@ layout_mode = 2
 layout_mode = 2
 size_flags_vertical = 3
 theme_override_styles/panel = SubResource("StyleBoxFlat_d13ii")
-current_tab = 4
+current_tab = 1
 tabs_position = 1
 tabs_visible = false
 tab_4/title = "ANA_TAB"
@@ -855,7 +903,6 @@ item_1/text = "Layer1/joint7"
 item_2/text = "Layer3/joint0"
 
 [node name="LAY_TAB" type="VBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer" unique_id=74805143]
-visible = false
 layout_mode = 2
 metadata/_tab_index = 1
 metadata/_tab_name = "LAY_TAB"
@@ -893,15 +940,20 @@ layout_mode = 2
 layout_mode = 2
 text = "THEME"
 
-[node name="LineEdit" type="LineEdit" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/LAY_TAB/ThemePicker" unique_id=967858835]
+[node name="Theme_Select" type="MenuButton" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/LAY_TAB/ThemePicker" unique_id=847116203]
+unique_name_in_owner = true
+layout_mode = 2
+text = " V "
+flat = false
+item_count = 1
+popup/item_0/text = "Example"
+popup/item_0/id = 0
+
+[node name="Theme_Title" type="LineEdit" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/LAY_TAB/ThemePicker" unique_id=967858835]
+unique_name_in_owner = true
 custom_minimum_size = Vector2(200, 0)
 layout_mode = 2
-text = "Default"
-
-[node name="Button" type="Button" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/LAY_TAB/ThemePicker" unique_id=2052023804]
-layout_mode = 2
-toggle_mode = true
-text = " V "
+text = "DEFAULT"
 
 [node name="Spacer" type="Control" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/LAY_TAB/ThemePicker" unique_id=1681092427]
 layout_mode = 2
@@ -1062,6 +1114,7 @@ color = Color(0.15792847, 0.15851259, 0.1953125, 1)
 script = SubResource("GDScript_272bh")
 
 [node name="SPT_TAB" type="HBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer" unique_id=1052644322]
+visible = false
 layout_mode = 2
 metadata/_tab_index = 4
 metadata/_tab_name = "ANA_TAB"
@@ -1234,6 +1287,16 @@ cancel_button_text = "What? No!"
 [connection signal="tab_changed" from="MarginContainer/HBoxContainer/VBoxContainer/HBoxContainer/TrayTabBar" to="." method="_on_tray_tab_bar_tab_changed" flags=18]
 [connection signal="toggled" from="MarginContainer/HBoxContainer/VBoxContainer/HBoxContainer/Mode" to="." method="_on_mode_toggled" flags=18]
 [connection signal="drag_ended" from="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter" to="." method="_on_tray_splitter_drag_ended" flags=18]
+[connection signal="pressed" from="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/LAY_TAB/HBoxContainer/Add_Layer" to="." method="_on_add_layer_pressed"]
+[connection signal="pressed" from="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/LAY_TAB/ThemePicker/dupl_theme" to="." method="_on_dupl_theme_pressed"]
+[connection signal="pressed" from="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/LAY_TAB/ThemePicker/rem_theme" to="." method="_on_rem_theme_pressed"]
+[connection signal="pressed" from="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/LAY_TAB/ThemePicker/save_theme" to="." method="_on_save_theme_pressed"]
+[connection signal="value_changed" from="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/LAY_TAB/GridContainer/HBoxContainer6/Cell_Size" to="." method="_on_cell_size_value_changed"]
+[connection signal="color_changed" from="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/LAY_TAB/GridContainer/HBoxContainer5/Back_Color" to="." method="_on_back_color_color_changed"]
+[connection signal="value_changed" from="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/LAY_TAB/GridContainer/HBoxContainer2/Orig_Thick" to="." method="_on_orig_thick_value_changed"]
+[connection signal="color_changed" from="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/LAY_TAB/GridContainer/HBoxContainer4/Orig_Color" to="." method="_on_orig_color_color_changed"]
+[connection signal="value_changed" from="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/LAY_TAB/GridContainer/HBoxContainer/Grid_Thick" to="." method="_on_grid_thick_value_changed"]
+[connection signal="color_changed" from="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/LAY_TAB/GridContainer/HBoxContainer3/Grid_Color" to="." method="_on_grid_color_color_changed"]
 [connection signal="toggled" from="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/ANA_TAB/VBoxContainer/Sim_Paused" to="." method="_on_sim_paused_toggled" flags=18]
 [connection signal="item_selected" from="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/ANA_TAB/VBoxContainer/Sim_Rate" to="." method="_on_sim_rate_item_selected" flags=18]
 [connection signal="toggled" from="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/TOY_TAB/VBoxContainer/fold_devices" to="." method="_on_fold_devices_toggled" flags=18]

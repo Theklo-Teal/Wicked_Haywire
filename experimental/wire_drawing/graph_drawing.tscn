@@ -152,8 +152,8 @@ func _gui_input(event: InputEvent) -> void:
 							var fin_ending := xNetBase.xWire.VERT.MIDDLE
 							if not X.info_wire.is_empty():
 								fin_ending = xNetBase.xWire.VERT.ORIGIN if X.info_wire.ratio < 0.5 else xNetBase.xWire.VERT.ENDING
-							
-							_new_wire(event.position, sel_joint, sel_wire, ini_ending, fin_ending)
+							if not ((sel_joint == X.sel_joint and sel_joint != null) or (sel_wire == X.sel_wire and sel_wire != null)):
+								_new_wire(event.position, sel_joint, sel_wire, ini_ending, fin_ending)
 						
 					MOUSE_BUTTON_RIGHT:
 						# Move Joint
@@ -167,12 +167,11 @@ func _draw() -> void:
 		if coord.z != X.layer:
 			continue
 		var joint = net.netlist.joints[coord]
-		joint.position = X.from_grid(Vector2i(coord.x, coord.y))
+
 		joint.draw(self, joint == X.sel_joint)
 	for wire in net.netlist.wires.get(X.layer, []):
 		if wire == X.sel_wire and X.detach_wire: continue
 		wire.draw(self, wire == X.sel_wire)
-
 
 var period : float = 0.33
 var _elapsed : float = 0
@@ -191,6 +190,10 @@ script/source = "extends Control
 
 func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion: queue_redraw()
+	
+	if event is InputEventMouseButton:
+		if get_parent().was_drag and event.is_released():
+			queue_redraw()
 	
 	if event is InputEventKey and not event.is_echo():
 		match event.keycode:

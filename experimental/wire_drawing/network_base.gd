@@ -194,20 +194,23 @@ class xWire extends xNetNode:
 	## The vector and position are updated if there's a xJoint, to track its position.
 	func get_rect() -> Rect2:
 		#WARNING Can't use `get_verts()` in here. It relies on this function, so causes infinite recursion.
+		
+		# Get vertex values assuming nothing changed.
 		var verts = find_verts(Rect2(position, vector.abs()), corners[0], corners[1], corners[2])
 		var start : Vector2 = verts[0]
 		var stop : Vector2 = verts[2]
-		for each in ori_conn:
-			if each is xJoint:
-				start = each.position
-				break
-		for each in end_conn:
-			if each is xJoint:
-				stop = each.position
-				break
 		
+		# Set new position or vector values if a ending joint changed.
+		#for each in ori_conn:
+			#if each is xJoint:
+				#start = each.position
+				#break
+		#for each in end_conn:
+			#if each is xJoint:
+				#stop = each.position
+				#break
 		vector = stop - start
-		position = start + vector
+		position = start
 		
 		return Rect2(position, vector).abs()
 	
@@ -248,38 +251,41 @@ class xWire extends xNetNode:
 		var wire = xWire.new()
 		wire.vector = stop - start
 		wire.corners = [ori, mid, end]
+		wire.position = start
 		return wire
 	
 	## Get a wire segment knowing the winding direction.
 	static func from_chiral(start:Vector2, stop:Vector2, clockwise:bool) -> xWire:
-		#TODO Set position
 		var vec = stop - start
 		var corns = get_corners_chi(vec, clockwise)
 		return from_corners(start, stop, corns[0], corns[1], corns[2])
 	
 	## Get a wire segment knowing we want the first line to be either the longest or shortest.
 	static func from_length(start:Vector2, stop:Vector2, short:bool) -> xWire:
-		#TODO Set position
 		var vec = stop - start
 		var corns = get_corners_len(vec, short)
 		return xWire.from_corners(start, stop, corns[0], corns[1], corns[2])
 	
 	func set_corners(ori:CORN, mid:CORN, end:CORN):
+		#TODO Set position ?
 		corners = [ori, mid, end]
 	
 	func set_endings(start:Vector2, stop:Vector2):
 		#TODO Set position
 		vector = stop - start
+		position = start
 		corners = get_corners_chi(vector, get_chirality(true))
 	
 	func set_chiral(start:Vector2, stop:Vector2, clockwise:bool):
 		#TODO Set position
 		vector = stop - start
+		position = start
 		corners = get_corners_chi( stop - start, clockwise)
 	
 	func set_length(start:Vector2, stop:Vector2, short:bool):
 		#TODO Set position
 		vector = stop - start
+		position = start
 		corners = get_corners_len( stop - start, short)
 	#endregion
 	
