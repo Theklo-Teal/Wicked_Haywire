@@ -1,5 +1,5 @@
 @tool
-extends FlowchartNode
+extends FlowchartGizmo
 class_name Electronics
 
 @export_storage var bitwidth : int = 1 : set=set_bitwidth

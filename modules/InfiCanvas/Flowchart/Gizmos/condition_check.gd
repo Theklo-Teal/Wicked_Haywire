@@ -2,9 +2,9 @@
 extends Electronics
 class_name ConditionCheck
 
-@onready var pos_q : ChartSocketSource = sockets[0]
-@onready var neg_q : ChartSocketSource = sockets[1]
-@onready var inps : Array[ChartSocketSink] = [sockets[2], sockets[3]]
+@onready var pos_q : ChartSocket = sockets.keys()[0]
+@onready var neg_q : ChartSocket = sockets.keys()[1]
+@onready var inps : Array[ChartSocket] = [sockets.keys()[2], sockets.keys()[3]]
 
 func set_bitwidth(val:int):
 	super(val)
@@ -51,9 +51,9 @@ func _on_extender_pressed():
 	match layout_axle:
 		AXLE.HORIZ:
 			custom_minimum_size.y += G.grid_size
-			var new_sink = ChartSocketSink.new()
+			var new_sink = ChartSocket.new()
 			inps.append(new_sink)
-			add_graph_socket(new_sink, Vector2i(0, sockets.size()))
+			add_socket(new_sink, Vector2i(0, sockets.size()))
 	if %retractor.disabled == true:
 		%retractor.disabled = false
 
@@ -63,6 +63,6 @@ func _on_retractor_pressed() -> void:
 			AXLE.HORIZ:
 				custom_minimum_size.y -= G.grid_size
 				var old_sink = inps.pop_back()
-				rem_graph_socket(old_sink)
+				rem_socket(old_sink)
 	if sockets.size() <= 4:
 		%retractor.disabled = true

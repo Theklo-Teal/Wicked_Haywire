@@ -1,10 +1,41 @@
-extends RefCounted
-class_name xNetBase
+@abstract
+extends Node
+class_name NetBase
 
 ## Definition of classes necessary to build a network.
 
-class xPort:
+#region Simulation Override Functions
+signal update_done
+signal begin_done
+signal finish_done
+
+@warning_ignore_start("unused_parameter")
+func update(graph:FlowchartNetwork):
+	_update(graph)
+	update_done.emit()
+
+func cycle_begin():
+	_cycle_begin()
+	begin_done.emit()
+
+func cycle_finish():
+	_cycle_finish()
+	finish_done.emit()
+
+func _update(graph:FlowchartNetwork):
+	pass
+
+func _cycle_begin():
+	pass
+
+func _cycle_finish():
+	pass
+@warning_ignore_restore("unused_parameter")
+#endregion
+
+class Port:
 	## Target for signals being conveyed during simulation using an Observer Pattern.
+	
 	var value
 	var aggregate : Array
 	
@@ -19,63 +50,106 @@ class xPort:
 		aggregate.append(val)
 
 
-@abstract class xNetNode extends Resource:
-	## Anything that can be connected in a network, like sockets
+@abstract class NetVert extends Resource:
+	## Anything that can be connected in a network, like joints
 	## and wires.
-	@export_storage var connected : Dictionary[xNetNode, xWire]
-	@export_storage var position : Vector2
+	@export_storage var coord : Vector2i :
+		set(val):
+			coord = val
+			_position = G.from_grid(coord)
+	@export_storage var _position : Vector2  # Spatial position is not to be relied on authoritavely. It should be updated whenever [code]coord[/code] is set, functioning as a cache so we don't have to call grid snapping all the time.
 	@export_storage var layer : int
 	
-	var colors : Array[Color] = [Color.YELLOW, Color.GOLD, Color.GOLDENROD]
+	## Returns both grid coordinate and layer as the same data type.
+	func get_cell() -> Vector3i:
+		return Vector3i(coord.x, coord.y, layer)
+	## Sets both grid coordinate and layer from the same data type.
+	func set_cell(cell:Vector3i):
+		layer = cell.z
+		coord = Vector2i(cell.x, cell.y)
 	
+	@abstract func get_connected(from:NetVert=null) -> Array[NetVert]
+	@abstract func get_outgoing(from:NetVert=null) -> Array[NetVert]
+	@abstract func get_ingoing(from:NetVert=null) -> Array[NetVert]
+	@abstract func get_link(connection:NetVert) -> Link
+	@abstract func is_outgoing(connection:NetVert) -> Link
+	
+	## How to draw this object on the [code]canvas[/code].
 	@abstract func draw(canvas:Control, highlight:bool=false)
 
-class xJoint extends xNetNode:
-	func draw(canvas:Control, highlight:bool=false):
-		canvas.draw_circle(position, X.CELL_RAD, colors[1] if highlight else colors[2])
+
+class Joint extends NetVert:
+	@export_storage var connected : Dictionary[Joint, Link]
+	
+	func get_connected(_from:NetVert=null) -> Array[NetVert]:
+		return connected.keys()
+	func get_ingoing(_from:NetVert=null) -> Array[NetVert]:
+		return connected.keys()
+	func get_outgoing(_from:NetVert=null) -> Array[NetVert]:
+		return connected.keys()
+	func get_link(connection:NetVert) -> Link:
+		return connected.get(connection, connection.connected.get(self, null))
+	func is_outgoing(connection:NetVert) -> Link:
+		return connected.get(connection, null)
+	
+	func draw(canvas:Control, _highlight:bool=false):
+		draw_at(canvas, _position)
 		draw_wires(canvas)
 	
 	func draw_wires(canvas:Control):
 		for conn in connected:
 			if connected[conn] == null: continue
-			connected[conn].draw(canvas, position, conn.position)
+			var wire = connected[conn]
+			wire.draw(canvas, _position, conn.position)
 	
 	static func draw_at(canvas:Control, where:Vector2):
-		canvas.draw_circle(where, X.CELL_RAD, Color.YELLOW)
+		var color = G.appearance.color.inverted()
+		color.a = 0.4
+		canvas.draw_circle(where, G.joint_rad, color)
 
-class xVia extends xJoint:
-	@export var text : String
-	func draw(canvas:Control, highlight:bool=false):
-		var thick = X.CELL_RAD - X.VIA_RAD
-		canvas.draw_circle(position, X.CELL_RAD - X.VIA_RAD / 2.0, colors[1] if highlight else colors[2], false, thick)
-		draw_wires(canvas)
-
-
-class xWire:
-	## And object that defines the visual representation of the connection between NetNodes.
+class Via extends Joint:
+	## A simple Joint that isn't associated with Gizmos and to be used
+	## as the ending of a wire and labelled to create a tunnel connection.
 	
+	@export var text : String = ""
+	
+	func draw(canvas:Control, highlight:=false):
+		if connected.size() != 2 or not text.is_empty():
+			var thick = G.appearance.joint_rad - G.appearance.via_hole # Find the thickness that produces a hole of constant size.
+			canvas.draw_circle(_position,
+				G.appearance.joint_rad - thick / 2.0 - G.appearance.clearance,
+				G.appearance.trace_color_highlight if highlight else G.appearance.trace_color_primary,
+				false, thick)
+
+class Link:
+	## And object that defines the visual representation of the connection between NetVerts.
 	enum M {  ## The method used to find the bend corner in the middle of a wire.
 		HANDI,  ## Handiness, if clockwise, or counterclockwise of the origin ending.
 		LENG,  ## By Length, whether the longest or shortest segment comes from the origin ending. 
 		}
-	
 	@export_storage var mode := M.LENG
 	@export_storage var chirality : bool  ## In M.HANDI "true" means clockwise. In M.LENG "true" means longest segment first.
-	@export_storage var bend : float  ## Defines the diagonal cutting the corner.
-
-	func draw(canvas:Control, start:Vector2, stop:Vector2):
-		canvas.draw_polyline(get_verts(start, stop), Color.GOLDENROD, X.WIRE_THICK)
+	@export_storage var bend : float :  ## Number from 0 to 1 as ratio, where 1 is the length of of shortest segment. It defines the diagonal segment of a corner.
+		set(val):
+			bend = clamp(val, 0, 1)
 	
-	static func draw_chiral(canvas:Control, start:Vector2, stop:Vector2, clockwise:bool, bending:float):
+	var net : NetBase
+	func _init(network:NetBase):
+		net = network
+	
+	func draw(canvas:Flowchart, start:Vector2, stop:Vector2):
+		canvas.draw_polyline(get_verts(start, stop), canvas.trace_color_primary, canvas.max_wire)
+	
+	static func draw_chiral(canvas:Flowchart, start:Vector2, stop:Vector2, clockwise:bool, ratio:float):
 		var middle = find_bend_chi(start, stop, clockwise)
-		canvas.draw_polyline(get_verts_from(start, middle, stop, bending), Color.GOLDENROD, X.WIRE_THICK)
+		canvas.draw_polyline(get_verts_from(start, middle, stop, ratio), canvas.trace_color_primary, canvas.max_wire)
 	
-	static func draw_length(canvas:Control, start:Vector2, stop:Vector2, longest:bool, bending:float):
+	static func draw_length(canvas:Flowchart, start:Vector2, stop:Vector2, longest:bool, ratio:float):
 		var middle = find_bend_len(start, stop, longest)
-		canvas.draw_polyline(get_verts_from(start, middle, stop, bending), Color.GOLDENROD, X.WIRE_THICK)
+		canvas.draw_polyline(get_verts_from(start, middle, stop, ratio), canvas.trace_color_primary, canvas.max_wire)
 	
 	### Given a a rectangle without [code]abs()[/code], draw on canvas such as the first line is either the longest or shortest.
-	#static func draw_length(canvas:Control, box:Rect2, short:bool, clr:=Color.GOLDENROD):
+	#static func draw_length(canvas:Flowchart, box:Rect2, short:bool, clr:=Color.GOLDENROD):
 		#var c = get_corners_len(box.size, short)
 		#draw_along(canvas, box.abs(), c[0], c[1], c[2], 1, clr)
 	
@@ -105,14 +179,15 @@ class xWire:
 		var axis = diff_abs.max_axis_index() if longest else diff_abs.min_axis_index()
 		return [Vector2(start.x, stop.y), Vector2(stop.x, start.y)][axis]
 	
-	static func get_verts_from(start:Vector2, middle:Vector2, stop:Vector2, bending:float) -> PackedVector2Array:
+	static func get_verts_from(start:Vector2, middle:Vector2, stop:Vector2, bend_dist:float) -> PackedVector2Array:
 		var verts : PackedVector2Array = [start]
+		var box = (start - stop).abs()
+		var short_axis : int = box.min_axis_index()  # Figure out the maximum bend_dist.
 		var segms = [(start - middle), (stop - middle)]
-		var shortest = 0 if segms[0].length_squared() < segms[1].length_squared() else 1
-		var bend_dist = min(bending, segms[shortest].length())
-		segms[0] = segms[0].normalized() * bend_dist + middle
-		segms[1] = segms[1].normalized() * bend_dist + middle
-		verts.append_array(segms)
+		var segm_norm = [segms[0].normalized(), segms[1].normalized()]
+		bend_dist = clampf(bend_dist, G.snap, box[short_axis])
+		verts.append(segm_norm[0] * bend_dist + middle)
+		verts.append(segm_norm[1] * bend_dist + middle)
 		verts.append(stop)
 		return verts
 	
@@ -148,7 +223,7 @@ class xWire:
 				# Even after finding a matching segment, we keep iterating through
 				# all segments so we can find the total length of the wire.
 				continue
-			if along < 1 and along > 0 and prox < X.CELL_DIA / 2.0:
+			if along < 1 and along > 0 and prox < net.snap / 2.0:
 				# We don't want to accept distances further than a segment's
 				# length, which happens when clicking near the mid corner as if
 				# bend ratio was 1.

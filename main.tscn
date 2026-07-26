@@ -3,8 +3,7 @@
 [ext_resource type="Texture2D" uid="uid://bliggdgfw3v4k" path="res://Wicked_Haywire_Logo.png" id="1_1bvp3"]
 [ext_resource type="PackedScene" uid="uid://bnatph83g21s6" path="res://modules/InfiCanvas/Flowchart/Flowchart.tscn" id="1_ig7tw"]
 [ext_resource type="Texture2D" uid="uid://buorl1ocq0h64" path="res://assets/flags.png" id="1_lquwl"]
-[ext_resource type="Resource" uid="uid://o8gsvfmhpdpa" path="res://styles/flowchart/Blueprint.tres" id="4_7mycd"]
-[ext_resource type="Script" uid="uid://cf6g8f4qcf6wb" path="res://modules/InfiCanvas/Flowchart/Graphs/flowchart_graph_base.gd" id="4_lquwl"]
+[ext_resource type="Script" uid="uid://d02c16crluegs" path="res://modules/InfiCanvas/spatial_partitioning.gd" id="4_7mycd"]
 [ext_resource type="Script" uid="uid://b07ljhmg8l7ne" path="res://modules/Sidebar.gd" id="6_7mycd"]
 [ext_resource type="Shader" uid="uid://d1gg4mr8iu7ia" path="res://modules/SidebarTray_Glass.gdshader" id="6_272bh"]
 
@@ -12,8 +11,9 @@
 script/source = "extends Node
 
 #TODO Mode button switches visibility of Component tray versus Analyser tray, so components can't be placed during simulation mode.
+#TODO Sidebar resize stored in settings
+#TODO Trace Colors in Layer Options
 
-@export_storage var schematic : Schematic
 @export_storage var split_container = 180 : 
 	set(val):
 		split_container = val
@@ -22,9 +22,6 @@ script/source = "extends Node
 			%TraySplitter.split_offsets[0] = val
 
 func _ready() -> void:
-	if schematic == null:
-		schematic = Schematic.new()
-	
 	var lang = G.setts.get_value(\"0\", \"language\", \"\")
 	lang = lang if lang in LANG else OS.get_locale_language()
 	lang = lang if lang in LANG else \"en\"
@@ -33,6 +30,9 @@ func _ready() -> void:
 	
 	%TrayTabBar.current_tab = G.setts.get_value(\"0\", \"ribbonbar\", 0)
 	%Ribbon/TabContainer.current_tab = G.setts.get_value(\"0\", \"ribbonbar\", 0)
+	print()
+	if %Ribbon/TabContainer.current_tab < 0:
+		%Ribbon.hide()
 	
 	find_flowchart_themes()
 	find_electronics_parts()
@@ -83,7 +83,7 @@ func find_flowchart_themes():
 func _on_flowchart_theme_picked(idx:int):
 	%Theme_Title.text = theme_list.get_item_text(idx)
 	var theme : FlowchartStyle = load(theme_list.get_item_metadata(idx))
-	%Flowchart.appearance = theme
+	G.appearance = theme
 	%Cell_Size.value = theme.cell_size
 	%Back_Color.color = theme.color
 	%Orig_Thick.value = theme.orig_thick
@@ -111,25 +111,26 @@ func _on_rem_theme_pressed() -> void:
 func _on_dupl_theme_pressed() -> void:
 	pass
 
+@warning_ignore_start(\"narrowing_conversion\")
 func _on_cell_size_value_changed(value: float) -> void:
-	%Flowchart.appearance.cell_size = value
+	G.appearance.cell_size = value
 func _on_back_color_color_changed(color: Color) -> void:
-	%Flowchart.appearance.color = color
+	G.appearance.color = color
 func _on_orig_thick_value_changed(value: float) -> void:
-	%Flowchart.appearance.orig_thick = value
+	G.appearance.orig_thick = value
 func _on_orig_color_color_changed(color: Color) -> void:
-	%Flowchart.appearance.orig_color = color
+	G.appearance.orig_color = color
 func _on_grid_thick_value_changed(value: float) -> void:
-	%Flowchart.appearance.grid_thick = value
+	G.appearance.grid_thick = value
 func _on_grid_color_color_changed(color: Color) -> void:
-	%Flowchart.appearance.grid_color = color
-
+	G.appearance.grid_color = color
+@warning_ignore_restore(\"narrowing_conversion\")
 #endregion
 
 #region Electronics Components Tray
 
 func find_electronics_parts():
-	const dev_path = \"res://devices/\"
+	const dev_path = \"res://gizmos/\"
 	for dev_category : String in parts_categories:
 		var open_button := Button.new()
 		parts_categories[dev_category].append(open_button)
@@ -214,7 +215,6 @@ func scheme_add_layer(title:String=\"\"):
 	if title.is_empty():
 		title = tr(\"LAYER\") + \"_\" + str(%Scheme_Layers.tab_count)
 	%Scheme_Layers.add_tab(title)
-	schematic.graphs[title] = FlowchartGraphElectronics.new()
 
 var scheme_layer_delete_target : String
 func _on_scheme_layers_tab_close_pressed(tab: int) -> void:
@@ -235,8 +235,6 @@ func scheme_rem_layer(target:String=\"\"):
 	
 	if target_idx > 0:
 		%Scheme_Layers.remove_tab(target_idx)
-		schematic.graphs.erase(target)
-		schematic.styles.erase(target)
 	
 	if %Scheme_Layers.tab_count == 0:
 		scheme_add_layer(tr(\"LAYER_ZERO\"))
@@ -450,78 +448,11 @@ func _draw() -> void:
 	draw_polyline(line, Color.REBECCA_PURPLE, 3)
 "
 
-[sub_resource type="GDScript" id="GDScript_h2yge"]
-script/source = "@tool
-extends Flowchart
-
-@export var appearance : FlowchartStyle : 
-	set(val):
-		appearance = val
-		if val != null:
-			val.changed.connect(_on_appearance_changed)
-			_on_appearance_changed()
-
-func _on_appearance_changed():
-	cell_size = appearance.cell_size
-	min_cell_size = appearance.min_cell_size
-	grid_thick = appearance.grid_thick
-	orig_thick = appearance.orig_thick
-	grid_color = appearance.grid_color
-	orig_color = appearance.orig_color
-	color = appearance.color
-
-
-func _ready() -> void:
-	super()
-	
-	if appearance == null:
-		appearance = FlowchartStyle.new()
-	
-	$PopupMenu.index_pressed.connect(_on_popup_menu_pressed.bind(0))
-	$PopupMenu.clear(true)
-	var idx = -1
-	for each in popup_devices:
-		idx += 1
-		if popup_devices[each] is Dictionary:
-			var submenu = PopupMenu.new()
-			$PopupMenu.add_submenu_node_item(each, submenu)
-			submenu.index_pressed.connect(_on_popup_menu_pressed.bind(idx))
-			for subeach in popup_devices[each]:
-				submenu.add_item(subeach)
-		else:
-			$PopupMenu.add_item(each)
-
-func _gui_input(event: InputEvent) -> void:
-	super(event)
-	
-	if event is InputEventMouseButton:
-		if event.button_index == MOUSE_BUTTON_LEFT:
-			if event.is_released():
-				var grabbed = G.grabbed_buttons.get_pressed_button()
-				if not grabbed == null:
-					add_graph_node(grabbed.get_meta(\"path\"), to_canvas_coord(fin_mouse))
-
-
-
-var popup_devices = {
-	\"Info Panel\": \"res://module/InfiCanvas/Flowchart/Nodes/info_panel.tscn\",
-	\"Cabling\":\"res://modules/InfiCanvas/Flowchart/Nodes/cabling.tscn\",
-	#\"Ammeter\"
-	#\"Voltmeter\"
-	#\"Heartbeat\": \"res://module/InfiCanvas/Flowchart/Nodes/heartbeat.tscn\",
-	}
-func _on_popup_menu_pressed(idx:int, submenu:int) -> void:
-	var press_text : String
-	if submenu > 0:
-		press_text = $PopupMenu.get_item_submenu_node(submenu).get_item_text(idx)
-		add_graph_node(popup_devices[$PopupMenu.get_item_text(submenu)][press_text])
-	else:
-		press_text = $PopupMenu.get_item_text(idx)
-		add_graph_node(popup_devices[press_text])
-"
+[sub_resource type="Resource" id="Resource_7mycd"]
+script = ExtResource("4_7mycd")
 
 [sub_resource type="Resource" id="Resource_272bh"]
-script = ExtResource("4_lquwl")
+script = ExtResource("4_7mycd")
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_7mycd"]
 shader = ExtResource("6_272bh")
@@ -770,7 +701,7 @@ tab_1/title = "LAY_TAB"
 tab_2/title = "SEL_TAB"
 tab_3/title = "ANA_TAB"
 tab_4/title = "SPT_TAB"
-tab_5/title = "TOY_TAB"
+tab_5/title = "GIZ_TAB"
 
 [node name="Mode" type="Button" parent="MarginContainer/HBoxContainer/VBoxContainer/HBoxContainer" unique_id=996853106]
 unique_name_in_owner = true
@@ -810,7 +741,9 @@ theme_override_styles/panel = SubResource("StyleBoxFlat_d13ii")
 current_tab = 1
 tabs_position = 1
 tabs_visible = false
+deselect_enabled = true
 tab_4/title = "ANA_TAB"
+tab_5/title = "TOY_TAB"
 
 [node name="SCH_TAB" type="HBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer" unique_id=1932010936]
 visible = false
@@ -1144,42 +1077,42 @@ text = "func ready():
 func loop():
 	pass"
 
-[node name="TOY_TAB" type="HBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer" unique_id=954640791]
+[node name="GIZ_TAB" type="HBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer" unique_id=954640791]
 visible = false
 layout_mode = 2
 theme_override_constants/separation = 0
 metadata/_tab_index = 5
 metadata/_tab_name = "TOY_TAB"
 
-[node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/TOY_TAB" unique_id=1700116013]
+[node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/GIZ_TAB" unique_id=1700116013]
 layout_mode = 2
 
-[node name="fold_devices" type="Button" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/TOY_TAB/VBoxContainer" unique_id=559831295]
+[node name="fold_devices" type="Button" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/GIZ_TAB/VBoxContainer" unique_id=559831295]
 layout_mode = 2
 toggle_mode = true
 text = "UNFOLD_ALL"
 
-[node name="ScrollContainer2" type="ScrollContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/TOY_TAB/VBoxContainer" unique_id=1472731615]
+[node name="ScrollContainer2" type="ScrollContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/GIZ_TAB/VBoxContainer" unique_id=1472731615]
 layout_mode = 2
 size_flags_vertical = 3
 horizontal_scroll_mode = 0
 vertical_scroll_mode = 2
 
-[node name="part_categories" type="VBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/TOY_TAB/VBoxContainer/ScrollContainer2" unique_id=2061698861]
+[node name="part_categories" type="VBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/GIZ_TAB/VBoxContainer/ScrollContainer2" unique_id=2061698861]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 theme_override_constants/separation = 0
 
-[node name="ScrollContainer" type="ScrollContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/TOY_TAB" unique_id=959007321]
+[node name="ScrollContainer" type="ScrollContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/GIZ_TAB" unique_id=959007321]
 layout_mode = 2
 size_flags_horizontal = 3
 horizontal_scroll_mode = 4
 vertical_scroll_mode = 0
 scroll_hint_mode = 1
 
-[node name="Components" type="HBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/TOY_TAB/ScrollContainer" unique_id=288877506]
+[node name="Components" type="HBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/GIZ_TAB/ScrollContainer" unique_id=288877506]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
@@ -1191,20 +1124,15 @@ layout_mode = 2
 size_flags_vertical = 3
 theme_override_constants/separation = 0
 
-[node name="Flowchart" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer" unique_id=1802454809 instance=ExtResource("1_ig7tw")]
+[node name="Flowchart" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer" unique_id=117644141 instance=ExtResource("1_ig7tw")]
 unique_name_in_owner = true
 clip_contents = true
 layout_mode = 2
 size_flags_vertical = 3
-color = Color(0.36299998, 0.39416662, 0.55, 1)
-script = SubResource("GDScript_h2yge")
-appearance = ExtResource("4_7mycd")
-update_rate = 0.01
-graph = SubResource("Resource_272bh")
-cell_size = 100
-grid_color = Color(0.4758, 0.50040334, 0.61, 1)
-orig_color = Color(0.63, 0.59031004, 0.2331, 1)
-chirality = 0
+parti = Dictionary[Variant, ExtResource("4_7mycd")]({
+"node": SubResource("Resource_7mycd"),
+"wire": SubResource("Resource_272bh")
+})
 
 [node name="MarginContainer" type="MarginContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/Flowchart" unique_id=1137236957]
 layout_mode = 1
@@ -1299,6 +1227,6 @@ cancel_button_text = "What? No!"
 [connection signal="color_changed" from="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/LAY_TAB/GridContainer/HBoxContainer3/Grid_Color" to="." method="_on_grid_color_color_changed"]
 [connection signal="toggled" from="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/ANA_TAB/VBoxContainer/Sim_Paused" to="." method="_on_sim_paused_toggled" flags=18]
 [connection signal="item_selected" from="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/ANA_TAB/VBoxContainer/Sim_Rate" to="." method="_on_sim_rate_item_selected" flags=18]
-[connection signal="toggled" from="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/TOY_TAB/VBoxContainer/fold_devices" to="." method="_on_fold_devices_toggled" flags=18]
+[connection signal="toggled" from="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer/GIZ_TAB/VBoxContainer/fold_devices" to="." method="_on_fold_devices_toggled" flags=18]
 [connection signal="tab_close_pressed" from="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/HBoxContainer/Scheme_Layers" to="." method="_on_scheme_layers_tab_close_pressed"]
 [connection signal="confirmed" from="Confirm_Rem_Layer" to="." method="scheme_rem_layer"]

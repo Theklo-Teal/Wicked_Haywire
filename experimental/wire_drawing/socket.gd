@@ -11,38 +11,12 @@ enum {
 @export_enum("HIZ INPUT OUTPUT BIDIR",) var mode : int
 
 
-func draw(canvas:Control, highlight:=false):
-	var rect = get_rect()
-	var clr : Color = Color.YELLOW if highlight else Color.GOLDENROD
+func draw(canvas:Control, highlight:bool=false):
 	match mode:
 		INPUT:
-			canvas.draw_circle(position, X.CELL_RAD, clr)
+			canvas.draw_circle(position, X.CELL_RAD, colors[1] if highlight else colors[2])
 		OUTPUT:
-			rect = rect.grow(-X.CLEARANCE / 2.0)
-			canvas.draw_rect(rect, clr)
-		HIZ:
-			var corn = [rect.position, Vector2(rect.postion.x, rect.end.y), Vector2(rect.end.x, rect.postion.y), rect.end]
-			canvas.draw_multiline([corn[0], corn[3], corn[1], corn[2]], clr, 3)
-		BIDIR:
-			rect = rect.grow(-X.CLEARANCE  / 2.0)
-			canvas.draw_rect(rect, clr, false, 2)
-			canvas.draw_circle(position, X.CELL_RAD, clr, false, 2)
-
-#region Simulation Fuctions
-#func emit(val):
-	#var port = get_port()
-	#if port != null:
-		#port.write(val)
-#
-#func query():
-	#var port = get_port()
-	#if port == null:
-		#return xNetwork.xPort.default
-	#else:
-		#return port.read()
-
-## Called during simulation update. Override this to call to [code]emit()[/code]
-## and [code]query()[code] as necessary.
-#func prompt():
-#	return
-#endregion
+			var rect = Rect2(position - Vector2.ONE * X.CELL_RAD, Vector2.ONE * X.CELL_DIA).grow(-X.CLEARANCE / 2.0)
+			canvas.draw_rect(rect, colors[1] if highlight else colors[2])
+	
+	draw_wires(canvas)

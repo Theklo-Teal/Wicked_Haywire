@@ -8,10 +8,11 @@ class_name InfiCanvas
 ## You can find the objects in view by applying the provided [code]canvas_rect[/code] to [code]SpatialPartition.find_objects_*()[/code.[br]
 ## Other UI details like the background pattern and the compass arrow can also be changed by overriding their functions.[br]
 ## Remember to use coordinates translated into canvas coordinates with [code]to_canvas_coord()[/code], or things will looks fixed on the screen. Then convert back with [code]to_screen_coord()[/code], for them to display in the correct place on screen.[br]
-## There are equivalent functions for Rect2, [code]to_canvas_rect[/code], [code]to_screen_rect[/code], which will resize a rect according to zoom.[br]
+## There are equivalent functions for Rect2, [code]to_canvas_rect()[/code], [code]to_screen_rect()[/code], which will resize a rect according to zoom.[br]
 ## If you are seeing background patterns being drawn outside the visible area, set "Layout/Clip Contents" in the inspector.
 
 # MODIFICATIONS
+# Panning respects zoom.
 # The `parti` dictionary accepts any type of key. Useful to have a choice between Enum/Ints or Strings as keys.
 # Updated documentation.
 # Spatial partitioning is now handled as a Resource of class_name `SpatialPartition`. So now it's simpler to maintain and multiple partitions for different objects can be managed with more control.
@@ -19,7 +20,6 @@ class_name InfiCanvas
 # SpatialPartition doesn't track position independently of the objects as it would when built into InfiCanvas. The position property of the object is used instead.
 # It isn't possible to define the rect of an object through overriding functions. The object should have a `get_rect()` method or `rect` property if that's relevant.
 
-#TODO Update description to not refer spatial partitioning features.
 #TODO Make zoom into the center
 #FIXME go_to(Vector2.ZERO) doesn't seem to work if InfiCanvas isn't root node.
 
@@ -127,12 +127,12 @@ func _gui_input(event: InputEvent) -> void:
 					_ini_origin = origin
 				MOUSE_BUTTON_WHEEL_UP:
 					if Input.is_key_pressed(KEY_CTRL):
-						zoom -= ZOOM_SPEED
+						zoom += ZOOM_SPEED
 					else:
 						origin.y += SCROLL_SPEED.y
 				MOUSE_BUTTON_WHEEL_DOWN:
 					if Input.is_key_pressed(KEY_CTRL):
-						zoom += ZOOM_SPEED
+						zoom -= ZOOM_SPEED
 					else:
 						origin.y -= SCROLL_SPEED.y
 				MOUSE_BUTTON_WHEEL_LEFT:
@@ -168,7 +168,7 @@ func _input(event: InputEvent) -> void:
 		if Input.is_mouse_button_pressed(MOUSE_BUTTON_MIDDLE):
 			lasso_screen_rect = Rect2(ini_mouse, displacement).abs()
 			if pan_allowed:
-				origin = _ini_origin + displacement
+				origin = _ini_origin + displacement / zoom
 		elif Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 			lasso_screen_rect = Rect2(ini_mouse, displacement).abs()
 			match chirality:
@@ -184,9 +184,13 @@ func _input(event: InputEvent) -> void:
 			for i in range(_selected.size()):
 				var obj = _selected[i]
 				var data : Dictionary = get_obj_data(obj)
-				data.position = _selected_positions[i] + displacement / zoom
+				data.position = obj_movement_modulate(_selected_positions[i] + displacement / zoom)
 				if "position" in obj:
 					obj.position = data.position
+
+## Override this function to implement things like grid snapping.
+func obj_movement_modulate(new_position:Vector2) -> Vector2:
+	return new_position
 
 func selected_obj_movement_start():
 	if move_obj_allowed:
@@ -199,7 +203,9 @@ func selected_obj_movement_start():
 			else:
 				_selected_positions.append(get_obj_rect(each).position)
 
-## You need to call this when the movement operations has finished.
+## You need to call this when the movement operations has finished.[br]
+## This calls a [code]_canvas_reposition()[/code] method on each moved object,
+## if implemented.
 func selected_obj_movement_stop():
 	queue_redraw()
 	lasso_allowed = true

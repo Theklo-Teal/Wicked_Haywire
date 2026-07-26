@@ -1,6 +1,6 @@
-[gd_scene load_steps=2 format=3 uid="uid://biwbp7mhl3co"]
+[gd_scene format=3 uid="uid://biwbp7mhl3co"]
 
-[ext_resource type="Script" uid="uid://cq7xjjxw10dly" path="res://module/InfiCanvas/Flowchart/Nodes/flowchart_node_base.gd" id="1_rd6u5"]
+[ext_resource type="Script" uid="uid://cq7xjjxw10dly" path="res://modules/InfiCanvas/Flowchart/Gizmos/flowchart_gizmo.gd" id="1_rd6u5"]
 
 [node name="FlowchartNode" type="Container"]
 offset_right = 270.0

@@ -1,5 +1,5 @@
 extends Resource
-class_name FlowchartGraph
+#class_name FlowchartGraph
 
 ## With the graph relationships being stored as a Godot Resource, it is easy to serialize them and make edits to the flowchart persist between exiting and loading the program.
 

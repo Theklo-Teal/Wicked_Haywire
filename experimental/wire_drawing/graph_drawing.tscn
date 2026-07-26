@@ -23,7 +23,7 @@ func _ready() -> void:
 		var coord = Vector2i(15, i + 5)
 		var sock = xSocket.new()
 		sock.mode = xSocket.INPUT if i % 2 == 0 else xSocket.OUTPUT
-		net.get_or_add_joint(X.from_grid(coord), X.layer,sock)
+		net.get_or_add_joint(coord, X.layer, sock)
 
 func _mouse_over_joint(where:Vector2):
 	var cell = X.to_grid(where).coord
@@ -37,57 +37,16 @@ func _mouse_over_wire(where:Vector2):
 		X.sel_wire = X.info_wire.wire
 		X.info_wire[\"bend\"] = X.sel_wire.bend
 
-func _resize_bend(wire:xNetBase.xWire, ini_bend:float, ini_pos:Vector2, end_pos:Vector2):
-		var verts = wire.get_verts()
-		var short_vert = wire.get_segment_is(false)
-		var rect = wire.get_rect()
-		var axis = rect.size.min_axis_index()
-		var dir = 1 if ini_pos[axis] > verts[short_vert][axis] else -1
-		var delta = end_pos - ini_pos
-		var dist : float = delta.length() * delta.sign()[axis] * dir * 2
-		dist /= rect.size[axis]
-		wire.bend = clamp(ini_bend + dist, 0, 1) 
-
-func _new_wire(release:Vector2, ini_joint:xNetBase.xJoint, ini_wire:xNetBase.xWire, ini_ending:xNetBase.xWire.VERT, fin_ending:xNetBase.xWire.VERT):
-	#NOTE This function won't be called if both ini_joint or ini_wire are null.
-	var alternate : bool = Input.is_key_pressed(KEY_SHIFT)
-	var wire = xNetBase.xWire.new()
-	
-	if X.sel_joint == null and X.sel_wire == null:
-		# Finished dragging on empty space
-		X.sel_joint = net.get_or_add_joint(release, X.layer, xNetBase.xVia.new())
-	
-	if ini_joint is xNetBase.xVia and ini_joint.text.is_empty() and ini_joint.connected.size() == 1:
-		# Delete ini_joint and attach new wire to another wire.
-		ini_wire = ini_joint.connected[0]
-		ini_ending = ini_wire.get_ending(ini_joint)
-		ini_joint = null
-		#TODO delete ini_joint
-	
-	var start : Vector2
-	var stop : Vector2
-	if ini_joint != null:
-		# Started from a joint
-		start = ini_joint.position
-		net.plug_wire(wire, ini_joint, xNetBase.xWire.VERT.ORIGIN)
-	elif ini_wire != null:
-		# Started from a wire
-		# net.split_wire(ini_wire)
-		start = ini_wire.get_vertex_position(ini_ending)
-		net.extend_wire(ini_wire, wire, ini_ending, xNetBase.xWire.VERT.ORIGIN)
-	
-	if X.sel_joint != null:
-		# Finished on a joint
-		stop = X.sel_joint.position
-		net.plug_wire(wire, ini_joint, xNetBase.xWire.VERT.ORIGIN)
-	elif X.sel_wire != null:
-		# Finished on a wire
-		# net.split_wire(X.sel_wire)
-		stop = X.sel_wire.get_vertex_position(fin_ending)
-		net.extend_wire(X.sel_wire, wire, fin_ending, xNetBase.xWire.VERT.ENDING)
-	
-	wire.set_length(start, stop, alternate)
-
+#func _resize_bend(wire:xNetBase.xWire, ini_bend:float, ini_pos:Vector2, end_pos:Vector2):
+		#var verts = wire.get_verts()
+		#var short_vert = wire.get_segment_is(false)
+		#var rect = wire.get_rect()
+		#var axis = rect.size.min_axis_index()
+		#var dir = 1 if ini_pos[axis] > verts[short_vert][axis] else -1
+		#var delta = end_pos - ini_pos
+		#var dist : float = delta.length() * delta.sign()[axis] * dir * 2
+		#dist /= rect.size[axis]
+		#wire.bend = clamp(ini_bend + dist, 0, 1) 
 
 var start_drag : Vector2
 var was_drag : bool
@@ -106,12 +65,12 @@ func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion:
 		if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
 			was_drag = true
-		if Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) and was_drag:
-			if X.sel_joint != null and not X.sel_joint is xSocket:
-				pass
-			elif not X.sel_wire == null:
-				if floor(X.info_wire.subratio) == 1:  # Clicked on Bend
-					_resize_bend(X.sel_wire, X.info_wire.bend, start_drag, event.position)
+		#if Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) and was_drag:
+			#if X.sel_joint != null and not X.sel_joint is xSocket:
+			#	pass
+			#elif not X.sel_wire == null:
+				#if floor(X.info_wire.subratio) == 1:  # Clicked on Bend
+					#_resize_bend(X.sel_wire, X.info_wire.bend, start_drag, event.position)
 				#else:
 					## Detach Wire
 					#if segm_info.subratio < 1:
@@ -126,39 +85,30 @@ func _gui_input(event: InputEvent) -> void:
 			X.sel_wire = null
 			X.sel_joint = null
 			_mouse_over_joint(event.position)
-			if X.sel_joint == null:
-				# If not pressing over a joint, select a wire.
-				_mouse_over_wire(event.position)
-				X.detach_wire = false
-				if X.sel_wire != null:  # A segment was found and selected
-					if event.button_index == MOUSE_BUTTON_RIGHT:
-						if floor(X.info_wire.subratio) != 1:  # Not clicking on a bend.
-							X.detach_wire = true
 		elif event.is_released():
 			if was_drag:
 				was_drag = false
 				queue_redraw()
+				var cell = X.to_grid(event.position)
 				match event.button_index:
 					MOUSE_BUTTON_LEFT:
-						var sel_joint := X.sel_joint
-						var sel_wire := X.sel_wire
-						var ini_ending := xNetBase.xWire.VERT.MIDDLE
-						if not X.info_wire.is_empty():
-							ini_ending = xNetBase.xWire.VERT.ORIGIN if X.info_wire.ratio < 0.5 else xNetBase.xWire.VERT.ENDING
-						
-						if not (sel_joint == null and sel_wire == null):
-							_mouse_over_joint(event.position)
-							_mouse_over_wire(event.position)
-							var fin_ending := xNetBase.xWire.VERT.MIDDLE
-							if not X.info_wire.is_empty():
-								fin_ending = xNetBase.xWire.VERT.ORIGIN if X.info_wire.ratio < 0.5 else xNetBase.xWire.VERT.ENDING
-							if not ((sel_joint == X.sel_joint and sel_joint != null) or (sel_wire == X.sel_wire and sel_wire != null)):
-								_new_wire(event.position, sel_joint, sel_wire, ini_ending, fin_ending)
+						# Create Wire
+						if X.sel_joint != null:
+							var orig = X.sel_joint
+							X.sel_joint = net.get_or_add_joint(cell.coord, X.layer, xNetBase.xVia.new())
+							orig.connected[X.sel_joint] = xNetBase.xWire.new()
+							X.sel_joint.connected[orig] = null
+							orig.connected[X.sel_joint].chirality = Input.is_key_pressed(KEY_SHIFT)
+							orig.connected[X.sel_joint].bend = X.CELL_DIA
 						
 					MOUSE_BUTTON_RIGHT:
 						# Move Joint
-						if X.sel_joint != null and not X.sel_joint is xSocket:
-							net.move_joint(X.sel_joint, event.position)
+						if X.sel_joint != null:
+							var coord = Vector3i(cell.coord.x, cell.coord.y, X.layer)
+							if not net.netlist.joints.has(coord):
+								net.netlist.joints.erase(X.coord_joint)
+								net.netlist.joints[coord] = X.sel_joint
+								X.sel_joint.position = cell.position
 
 
 func _draw() -> void:
@@ -167,21 +117,17 @@ func _draw() -> void:
 		if coord.z != X.layer:
 			continue
 		var joint = net.netlist.joints[coord]
-
 		joint.draw(self, joint == X.sel_joint)
-	for wire in net.netlist.wires.get(X.layer, []):
-		if wire == X.sel_wire and X.detach_wire: continue
-		wire.draw(self, wire == X.sel_wire)
 
-var period : float = 0.33
-var _elapsed : float = 0
-func _process(delta: float) -> void:
-	_elapsed += delta
-	if _elapsed > period:
-		_elapsed = 0
-		net.setup_cycle()
-		net.setup_cycle()
-		net.finish_cycle()
+#var period : float = 0.33
+#var _elapsed : float = 0
+#func _process(delta: float) -> void:
+	#_elapsed += delta
+	#if _elapsed > period:
+		#_elapsed = 0
+		#net.setup_cycle()
+		#net.setup_cycle()
+		#net.finish_cycle()
 "
 
 [sub_resource type="GDScript" id="GDScript_08qwr"]
@@ -214,13 +160,12 @@ func _draw() -> void:
 	if get_parent().was_drag and X.sel_joint != null and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 		var start = X.from_grid(Vector2i(X.coord_joint.x, X.coord_joint.y))
 		var stop = X.to_grid(get_local_mouse_position()).position
-		var rect = Rect2(start, stop - start)
-		xNetBase.xWire.draw_length(self, rect, Input.is_key_pressed(KEY_SHIFT), Color.YELLOW)
+		xNetBase.xWire.draw_length(self, start, stop, Input.is_key_pressed(KEY_SHIFT), X.CELL_DIA)
 	
 	#Joint being moved
 	if get_parent().was_drag and X.sel_joint != null and not X.sel_joint is xSocket and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
 		@warning_ignore(\"static_called_on_instance\")
-		X.sel_joint.draw_at(self, get_global_mouse_position(), Color.YELLOW)
+		X.sel_joint.draw_at(self, X.to_grid(get_global_mouse_position()).position)
 	
 "
 

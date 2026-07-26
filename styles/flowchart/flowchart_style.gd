@@ -29,3 +29,16 @@ class_name FlowchartStyle
 	set(val):
 		color = val
 		emit_changed()
+
+@export_color_no_alpha var trace_primary := Color.WHITE:
+	set(val):
+		trace_primary = val
+		emit_changed()
+@export_color_no_alpha var trace_secondary := Color.DARK_GRAY :
+	set(val):
+		trace_secondary = val
+		emit_changed()
+@export_color_no_alpha var trace_highlight := Color.DARK_SLATE_GRAY :
+	set(val):
+		trace_highlight = val
+		emit_changed()

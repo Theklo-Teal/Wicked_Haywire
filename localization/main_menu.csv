@@ -4,7 +4,8 @@ LAY_TAB,Layer,Tavolo,Camada
 SEL_TAB,Selection,Selekto,Selecionado
 ANA_TAB,Analyzer,Skopo,Analizador
 SPT_TAB,Script,Skripto,Programa
-TOY_TAB,Gizmos,Aparato,Dispositivos
+GIZ_TAB,Gizmos,Aparatoj,Dispositivos
+TOY_TAB,Toys,Ludiloj,Brinquedos
 PLACE,Place,Allokigi,Colocar
 POKE,Poke,Tuŝi,Tocar
 SHOW_NOTES,Show Notes,Vidigi Komento,Mostrar Notas
