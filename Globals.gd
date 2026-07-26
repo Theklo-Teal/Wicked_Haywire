@@ -8,7 +8,8 @@ var appearance : FlowchartStyle = load("res://styles/flowchart/Blueprint.tres") 
 		if chart != null:
 			if not appearance.changed.is_connected(chart._on_appearance_changed):
 				appearance.changed.connect(chart._on_appearance_changed)
-var wire_from : NetBase.Joint
+var layer : int = 0
+var wire_from := Vector2.INF
 
 var grid_changed := true
 var snap : int = 12 :  ## Size of grid snapping  cells. The snap grid is based on a rhombus. Refer to [code]to_grid()[/code] for more information.

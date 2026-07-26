@@ -95,13 +95,7 @@ var grid_changed := true
 #endregion
 
 #region Boilerplate
-
-var layer : int = 0
 var gizmo_pallet : Dictionary[String, Resource]
-
-# Wire info
-var wiring_allowed : bool = true
-var is_wiring : bool = false
 
 enum Mode{
 	EDITING,  ## Nodes being repositioned and sockets being connected.
@@ -112,7 +106,7 @@ var mode : Mode :
 	set(val):
 		mode = val
 		G._on_flowchart_mode_changed(mode)
-		for gizmo : FlowchartGizmo in $Network.netlist.gizmos.get(layer, []):
+		for gizmo : FlowchartGizmo in $Network.netlist.gizmos.get(G.layer, []):
 			gizmo._on_flowchart_mode_changed(mode)
 
 func _ready() -> void:
@@ -135,8 +129,8 @@ func draw_fore_geometry(_viewed_canvas_rect:Rect2):
 		#draw_circle(to_screen_coord(v.position), 6, Color.WHITE)
 	
 	# Draw wire being pulled.
-	if is_wiring and wiring_allowed:
-		pass
+	if wiring_allowed and G.wire_from != Vector2.INF:
+		NetBase.Link.draw_length(self, to_screen_coord(G.wire_from), get_local_mouse_position(), Input.is_key_pressed(KEY_SHIFT), G.snap)
 
 #endregion
 
@@ -152,7 +146,7 @@ func _gui_input(event: InputEvent) -> void:
 					if not is_moving_obj:
 						_selected.clear()
 					if wiring_allowed:
-						if is_wiring:
+						if G.wire_from != Vector2.INF:
 							pass
 						else:
 							if mode == Mode.EDITING and G.grabbed_buttons.get_pressed_button() == null:
@@ -162,7 +156,7 @@ func _gui_input(event: InputEvent) -> void:
 		elif event.is_released():
 			match event.button_index:
 				MOUSE_BUTTON_LEFT:
-					if is_wiring and wiring_allowed:
+					if wiring_allowed and G.wire_from != Vector2.INF:
 						# Stop wiring
 						pass
 					elif lasso_canvas_rect.size > MINIMUM_LASSO:
@@ -189,7 +183,7 @@ func _input(event: InputEvent) -> void:
 				if each is FlowchartGizmo:
 					rem_gizmo(each)
 		if event.keycode == KEY_SHIFT:
-			if is_wiring:
+			if G.wire_from != Vector2.INF:
 				queue_redraw()
 			if event.is_pressed() and is_moving_obj:
 				# Regretting not having held Shift before mouse motion.
@@ -202,7 +196,7 @@ func _input(event: InputEvent) -> void:
 				selected_obj_movement_stop()
 	
 	if event is InputEventMouseMotion:
-		if is_wiring and wiring_allowed:
+		if wiring_allowed and G.wire_from != Vector2.INF:
 			queue_redraw()
 		elif Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) and not is_moving_obj and move_obj_allowed:
 			selected_obj_movement_start()
@@ -214,7 +208,8 @@ func obj_movement_modulate(new_position:Vector2) -> Vector2:
 	return G.to_grid(new_position).position
 
 func escape_key_action():
-	if is_wiring:
+	if G.wire_from != Vector2.INF:
+		G.wire_from = Vector2.INF
 		return
 	super()
 
@@ -271,7 +266,7 @@ func add_gizmo(res:String, where:=Vector2.ZERO):
 	elif gizmo is PackedScene:
 		gizmo = gizmo.instantiate()
 	place_object(gizmo, where, parti.node)
-	$Network.netlist.gizmos.get_or_add(layer, []).append(gizmo)
+	$Network.netlist.gizmos.get_or_add(G.layer, []).append(gizmo)
 	gizmo._on_flowchart_mode_changed(mode)
 
 func rem_gizmo(_gizmo:FlowchartGizmo):
@@ -288,6 +283,19 @@ func rem_gizmo(_gizmo:FlowchartGizmo):
 
 #endregion
 
+#endregion
+
+#region Wiring
+# Wire info
+var wiring_allowed : bool = true
+
+func start_socket_wiring(sock_data:Dictionary):
+	lasso_allowed = false
+	G.wire_from = sock_data.global_position
+
+func stop_socket_wiring(sock_data:Dictionary):
+	lasso_allowed = true
+	G.wire_from = Vector2.INF
 #endregion
 
 #region Simulation Implementation

@@ -51,7 +51,7 @@ signal finish_done
 			var coord = sockets[sock]
 			sock.coord = coord
 			sock._position = get_socket_position_from_coord(coord)
-			_sockdex[coord] = sock
+			_sockdex[get_socket_true_coord(coord)] = sock
 
 var _sockdex : Dictionary[Vector2i, ChartSocket]  # Back reference to find which socket is in at certain coord.
 
@@ -91,6 +91,7 @@ func _on_resized():
 	custom_minimum_size = custom_minimum_size.max(Vector2.ONE * G.snap)
 	for sock in sockets:
 		var coord = sockets[sock]
+		_sockdex[get_socket_true_coord(coord)] = sock
 		sock._position = get_socket_position_from_coord(coord)
 	size = size.snappedf(G.snap * 2)
 	_grid.x = floori(size.x / G.snap)
@@ -175,6 +176,7 @@ func _init() -> void:
 	resized.connect(_on_resized)
 	mouse_entered.connect(func():_mouse_hover = true)
 	mouse_exited.connect(_on_mouse_exit)
+	_on_resized()
 
 func _on_mouse_exit():
 	_mouse_hover = false
@@ -202,8 +204,8 @@ var hover_socket : ChartSocket :
 		hover_socket = val
 func _on_mouse_stopped():
 	# Check if mouse is over a socket.
-	var cell = (get_local_mouse_position() - Vector2(0.5, 0.5) * G.snap).snappedf(G.snap)
-	var sock = _sockdex.get(Vector2i(cell / G.snap))
+	var cell = G.to_grid(get_local_mouse_position()).coord
+	var sock = _sockdex.get(cell)
 	if hover_socket != null and hover_socket != sock:
 		queue_redraw()
 		hover_socket.hover = false
@@ -219,7 +221,6 @@ func _input(event: InputEvent) -> void:
 	if _mouse_hover and G.mode == Flowchart.Mode.EDITING:
 		if event is InputEventMouseMotion:
 			mouse_moving = true
-			
 			queue_redraw()
 		if event is InputEventMouseButton and owner is Flowchart:
 			if hover_socket != null and event.button_index == MOUSE_BUTTON_LEFT:
@@ -247,19 +248,21 @@ func _gui_input(event: InputEvent) -> void:
 
 func _on_socket_pressed(socket:ChartSocket):
 	var sock_data = {
-		"node":self,
-		"idx": sockets.keys().find(socket),
-		"local_coord": get_socket_position(socket),
+		"gizmo":self,
+		"socket": socket,
+		"local_position": get_socket_position(socket),
+		"global_position": get_socket_position(socket) + position,
 		}
-	if sock_data.idx >= 0:
+	if sock_data.socket != null:
 		owner.start_socket_wiring(sock_data)
 func _on_socket_released(socket:ChartSocket):
 	var sock_data = {
-		"node":self,
-		"idx": sockets.keys().find(socket),
-		"local_coord": get_socket_position(socket),
+		"gizmo":self,
+		"socket": socket,
+		"local_position": get_socket_position(socket),
+		"global_position": get_socket_position(socket) + position,
 		}
-	if sock_data.idx >= 0:
+	if sock_data.socket != null:
 		owner.stop_socket_wiring(sock_data)
 
 #endregion

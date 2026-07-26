@@ -57,7 +57,7 @@ class Port:
 		set(val):
 			coord = val
 			_position = G.from_grid(coord)
-	@export_storage var _position : Vector2  # Spatial position is not to be relied on authoritavely. It should be updated whenever [code]coord[/code] is set, functioning as a cache so we don't have to call grid snapping all the time.
+	@export_storage var _position : Vector2  #NOTE: Spatial position is not to be relied on authoritavely. It should be updated whenever [code]coord[/code] is set, functioning as a cache so we don't have to call grid snapping all the time.
 	@export_storage var layer : int
 	
 	## Returns both grid coordinate and layer as the same data type.
@@ -93,8 +93,8 @@ class Joint extends NetVert:
 		return connected.get(connection, null)
 	
 	func draw(canvas:Control, _highlight:bool=false):
-		draw_at(canvas, _position)
 		draw_wires(canvas)
+		draw_at(canvas, _position)
 	
 	func draw_wires(canvas:Control):
 		for conn in connected:
@@ -140,13 +140,13 @@ class Link:
 	func draw(canvas:Flowchart, start:Vector2, stop:Vector2):
 		canvas.draw_polyline(get_verts(start, stop), canvas.trace_color_primary, canvas.max_wire)
 	
-	static func draw_chiral(canvas:Flowchart, start:Vector2, stop:Vector2, clockwise:bool, ratio:float):
+	static func draw_chiral(canvas:Flowchart, start:Vector2, stop:Vector2, clockwise:bool, bend_dist:float):
 		var middle = find_bend_chi(start, stop, clockwise)
-		canvas.draw_polyline(get_verts_from(start, middle, stop, ratio), canvas.trace_color_primary, canvas.max_wire)
+		canvas.draw_polyline(get_verts_from(start, middle, stop, bend_dist), canvas.trace_color_primary, canvas.max_wire)
 	
-	static func draw_length(canvas:Flowchart, start:Vector2, stop:Vector2, longest:bool, ratio:float):
+	static func draw_length(canvas:Flowchart, start:Vector2, stop:Vector2, longest:bool, bend_dist:float):
 		var middle = find_bend_len(start, stop, longest)
-		canvas.draw_polyline(get_verts_from(start, middle, stop, ratio), canvas.trace_color_primary, canvas.max_wire)
+		canvas.draw_polyline(get_verts_from(start, middle, stop, bend_dist), canvas.trace_color_primary, canvas.max_wire)
 	
 	### Given a a rectangle without [code]abs()[/code], draw on canvas such as the first line is either the longest or shortest.
 	#static func draw_length(canvas:Flowchart, box:Rect2, short:bool, clr:=Color.GOLDENROD):

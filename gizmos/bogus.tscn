@@ -37,7 +37,6 @@ anchors_preset = 0
 offset_right = 96.0
 offset_bottom = 72.0
 script = ExtResource("1_0ywhu")
-show_grid = true
 panelstyle = Array[StyleBox]([SubResource("StyleBoxFlat_u06mr")])
 panelrect = Array[Rect2]([Rect2(0, 0, -1, -1)])
 panels = Array[int]([0])
