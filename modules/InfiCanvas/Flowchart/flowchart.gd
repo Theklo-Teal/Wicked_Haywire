@@ -63,6 +63,25 @@ func _on_appearance_changed():
 	trace_color_secondary = G.appearance.trace_secondary
 	trace_color_highlight = G.appearance.trace_highlight
 
+#region Grid Snapping
+@export var snap : int = 12 :  ## Size of grid snapping cells. The snap grid is based on a rhombus. Refer to [code]Flowchart.to_grid()[/code] for more information.
+	set(val):
+		G.snap = val
+		snap = G.snap
+@export var via_hole : int = 4 :  ## Radius of the holes in joints.
+	set(val):
+		G.via_hole = val
+		via_hole = G.via_hole
+@export var max_wire : int = 8 :  ## Maximum thickness of a wire.
+	set(val):
+		G.max_wire = val
+		max_wire = G.max_wire
+@export var clearance : int = 2 :  ## Minimum distance between conductors.
+	set(val):
+		G.clearance = val
+		clearance = G.clearance
+#endregion
+
 func _process(delta: float) -> void:
 	if OS.has_feature("editor_hint"): return
 	process_elapse += delta
@@ -73,26 +92,6 @@ func _process(delta: float) -> void:
 	_on_sim_update()
 	skip_cycle = false
 
-
-#region Grid Snapping
-var grid_changed := true
-@export var snap : int = 9 :  ## Size of grid snapping cells. The snap grid is based on a rhombus. Refer to [code]Flowchart.to_grid()[/code] for more information.
-	set(val):
-		snap = max(1, val)
-		grid_changed = true
-@export var via_hole : int = 4 :  ## Radius of the holes in joints.
-	set(val):
-		via_hole = max(0, val)
-		grid_changed = true
-@export var max_wire : int = 7 :  ## Maximum thickness of a wire.
-	set(val):
-		max_wire = clamp(val, 1, snap)
-		grid_changed = true
-@export var clearance : int = 2 :  ## Minimum distance between conductors.
-	set(val):
-		clearance = max(0, val)
-		grid_changed = true
-#endregion
 
 #region Boilerplate
 var gizmo_pallet : Dictionary[String, Resource]
@@ -124,13 +123,15 @@ func _ready() -> void:
 
 #region Drawing
 
-func draw_fore_geometry(_viewed_canvas_rect:Rect2):
-	#for v in parti.wire.find_objects_simple(viewed_canvas_rect):
-		#draw_circle(to_screen_coord(v.position), 6, Color.WHITE)
+func draw_fore_geometry(viewed_canvas_rect:Rect2):
+	if OS.has_feature("editor_hint"): return
+	
+	for each in parti.wire.find_objects_simple(viewed_canvas_rect):
+		each.draw(self)
 	
 	# Draw wire being pulled.
-	if wiring_allowed and G.wire_from != Vector2.INF:
-		NetBase.Link.draw_length(self, to_screen_coord(G.wire_from), get_local_mouse_position(), Input.is_key_pressed(KEY_SHIFT), G.snap)
+	if wiring_allowed and not G.wire_from.is_empty():
+		NetBase.Link.draw_length(self, to_screen_coord(G.wire_from.global_position), get_local_mouse_position(), Input.is_key_pressed(KEY_SHIFT), G.snap)
 
 #endregion
 
@@ -139,6 +140,7 @@ func _gui_input(event: InputEvent) -> void:
 	super(event)
 	
 	if event is InputEventMouseButton:
+		var cell = G.to_grid(to_canvas_coord(event.position))
 		if event.is_pressed():
 			match event.button_index:
 				MOUSE_BUTTON_LEFT:
@@ -146,19 +148,19 @@ func _gui_input(event: InputEvent) -> void:
 					if not is_moving_obj:
 						_selected.clear()
 					if wiring_allowed:
-						if G.wire_from != Vector2.INF:
-							pass
-						else:
-							if mode == Mode.EDITING and G.grabbed_buttons.get_pressed_button() == null:
-								#TODO mode == Mode.EDITING, in contrast to mode == Mode.PLACING instead of checking `grabbed_buttons`
-								# Start wiring
-								pass
+						var via = $Network.netlist.joints.get(Vector3i(cell.coord.x, cell.coord.y, G.layer), null)
+						if via != null:
+							start_via_wiring({
+								"socket": via,
+								"local_position": event.position,
+								})
+						elif not G.wire_from.is_empty():
+							stop_canvas_wiring(event.position)
 		elif event.is_released():
 			match event.button_index:
 				MOUSE_BUTTON_LEFT:
-					if wiring_allowed and G.wire_from != Vector2.INF:
-						# Stop wiring
-						pass
+					if wiring_allowed and not G.wire_from.is_empty():
+						stop_canvas_wiring(event.position)
 					elif lasso_canvas_rect.size > MINIMUM_LASSO:
 						if lasso_allowed:
 							if lasso_mode:
@@ -183,7 +185,7 @@ func _input(event: InputEvent) -> void:
 				if each is FlowchartGizmo:
 					rem_gizmo(each)
 		if event.keycode == KEY_SHIFT:
-			if G.wire_from != Vector2.INF:
+			if not G.wire_from.is_empty():
 				queue_redraw()
 			if event.is_pressed() and is_moving_obj:
 				# Regretting not having held Shift before mouse motion.
@@ -196,7 +198,7 @@ func _input(event: InputEvent) -> void:
 				selected_obj_movement_stop()
 	
 	if event is InputEventMouseMotion:
-		if wiring_allowed and G.wire_from != Vector2.INF:
+		if wiring_allowed and not G.wire_from.is_empty():
 			queue_redraw()
 		elif Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) and not is_moving_obj and move_obj_allowed:
 			selected_obj_movement_start()
@@ -208,8 +210,8 @@ func obj_movement_modulate(new_position:Vector2) -> Vector2:
 	return G.to_grid(new_position).position
 
 func escape_key_action():
-	if G.wire_from != Vector2.INF:
-		G.wire_from = Vector2.INF
+	if not G.wire_from.is_empty():
+		G.wire_from.clear()
 		return
 	super()
 
@@ -259,15 +261,17 @@ func _on_popup_pressed(idx:int):
 
 
 #region Nodes
-func add_gizmo(res:String, where:=Vector2.ZERO):
+func add_gizmo(res:String, where:=Vector2.ZERO) -> FlowchartGizmo:
 	var gizmo = gizmo_pallet.get(res)
 	if gizmo is Script:
 		gizmo = gizmo.new()
 	elif gizmo is PackedScene:
 		gizmo = gizmo.instantiate()
+	where = G.to_grid(where).position
 	place_object(gizmo, where, parti.node)
 	$Network.netlist.gizmos.get_or_add(G.layer, []).append(gizmo)
 	gizmo._on_flowchart_mode_changed(mode)
+	return gizmo
 
 func rem_gizmo(_gizmo:FlowchartGizmo):
 	pass
@@ -277,6 +281,20 @@ func rem_gizmo(_gizmo:FlowchartGizmo):
 	#queue_redraw()
 	#remove_object(node)
 	#node.queue_free()
+
+func add_via(where:Vector2) -> NetBase.Via:
+	var via := NetBase.Via.new()
+	var cell = G.to_grid(to_canvas_coord(where))
+	via.coord = cell.coord
+	place_object(via, via.position, parti.wire)
+	$Network.netlist.joints[Vector3i(via.coord.x, via.coord.y, G.layer)] = via
+	queue_redraw()
+	return via
+
+func rem_via(via:NetBase.Via):
+	remove_object(via)
+	queue_redraw()
+
 #endregion
 
 #region Wires
@@ -289,13 +307,37 @@ func rem_gizmo(_gizmo:FlowchartGizmo):
 # Wire info
 var wiring_allowed : bool = true
 
+## Gizmo socket has started a wire.
 func start_socket_wiring(sock_data:Dictionary):
 	lasso_allowed = false
-	G.wire_from = sock_data.global_position
+	G.wire_from = sock_data
 
+## Wire stopped at a Gizmo socket.
 func stop_socket_wiring(sock_data:Dictionary):
+	sock_data.socket.connected[G.wire_from.socket] = null
+	G.wire_from.socket.connected[sock_data.socket] = NetBase.Link.new()
+	G.wire_from.socket.connected[sock_data.socket].chirality = Input.is_key_pressed(KEY_SHIFT)
+	
 	lasso_allowed = true
-	G.wire_from = Vector2.INF
+	G.wire_from.clear()
+	queue_redraw()
+
+## Wire stopped on empty canvas.
+func stop_canvas_wiring(where:Vector2):
+	var via : NetBase.Via = add_via(where)
+	via.connected[G.wire_from.socket] = null
+	G.wire_from.socket.connected[via] = NetBase.Link.new()
+	G.wire_from.socket.connected[via].chirality = Input.is_key_pressed(KEY_SHIFT)
+	
+	lasso_allowed = true
+	G.wire_from.clear()
+	queue_redraw()
+
+func start_via_wiring(sock_data:Dictionary):
+	lasso_allowed = false
+	G.wire_from = sock_data
+	queue_redraw()
+
 #endregion
 
 #region Simulation Implementation

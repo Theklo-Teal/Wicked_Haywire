@@ -2,6 +2,11 @@
 extends NetBase.Joint
 class_name ChartSocket
 
+
+#NOTE: Sockets exceptionally have their set position apart from the conversion
+# from coordinate. We want negative coordinates to wrap around to stay contained
+# to a FlowchartGizmo
+
 enum {
 	HIZ,  ## Electrically isolated socket
 	SINK,  ## This socket reads a value
@@ -14,36 +19,39 @@ var hover : bool
 var bitwidth : int
 
 @export_enum("Hi-Z", "Sink", "Source", "Bidir") var mode : int
-
+@export var show_check : bool
+var checked : bool
 @export_group("Porting")
 @export var port_class : StringName = "Port"  ## What kind of link is preferred if there's none when connecting this socket? It defines what format, protocol, and variable type the read and write values are.
 @export var accepted_port : Array[StringName] = ["Port"]  ## When connecting to another socket, we assume we can connect to it, but something in our [code]refuse_link[/code] is its [code]link_class[/code] we refuse to connect. Adding it to this array, allows an exception to accept connection.
 @export var refuse_port : Array[StringName]  ## When connecting to another socket, we assume we can connect to it, except if something in our [code]refuse_link[/code] is its [code]link_class[/code], so we refuse to connect. Unless, its [code]link_class[/code] is also in [code]accept_link[/code], so we excpetionally allow connection.
 
-func _init() -> void:
-	pass
+#func draw_wires(canvas:Control):
+	#for conn in connected:
+		#if connected[conn] == null: continue
+		#var wire = connected[conn]
+		#wire.draw(canvas, G.chart.to_screen_coord(position), G.chart.to_screen_coord(conn.position))
 
-var show_check : bool = true
-var checked : bool = false
-func draw(canvas:Control, _highlighted:=false):
+func draw(canvas:Control):
 	draw_wires(canvas)
 	var color = G.appearance.trace_primary if hover else G.appearance.trace_secondary
 	match mode:
 		HIZ:
 			color = G.appearance.color.inverted()
-			canvas.draw_circle(_position, G.joint_rad, color)
+			canvas.draw_circle(position, G.joint_rad, color)
 		SINK:
-			canvas.draw_rect(Rect2(-Vector2.ONE * G.joint_rad + _position, Vector2.ONE * G.snap), color)
+			var wid = G.joint_rad * 1.4142  # (Square-root of 2)
+			canvas.draw_rect(Rect2(-Vector2(0.5, 0.5) * wid + position, Vector2.ONE * wid), color)
 		SOURCE:
 			var polyline := [
-				_position + Vector2(0, -G.joint_rad),
-				_position + Vector2(G.joint_rad, 0),
-				_position + Vector2(0, G.joint_rad),
-				_position + Vector2(-G.joint_rad, 0),
+				position + Vector2(0, -G.joint_rad),
+				position + Vector2(G.joint_rad, 0),
+				position + Vector2(0, G.joint_rad),
+				position + Vector2(-G.joint_rad, 0),
 			]
 			canvas.draw_colored_polygon(polyline, color)
 		BIDIR:
-			canvas.draw_circle(_position, G.joint_rad, color)
+			canvas.draw_circle(position, G.joint_rad, color)
 	
 	#if show_check and checked:
 		#canvas.draw_circle(where, G.grid_size * 0.3, color)

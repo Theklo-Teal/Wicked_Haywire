@@ -56,8 +56,8 @@ class Port:
 	@export_storage var coord : Vector2i :
 		set(val):
 			coord = val
-			_position = G.from_grid(coord)
-	@export_storage var _position : Vector2  #NOTE: Spatial position is not to be relied on authoritavely. It should be updated whenever [code]coord[/code] is set, functioning as a cache so we don't have to call grid snapping all the time.
+			position = G.from_grid(coord)
+	@export_storage var position : Vector2  #NOTE: Spatial position is not to be relied on authoritavely. It should be updated whenever [code]coord[/code] is set, functioning as a cache so we don't have to call grid snapping all the time.
 	@export_storage var layer : int
 	
 	## Returns both grid coordinate and layer as the same data type.
@@ -75,7 +75,7 @@ class Port:
 	@abstract func is_outgoing(connection:NetVert) -> Link
 	
 	## How to draw this object on the [code]canvas[/code].
-	@abstract func draw(canvas:Control, highlight:bool=false)
+	@abstract func draw(canvas:Control)
 
 
 class Joint extends NetVert:
@@ -92,15 +92,15 @@ class Joint extends NetVert:
 	func is_outgoing(connection:NetVert) -> Link:
 		return connected.get(connection, null)
 	
-	func draw(canvas:Control, _highlight:bool=false):
+	func draw(canvas:Control):
 		draw_wires(canvas)
-		draw_at(canvas, _position)
+		draw_at(canvas, position)
 	
 	func draw_wires(canvas:Control):
 		for conn in connected:
 			if connected[conn] == null: continue
 			var wire = connected[conn]
-			wire.draw(canvas, _position, conn.position)
+			wire.draw(canvas, G.chart.to_screen_coord(position), G.chart.to_screen_coord(conn.position))
 	
 	static func draw_at(canvas:Control, where:Vector2):
 		var color = G.appearance.color.inverted()
@@ -113,15 +113,15 @@ class Via extends Joint:
 	
 	@export var text : String = ""
 	
-	func draw(canvas:Control, highlight:=false):
-		if connected.size() != 2 or not text.is_empty():
-			var thick = G.appearance.joint_rad - G.appearance.via_hole # Find the thickness that produces a hole of constant size.
-			canvas.draw_circle(_position,
-				G.appearance.joint_rad - thick / 2.0 - G.appearance.clearance,
-				G.appearance.trace_color_highlight if highlight else G.appearance.trace_color_primary,
-				false, thick)
+	func draw(canvas:Control):
+		#if connected.size() != 2 or not text.is_empty():
+		var thick = G.joint_rad - G.via_hole # Find the thickness that produces a hole of constant size.
+		canvas.draw_circle(G.chart.to_screen_coord(position),
+			G.joint_rad - thick / 2.0 - G.clearance,
+			G.appearance.trace_primary,
+			false, thick)
 
-class Link:
+class Link extends Resource:
 	## And object that defines the visual representation of the connection between NetVerts.
 	enum M {  ## The method used to find the bend corner in the middle of a wire.
 		HANDI,  ## Handiness, if clockwise, or counterclockwise of the origin ending.
@@ -133,25 +133,16 @@ class Link:
 		set(val):
 			bend = clamp(val, 0, 1)
 	
-	var net : NetBase
-	func _init(network:NetBase):
-		net = network
+	func draw(canvas:Control, start:Vector2, stop:Vector2):
+		canvas.draw_polyline(get_verts(start, stop), G.appearance.trace_primary, G.max_wire)
 	
-	func draw(canvas:Flowchart, start:Vector2, stop:Vector2):
-		canvas.draw_polyline(get_verts(start, stop), canvas.trace_color_primary, canvas.max_wire)
-	
-	static func draw_chiral(canvas:Flowchart, start:Vector2, stop:Vector2, clockwise:bool, bend_dist:float):
+	static func draw_chiral(canvas:Control, start:Vector2, stop:Vector2, clockwise:bool, bend_dist:float):
 		var middle = find_bend_chi(start, stop, clockwise)
-		canvas.draw_polyline(get_verts_from(start, middle, stop, bend_dist), canvas.trace_color_primary, canvas.max_wire)
+		canvas.draw_polyline(get_verts_from(start, middle, stop, bend_dist), G.appearance.trace_primary, G.max_wire)
 	
-	static func draw_length(canvas:Flowchart, start:Vector2, stop:Vector2, longest:bool, bend_dist:float):
+	static func draw_length(canvas:Control, start:Vector2, stop:Vector2, longest:bool, bend_dist:float):
 		var middle = find_bend_len(start, stop, longest)
-		canvas.draw_polyline(get_verts_from(start, middle, stop, bend_dist), canvas.trace_color_primary, canvas.max_wire)
-	
-	### Given a a rectangle without [code]abs()[/code], draw on canvas such as the first line is either the longest or shortest.
-	#static func draw_length(canvas:Flowchart, box:Rect2, short:bool, clr:=Color.GOLDENROD):
-		#var c = get_corners_len(box.size, short)
-		#draw_along(canvas, box.abs(), c[0], c[1], c[2], 1, clr)
+		canvas.draw_polyline(get_verts_from(start, middle, stop, bend_dist), G.appearance.trace_primary, G.max_wire)
 	
 	## Returns the coordinate of the middle vertex, neglecting [code]bend[/code].
 	func find_bend(start:Vector2, stop:Vector2) -> Vector2:
@@ -223,7 +214,7 @@ class Link:
 				# Even after finding a matching segment, we keep iterating through
 				# all segments so we can find the total length of the wire.
 				continue
-			if along < 1 and along > 0 and prox < net.snap / 2.0:
+			if along < 1 and along > 0 and prox < G.snap / 2.0:
 				# We don't want to accept distances further than a segment's
 				# length, which happens when clicking near the mid corner as if
 				# bend ratio was 1.

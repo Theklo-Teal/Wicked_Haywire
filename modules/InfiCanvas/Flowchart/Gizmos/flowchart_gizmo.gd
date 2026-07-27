@@ -50,7 +50,7 @@ signal finish_done
 		for sock in sockets:
 			var coord = sockets[sock]
 			sock.coord = coord
-			sock._position = get_socket_position_from_coord(coord)
+			sock.position = get_socket_position_from_coord(coord)
 			_sockdex[get_socket_true_coord(coord)] = sock
 
 var _sockdex : Dictionary[Vector2i, ChartSocket]  # Back reference to find which socket is in at certain coord.
@@ -92,7 +92,7 @@ func _on_resized():
 	for sock in sockets:
 		var coord = sockets[sock]
 		_sockdex[get_socket_true_coord(coord)] = sock
-		sock._position = get_socket_position_from_coord(coord)
+		sock.position = get_socket_position_from_coord(coord)
 	size = size.snappedf(G.snap * 2)
 	_grid.x = floori(size.x / G.snap)
 	_grid.y = floori(size.y / G.snap)
@@ -126,9 +126,7 @@ func _draw() -> void:
 	if OS.has_feature("editor_hint") and show_grid:
 		for y : int in range(_grid.y + 1):
 			for x : int in range(_grid.x + 1):
-				if y % 2 == 0 and x % 2 == 0: continue
-				@warning_ignore("integer_division")
-				var pos = G.from_grid(Vector2i(x / 2, y))
+				var pos = Vector2(x,y) * G.snap
 				draw_circle(pos, G.joint_rad, Color.HOT_PINK, false)
 	
 	for sock : ChartSocket in sockets:
@@ -140,25 +138,25 @@ func _draw() -> void:
 # Get the grid coord of socket, after computing negative values
 func get_socket_true_coord(socket_coord:Vector2i):
 	@warning_ignore("integer_division")
-	socket_coord.x = wrapi(socket_coord.x, 0, _grid.x / 2 + 1)
+	socket_coord.x = wrapi(socket_coord.x, 0, _grid.x + 1)
 	@warning_ignore("integer_division")
-	socket_coord.y = wrapi(socket_coord.y, 0, _grid.y / 2 + 1)
+	socket_coord.y = wrapi(socket_coord.y, 0, _grid.y + 1)
 	return socket_coord
 ## Get a socket position from its Grid Coordinate, negative values wrap around to stay contained in the Gizmo.
 func get_socket_position_from_coord(socket_coord:Vector2i) -> Vector2:
-	return G.from_grid(get_socket_true_coord(socket_coord))
+	return get_socket_true_coord(socket_coord) * G.snap
 ## Get a socket position from its instance
 func get_socket_position(socket:ChartSocket) -> Vector2:
 	var coord = sockets[socket]
 	return get_socket_position_from_coord(coord)
 
 
-func add_socket(_socket : ChartSocket, _coord := Vector2i.ZERO):
-	pass
-	#socket.coord = coord
-	#sockets.append(socket)
-	#register_socket(socket)
-	#queue_sort()
+func add_socket(socket : ChartSocket, coord := Vector2i.ZERO):
+	socket.coord = coord
+	socket.position = get_socket_position_from_coord(coord)
+	sockets[socket] = coord
+	_sockdex[get_socket_true_coord(coord)] = socket
+	queue_redraw()
 
 func rem_socket(_socket : ChartSocket):
 	pass
@@ -204,7 +202,9 @@ var hover_socket : ChartSocket :
 		hover_socket = val
 func _on_mouse_stopped():
 	# Check if mouse is over a socket.
-	var cell = G.to_grid(get_local_mouse_position()).coord
+	var cell := Vector2i(get_local_mouse_position())
+	cell.x = roundi(inverse_lerp(0, G.snap, cell.x))
+	cell.y = roundi(inverse_lerp(0, G.snap, cell.y))
 	var sock = _sockdex.get(cell)
 	if hover_socket != null and hover_socket != sock:
 		queue_redraw()

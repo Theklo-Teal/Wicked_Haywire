@@ -16,8 +16,8 @@ corner_radius_bottom_right = 4
 script = ExtResource("2_u06mr")
 mode = 1
 connected = Dictionary[SubResource("GDScript_u06mr"), SubResource("GDScript_j1ehs")]({})
-coord = Vector2i(0, 3)
-_position = Vector2(0, 36)
+coord = Vector2i(0, 1)
+position = Vector2(0, 22)
 layer = 0
 metadata/_custom_type_script = "uid://ddaiqnfpchm0j"
 
@@ -25,24 +25,24 @@ metadata/_custom_type_script = "uid://ddaiqnfpchm0j"
 script = ExtResource("2_u06mr")
 mode = 2
 connected = Dictionary[SubResource("GDScript_u06mr"), SubResource("GDScript_j1ehs")]({})
-coord = Vector2i(-1, 3)
-_position = Vector2(96, 36)
+coord = Vector2i(-1, 1)
+position = Vector2(88, 22)
 layer = 0
 metadata/_custom_type_script = "uid://ddaiqnfpchm0j"
 
 [node name="Bogus" type="Control" unique_id=541440936]
-custom_minimum_size = Vector2(12, 12)
+custom_minimum_size = Vector2(22, 22)
 layout_mode = 3
 anchors_preset = 0
-offset_right = 96.0
-offset_bottom = 72.0
+offset_right = 88.0
+offset_bottom = 44.0
 script = ExtResource("1_0ywhu")
 panelstyle = Array[StyleBox]([SubResource("StyleBoxFlat_u06mr")])
 panelrect = Array[Rect2]([Rect2(0, 0, -1, -1)])
 panels = Array[int]([0])
 sockets = Dictionary[ExtResource("2_u06mr"), Vector2i]({
-SubResource("Resource_u06mr"): Vector2i(0, 3),
-SubResource("Resource_j1ehs"): Vector2i(-1, 3)
+SubResource("Resource_u06mr"): Vector2i(0, 1),
+SubResource("Resource_j1ehs"): Vector2i(-1, 1)
 })
 metadata/_custom_type_script = "uid://dxbdnxmvfy5cw"
 
