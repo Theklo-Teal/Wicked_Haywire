@@ -35,13 +35,9 @@ class_name Flowchart
 
 #TODO Allow Rotating and Mirroring Graph Nodes
 #TODO Procedural Nodes
-#TODO Implement new Rect2 based wire method
 #TODO Check if I can actually save the network and reload it.
 #TODO Allow Copy, Paste and Duplicate
 #TODO Allow Undo/Redo: Class UndoRedo
-
-
-const HIGHLIGHT_THICK = 3
 
 @export var update_rate : float = 0.01 :  # Time for the simulation to update state.
 	set(val):
@@ -64,34 +60,22 @@ func _on_appearance_changed():
 	trace_color_highlight = G.appearance.trace_highlight
 
 #region Grid Snapping
-@export var snap : int = 12 :  ## Size of grid snapping cells. The snap grid is based on a rhombus. Refer to [code]Flowchart.to_grid()[/code] for more information.
-	set(val):
-		G.snap = val
-		snap = G.snap
-@export var via_hole : int = 4 :  ## Radius of the holes in joints.
-	set(val):
-		G.via_hole = val
-		via_hole = G.via_hole
-@export var max_wire : int = 8 :  ## Maximum thickness of a wire.
-	set(val):
-		G.max_wire = val
-		max_wire = G.max_wire
-@export var clearance : int = 2 :  ## Minimum distance between conductors.
-	set(val):
-		G.clearance = val
-		clearance = G.clearance
 
-var joint_rad : float
-
+const SNAP = 12  ## Size of grid SNAPping cells. The snap grid is based on a rhombus. Refer to [code]Flowchart.to_grid()[/code] for more information.
+const VIA_HOLE = 4  ## Radius of the holes in joints.
+const MAX_WIRE = 8  ## Maximum thickness of a wire.
+const CLEARANCE = 2  ## Minimum distance between conductors.
+const JOINT_RAD = 6
+static func snap_grid(pos:Vector2) -> Vector2:
+	return pos.snappedf(SNAP)
 ## Returns the actual space position snapped to the grid from a grid coordinate.
-func from_grid(coord:Vector2i) -> Vector2:
-	return Vector2(coord) * snap
-
+static func from_grid(coord:Vector2i) -> Vector2:
+	return Vector2(coord) * SNAP
 ## Returns [code]coord[/code]
-func to_grid(position:Vector2) -> Vector2i:
+static func to_grid(pos:Vector2) -> Vector2i:
 	var coord := Vector2i(  ## Find cell coordinate in the grid
-		roundi(inverse_lerp(0, snap * 2, position.x)),
-		roundi(inverse_lerp(0, snap, position.y))
+		roundi(inverse_lerp(0, SNAP * 2, pos.x)),
+		roundi(inverse_lerp(0, SNAP, pos.y))
 		)
 	return coord
 #endregion
@@ -117,8 +101,7 @@ enum Mode{
 var mode : Mode : 
 	set(val):
 		mode = val
-		G._on_flowchart_mode_changed(mode)
-		for gizmo : FlowchartGizmo in Net.netlist.gizmos.get(G.layer, []):
+		for gizmo : FlowchartGizmo in $Network.netlist.gizmos.get(G.layer, []):
 			gizmo._on_flowchart_mode_changed(mode)
 
 func _ready() -> void:
@@ -138,29 +121,32 @@ func _ready() -> void:
 
 func draw_back_geometry(viewed_canvas_rect:Rect2):
 	if OS.has_feature("editor_hint"): return
+	
+	for joint in parti.joint.find_objects_simple(viewed_canvas_rect):
+		if not joint is GizmoSocket:
+			var where = from_grid(joint.coord)
+			joint.draw(self, to_screen_coord(where))
 
 func draw_fore_geometry(canvas:Control, viewed_canvas_rect:Rect2):
 	if OS.has_feature("editor_hint"): return
 	
-	for joint in parti.joint.find_objects_simple(viewed_canvas_rect):
-		if joint is FlowchartSocket:
-			joint.draw(self)
+	for gizmo : FlowchartGizmo in parti.node.find_objects_simple(viewed_canvas_rect):
+		for coord in gizmo._sockdex:
+			var socket = gizmo._sockdex[coord]
+			var where = from_grid(socket.coord) + gizmo.position
+			socket.draw(canvas, to_screen_coord(where))
 	
 	# Draw wire being pulled.
-	if wiring_allowed and not G.wire_from.is_empty():
-		NetBase.Link.draw_length(canvas, to_screen_coord(G.wire_from.global_position), get_local_mouse_position(), Input.is_key_pressed(KEY_SHIFT), G.snap)
-	
-	for gizmo in Net.netlist.gizmos.get_or_add(G.layer, []):
-		for sock in gizmo.sockets:
-			sock.draw(self)
+	#if wiring_allowed and not wire_from.is_empty():
+	#	NetBase.Link.draw_length(canvas, to_screen_coord(wire_from.global_position), get_local_mouse_position(), Input.is_key_pressed(KEY_SHIFT), G.snap)
 
 func draw_overlay(canvas:Control, _viewed_canvas_rect:Rect2):
 	if OS.has_feature("editor_hint"): return
 	
-	var where = G.snap_grid(get_local_mouse_position())
+	var where = snap_grid(get_local_mouse_position())
 	var clr = G.appearance.color.inverted()
 	clr.a = 0.4
-	canvas.draw_circle(where, G.joint_rad, clr)
+	canvas.draw_circle(where, JOINT_RAD, clr)
 
 #endregion
 
@@ -169,7 +155,7 @@ func _gui_input(event: InputEvent) -> void:
 	super(event)
 	
 	if event is InputEventMouseButton:
-		var cell = G.to_grid(to_canvas_coord(event.position))
+		var cell = snap_grid(to_canvas_coord(event.position))
 		if event.is_pressed():
 			match event.button_index:
 				MOUSE_BUTTON_LEFT:
@@ -177,18 +163,18 @@ func _gui_input(event: InputEvent) -> void:
 					if not is_moving_obj:
 						_selected.clear()
 					if wiring_allowed:
-						var via = Net.netlist.joints.get(Vector3i(cell.x, cell.y, G.layer), null)
+						var via = $Network.netlist.joints.get(Vector3i(cell.x, cell.y, G.layer), null)
 						if via != null:
 							start_via_wiring({
 								"socket": via,
 								"local_position": event.position,
 								})
-						elif not G.wire_from.is_empty():
-							stop_canvas_wiring(event.position)
+						#elif not wire_from.is_empty():
+						#	stop_canvas_wiring(event.position)
 		elif event.is_released():
 			match event.button_index:
 				MOUSE_BUTTON_LEFT:
-					if wiring_allowed and not G.wire_from.is_empty():
+					if wiring_allowed and not wire_from.is_empty():
 						stop_canvas_wiring(event.position)
 					elif lasso_canvas_rect.size > MINIMUM_LASSO:
 						if lasso_allowed:
@@ -214,7 +200,7 @@ func _input(event: InputEvent) -> void:
 				if each is FlowchartGizmo:
 					rem_gizmo(each)
 		if event.keycode == KEY_SHIFT:
-			if not G.wire_from.is_empty():
+			if not wire_from.is_empty():
 				queue_redraw()
 			if event.is_pressed() and is_moving_obj:
 				# Regretting not having held Shift before mouse motion.
@@ -227,20 +213,20 @@ func _input(event: InputEvent) -> void:
 				selected_obj_movement_stop()
 	
 	if event is InputEventMouseMotion:
-		if wiring_allowed and not G.wire_from.is_empty():
+		if wiring_allowed and not wire_from.is_empty():
 			queue_redraw()
 		elif Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) and not is_moving_obj and move_obj_allowed:
 			selected_obj_movement_start()
-		if is_moving_obj and move_obj_allowed:
-			if not Input.is_key_pressed(KEY_SHIFT):
-				pass
+		#if is_moving_obj and move_obj_allowed:
+			#if not Input.is_key_pressed(KEY_SHIFT):
+				#pass
 
 func obj_movement_modulate(new_position:Vector2) -> Vector2:
-	return G.snap_grid(new_position)
+	return snap_grid(new_position)
 
 func escape_key_action():
-	if not G.wire_from.is_empty():
-		G.wire_from.clear()
+	if not wire_from.is_empty():
+		wire_from.clear()
 		return
 	super()
 
@@ -296,23 +282,23 @@ func add_gizmo(res:String, where:=Vector2.ZERO) -> FlowchartGizmo:
 		gizmo = gizmo.new()
 	elif gizmo is PackedScene:
 		gizmo = gizmo.instantiate()
-	where = G.snap_grid(where)
+	where = snap_grid(where)
 	place_object(gizmo, where, parti.node)
-	Net.register_gizmo(gizmo, G.layer)
+	$Network.register_gizmo(gizmo, G.layer)
 	gizmo._on_flowchart_mode_changed(mode)
 	return gizmo
 
 func rem_gizmo(_gizmo:FlowchartGizmo):
 	pass
-	#net.rem_node(node)
+	#$Network.rem_node(node)
 	##TODO Remove node sockets from links.
-	#await net.sim_cycle_begun
+	#await $Network.sim_cycle_begun
 	#queue_redraw()
 	#remove_object(node)
 	#node.queue_free()
 
 func add_via(where:Vector2) -> NetBase.Via:
-	var via = Net.get_or_add_joint(to_canvas_coord(where), G.layer, Net.Via.new())
+	var via = $Network.get_or_add_joint(to_canvas_coord(where), G.layer, $Network.Via.new())
 	place_object(via, via.position, parti.joint)
 	queue_redraw()
 	return via
@@ -332,36 +318,35 @@ func rem_via(via:NetBase.Via):
 #region Wiring
 # Wire info
 var wiring_allowed : bool = true
+var wire_from : Dictionary
 
 ## Gizmo socket has started a wire.
 func start_socket_wiring(sock_data:Dictionary):
 	lasso_allowed = false
-	G.wire_from = sock_data
+	wire_from = sock_data
 
 ## Wire stopped at a Gizmo socket.
 func stop_socket_wiring(sock_data:Dictionary):
-	sock_data.socket.connected[G.wire_from.socket] = null
-	G.wire_from.socket.connected[sock_data.socket] = NetBase.Link.new()
-	G.wire_from.socket.connected[sock_data.socket].chirality = Input.is_key_pressed(KEY_SHIFT)
+	var wire = $Network.linking(wire_from, sock_data)
+	wire.chirality = Input.is_key_pressed(KEY_SHIFT)
 	
 	lasso_allowed = true
-	G.wire_from.clear()
+	wire_from.clear()
 	queue_redraw()
 
 ## Wire stopped on empty canvas.
 func stop_canvas_wiring(where:Vector2):
 	var via : NetBase.Via = add_via(where)
-	via.connected[G.wire_from.socket] = null
-	G.wire_from.socket.connected[via] = NetBase.Link.new()
-	G.wire_from.socket.connected[via].chirality = Input.is_key_pressed(KEY_SHIFT)
+	var wire = $Network.linking(wire_from, via)
+	wire.chirality = Input.is_key_pressed(KEY_SHIFT)
 	
 	lasso_allowed = true
-	G.wire_from.clear()
+	wire_from.clear()
 	queue_redraw()
 
 func start_via_wiring(sock_data:Dictionary):
 	lasso_allowed = false
-	G.wire_from = sock_data
+	wire_from = sock_data
 	queue_redraw()
 
 #endregion
@@ -384,8 +369,8 @@ func pause_sim():
 func resume_sim():
 	sim_paused = false
 func reset_sim():
-	for link in Net.the_links:
-		Net.the_links[link] = link.default
+	for link in $Network.the_links:
+		$Network.the_links[link] = link.default
 
 var gizmos : Array[FlowchartGizmo]
 func _on_sim_update():
@@ -394,27 +379,27 @@ func _on_sim_update():
 	sim_cycle_started.emit()
 	
 	gizmos.clear()
-	for lay in Net.netlist.gizmos:
-		gizmos.append_array(Net.netlist.gizmos[lay])
+	for lay in $Network.netlist.gizmos:
+		gizmos.append_array($Network.netlist.gizmos[lay])
 	
-	Net.cycle_begin()
+	$Network.cycle_begin()
 	
 	if not (skip_cycle or sim_paused):
-		for port in Net.ports:
+		for port in $Network.ports:
 			for vert in port.verts:
 				vert.cycle_begin(port)
 		
 		sim_update_started.emit()
-		for port in Net.ports:
+		for port in $Network.ports:
 			for vert in port.verts:
 				vert.cycle_update(port)
 		sim_update_finish.emit()
 	
-		for port in Net.ports:
+		for port in $Network.ports:
 			for vert in port.verts:
 				vert.cycle_finish(port)
 	
-	Net.cycle_finish()
+	$Network.cycle_finish()
 	
 	sim_cycle_finish.emit()
 	in_a_cycle = false

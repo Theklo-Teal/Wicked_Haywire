@@ -21,9 +21,9 @@ class NetData extends Resource:
 	## We have network elements in here, so they can be serialized and interchanged
 	## with loading and saving.
 	@export_storage var joints : Dictionary[int, Joint]  ## Find joint from their hashes.
-	@export_storage var links : Dictionary[int, Link]  ## The key is the XOR of hashes of two joints. The value is the Link instance representing that. 
-	@export_storage var pairs : Dictionary[int, Array]  ## The link hash according to the joints involved. The order encodes the orientation of the link.
 	@export_storage var vias : Dictionary[Vector3i, Joint]  ## For free standing joints.
+	@export_storage var pairs : Dictionary[int, Array]  ## The link hash according to the joints involved. The order encodes the orientation of the link.
+	@export_storage var links : Dictionary[int, Link]  ## The key is the XOR of hashes of two joints. The value is the Link instance representing that. 	
 	@export_storage var gizmos : Dictionary[int, Array]  ## An array of Gizmo for a given layer.
 	
 	## Produce the hash of a pair of joints.
@@ -86,16 +86,15 @@ func cycle_finish():
 
 func register_gizmo(gizmo:FlowchartGizmo, layer:int):
 	netlist.gizmos.get_or_add(layer, []).append(gizmo)
-	for coord in gizmo.sockets:
-		var socket = gizmo.sockets[coord]
+	for coord in gizmo._sockdex:
+		var socket = gizmo._sockdex[coord]
 		netlist.joints[hash(socket)] = socket
 
 ## Tries to returns an existing joint at [code]where[/code], otherwise registers
 ## the given joint. Whatever joint is used, is returned.
 func get_or_add_joint(where:Vector2, layer:int, added_joint:Joint) -> Joint:
-	var cell = X.to_grid(where)
+	var cell = Flowchart.to_grid(where)
 	var joint = netlist.vias.get_or_add(Vector3i(cell.x, cell.y, layer), added_joint)
-	joint.position = cell.position
 	joint.layer = layer
 	netlist.joints[hash(joint)] = joint
 	return joint
@@ -103,9 +102,9 @@ func get_or_add_joint(where:Vector2, layer:int, added_joint:Joint) -> Joint:
 	# So we don't get their tunnel name at registering.
 
 func move_joint(joint:Joint, where:Vector2) -> Error:
-	var from = X.to_grid(joint.position)
+	var from = Flowchart.to_grid(joint.position)
 	var cell_from = Vector3i(from.coord.x, from.coord.y, joint.layer)
-	var to = X.to_grid(where)
+	var to = Flowchart.to_grid(where)
 	var cell_to = Vector3i(to.coord.x, to.coord.y, joint.layer)
 	if cell_to in netlist.vias:
 		return ERR_ALREADY_IN_USE

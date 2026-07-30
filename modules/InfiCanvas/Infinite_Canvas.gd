@@ -215,6 +215,7 @@ func _input(event: InputEvent) -> void:
 func obj_movement_modulate(new_position:Vector2) -> Vector2:
 	return new_position
 
+## Call this function if selected objects are about to be moved.
 func selected_obj_movement_start():
 	if move_obj_allowed:
 		lasso_allowed = false

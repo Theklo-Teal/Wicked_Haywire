@@ -2,7 +2,7 @@
 extends Control
 class_name FlowchartGizmo
 
-## A panel containing FlowchartSockets to be added to Flowchart and FlowchartNetwork.[br]
+## A panel containing GizmoSockets to be added to Flowchart and FlowchartNetwork.[br]
 ## The size of a Gizmo is always a multiple of the grid snapping. Any sockets will
 ## also snap to the grid. Position is presumably snapped to the grid by Flowchart.
 ## You may see the available grid cells in editor if [code]show_grid[/code] is enabled.
@@ -41,7 +41,7 @@ signal finish_done
 		panels = _val
 		queue_redraw()
 
-@export var sockets : Dictionary[FlowchartSocket, Vector2i] : 
+@export var sockets : Dictionary[GizmoSocket, Vector2i] : 
 	set(val):
 		queue_redraw()
 		val.erase(null)
@@ -50,12 +50,12 @@ signal finish_done
 		for sock in sockets:
 			var coord = sockets[sock]
 			sock.coord = coord
-			sock.position = get_socket_position_from_coord(coord)
 			_sockdex[get_socket_true_coord(coord)] = sock
 
-var _sockdex : Dictionary[Vector2i, FlowchartSocket]  # Back reference to find which socket is in at certain coord.
+var _sockdex : Dictionary[Vector2i, GizmoSocket]  # Back reference to find which socket is in at certain coord. Coordinates are wrapped, so if they are negative in [code]sockets[/code] they will be positive here.
 
-func _parti_registered(parti:SpatialPartition, data:Dictionary) -> void:
+
+func _parti_registered(_parti:SpatialPartition, data:Dictionary) -> void:
 	data.registry_acknowledged = true
 
 func _on_flowchart_mode_changed(mode:Flowchart.Mode):
@@ -88,14 +88,14 @@ func _on_flowchart_mode_changed(mode:Flowchart.Mode):
 
 var _grid : Vector2i
 func _on_resized():
-	custom_minimum_size = custom_minimum_size.max(Vector2.ONE * G.snap)
+	custom_minimum_size = custom_minimum_size.max(Vector2.ONE * Flowchart.SNAP)
 	for sock in sockets:
 		var coord = sockets[sock]
 		_sockdex[get_socket_true_coord(coord)] = sock
 		sock.position = get_socket_position_from_coord(coord)
-	size = size.snappedf(G.snap)
-	_grid.x = floori(size.x / G.snap)
-	_grid.y = floori(size.y / G.snap)
+	size = size.snappedf(Flowchart.SNAP)
+	_grid.x = floori(size.x / Flowchart.SNAP)
+	_grid.y = floori(size.y / Flowchart.SNAP)
 
 #region Drawing Background
 func _draw() -> void:
@@ -109,26 +109,29 @@ func _draw() -> void:
 		siz_floor *=  rect.size.sign()
 		
 		# Scale to the grid
-		rect.position = pos_floor * G.snap + G.snap * pos_deci
-		rect.size = siz_floor * G.snap + G.snap * siz_deci
+		rect.position = pos_floor * Flowchart.SNAP + Flowchart.SNAP * pos_deci
+		rect.size = siz_floor * Flowchart.SNAP + Flowchart.SNAP * siz_deci
 		
-		rect.position.x = clamp(rect.position.x, -G.snap, size.x)
-		rect.position.y = clamp(rect.position.y, -G.snap, size.y)
+		rect.position.x = clamp(rect.position.x, -Flowchart.SNAP, size.x)
+		rect.position.y = clamp(rect.position.y, -Flowchart.SNAP, size.y)
 		
 		# Expand with node size.
-		var max_end = size + Vector2(2,2) * G.snap
-		rect.end.x = wrap(rect.end.x, rect.position.x + G.snap, max_end.x)
-		rect.end.y = wrap(rect.end.y, rect.position.y + G.snap, max_end.y)
+		var max_end = size + Vector2(2,2) * Flowchart.SNAP
+		rect.end.x = wrap(rect.end.x, rect.position.x + Flowchart.SNAP, max_end.x)
+		rect.end.y = wrap(rect.end.y, rect.position.y + Flowchart.SNAP, max_end.y)
 		
 		draw_style_box(style, rect)
 	
 	# Visual helper to tell the grid cells
-	if OS.has_feature("editor_hint") and show_grid:
-		for y : int in range(_grid.y + 1):
-			for x : int in range(_grid.x + 1):
-				var pos = Vector2(x,y) * G.snap
-				draw_circle(pos, G.joint_rad, Color.HOT_PINK, false)
-
+	if OS.has_feature("editor_hint"):
+		if show_grid:
+			for y : int in range(_grid.y + 1):
+				for x : int in range(_grid.x + 1):
+					var pos = Vector2(x,y) * Flowchart.SNAP
+					draw_circle(pos, Flowchart.JOINT_RAD, Color.HOT_PINK, false)
+		for coord in _sockdex:
+			var where = Flowchart.from_grid(coord)
+			_sockdex[coord].draw(self, where)
 #endregion
 
 #region Socket Managment
@@ -141,21 +144,21 @@ func get_socket_true_coord(socket_coord:Vector2i):
 	return socket_coord
 ## Get a socket position from its Grid Coordinate, negative values wrap around to stay contained in the Gizmo.
 func get_socket_position_from_coord(socket_coord:Vector2i) -> Vector2:
-	return get_socket_true_coord(socket_coord) * G.snap
+	return get_socket_true_coord(socket_coord) * Flowchart.SNAP
 ## Get a socket position from its instance
-func get_socket_position(socket:FlowchartSocket) -> Vector2:
+func get_socket_position(socket:GizmoSocket) -> Vector2:
 	var coord = sockets[socket]
 	return get_socket_position_from_coord(coord)
 
 
-func add_socket(socket : FlowchartSocket, coord := Vector2i.ZERO):
+func add_socket(socket : GizmoSocket, coord := Vector2i.ZERO):
 	socket.coord = coord
 	socket.position = get_socket_position_from_coord(coord)
 	sockets[socket] = coord
 	_sockdex[get_socket_true_coord(coord)] = socket
 	queue_redraw()
 
-func rem_socket(_socket : FlowchartSocket):
+func rem_socket(_socket : GizmoSocket):
 	pass
 	#if owner is Flowchart:
 		#owner.clear_wires(socket)
@@ -192,7 +195,7 @@ func _process(_delta: float) -> void:
 		mouse_moved = false
 		_on_mouse_stopped()
 
-var hover_socket : FlowchartSocket : 
+var hover_socket : GizmoSocket : 
 	set(val):
 		if val != hover_socket:
 			queue_redraw()
@@ -200,8 +203,8 @@ var hover_socket : FlowchartSocket :
 func _on_mouse_stopped():
 	# Check if mouse is over a socket.
 	var cell := Vector2i(get_local_mouse_position())
-	cell.x = roundi(inverse_lerp(0, G.snap, cell.x))
-	cell.y = roundi(inverse_lerp(0, G.snap, cell.y))
+	cell.x = roundi(inverse_lerp(0, Flowchart.SNAP, cell.x))
+	cell.y = roundi(inverse_lerp(0, Flowchart.SNAP, cell.y))
 	var sock = _sockdex.get(cell)
 	if hover_socket != null and hover_socket != sock:
 		queue_redraw()
@@ -215,7 +218,7 @@ func _on_mouse_stopped():
 #endregion
 
 func _input(event: InputEvent) -> void:
-	if _mouse_hover and G.mode == Flowchart.Mode.EDITING:
+	if _mouse_hover and G.chart.mode == Flowchart.Mode.EDITING:
 		if event is InputEventMouseMotion:
 			mouse_moving = true
 			queue_redraw()
@@ -243,7 +246,7 @@ func _gui_input(event: InputEvent) -> void:
 				elif existing < 0:
 					owner._selected = [self]
 
-func _on_socket_pressed(socket:FlowchartSocket):
+func _on_socket_pressed(socket:GizmoSocket):
 	var sock_data = {
 		"gizmo":self,
 		"socket": socket,
@@ -252,7 +255,7 @@ func _on_socket_pressed(socket:FlowchartSocket):
 		}
 	if sock_data.socket != null:
 		owner.start_socket_wiring(sock_data)
-func _on_socket_released(socket:FlowchartSocket):
+func _on_socket_released(socket:GizmoSocket):
 	var sock_data = {
 		"gizmo":self,
 		"socket": socket,

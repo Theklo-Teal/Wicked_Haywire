@@ -53,11 +53,8 @@ class Port:
 @abstract class NetVert extends Resource:
 	## Anything that can be connected in a network, like joints
 	## and wires.
-	@export_storage var coord : Vector2i :
-		set(val):
-			coord = val
-			position = G.from_grid(coord)
-	@export_storage var position : Vector2  #NOTE: Spatial position is not to be relied on authoritavely. It should be updated whenever [code]coord[/code] is set, functioning as a cache so we don't have to call grid snapping all the time.
+	@export_storage var position : Vector2  ## This allows the socket to be found by spatial partitioning.
+	@export_storage var coord : Vector2i
 	@export_storage var layer : int
 	
 	## Returns both grid coordinate and layer as the same data type.
@@ -69,14 +66,11 @@ class Port:
 		coord = Vector2i(cell.x, cell.y)
 	
 	## How to draw this object on the [code]canvas[/code].
-	@abstract func draw(canvas:Control)
+	@abstract func draw(canvas:Control, where:Vector2)
 
 
 class Joint extends NetVert:
-	func draw(canvas:Control):
-		draw_at(canvas, position)
-	
-	static func draw_at(canvas:Control, where:Vector2):
+	func draw(canvas:Control, where:Vector2):
 		var color = G.appearance.color.inverted()
 		color.a = 0.4
 		canvas.draw_circle(where, G.joint_rad, color)
@@ -86,14 +80,6 @@ class Via extends Joint:
 	## as the ending of a wire and labelled to create a tunnel connection.
 	
 	@export var text : String = ""
-	
-	func draw(canvas:Control):
-		#if connected.size() != 2 or not text.is_empty():
-		var thick = G.joint_rad - G.via_hole # Find the thickness that produces a hole of constant size.
-		canvas.draw_circle(G.chart.to_screen_coord(position),
-			G.joint_rad - thick / 2.0 - G.clearance,
-			G.appearance.trace_primary,
-			false, thick)
 
 class Socket extends Joint:
 	enum {

@@ -3,7 +3,6 @@
 [ext_resource type="Texture2D" uid="uid://bliggdgfw3v4k" path="res://Wicked_Haywire_Logo.png" id="1_1bvp3"]
 [ext_resource type="PackedScene" uid="uid://bnatph83g21s6" path="res://modules/InfiCanvas/Flowchart/Flowchart.tscn" id="1_ig7tw"]
 [ext_resource type="Texture2D" uid="uid://buorl1ocq0h64" path="res://assets/flags.png" id="1_lquwl"]
-[ext_resource type="Script" uid="uid://d02c16crluegs" path="res://modules/InfiCanvas/spatial_partitioning.gd" id="4_7mycd"]
 [ext_resource type="Script" uid="uid://b07ljhmg8l7ne" path="res://modules/Sidebar.gd" id="6_7mycd"]
 [ext_resource type="Shader" uid="uid://d1gg4mr8iu7ia" path="res://modules/SidebarTray_Glass.gdshader" id="6_272bh"]
 
@@ -447,12 +446,6 @@ func _draw() -> void:
 		span += step
 	draw_polyline(line, Color.REBECCA_PURPLE, 3)
 "
-
-[sub_resource type="Resource" id="Resource_7mycd"]
-script = ExtResource("4_7mycd")
-
-[sub_resource type="Resource" id="Resource_272bh"]
-script = ExtResource("4_7mycd")
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_7mycd"]
 shader = ExtResource("6_272bh")
@@ -1129,10 +1122,6 @@ unique_name_in_owner = true
 clip_contents = true
 layout_mode = 2
 size_flags_vertical = 3
-parti = Dictionary[Variant, ExtResource("4_7mycd")]({
-"node": SubResource("Resource_7mycd"),
-"wire": SubResource("Resource_272bh")
-})
 
 [node name="MarginContainer" type="MarginContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/Flowchart" unique_id=1137236957]
 layout_mode = 1
