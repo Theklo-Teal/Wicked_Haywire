@@ -15,6 +15,9 @@ corner_radius_bottom_right = 4
 [sub_resource type="Resource" id="Resource_u06mr"]
 script = ExtResource("2_u06mr")
 mode = 1
+port_class = &"Port"
+accepted_port = Array[StringName]([&"Port"])
+refuse_port = Array[StringName]([])
 connected = Dictionary[SubResource("GDScript_u06mr"), SubResource("GDScript_j1ehs")]({})
 coord = Vector2i(0, 1)
 position = Vector2(0, 22)
@@ -24,6 +27,9 @@ metadata/_custom_type_script = "uid://ddaiqnfpchm0j"
 [sub_resource type="Resource" id="Resource_j1ehs"]
 script = ExtResource("2_u06mr")
 mode = 2
+port_class = &"Port"
+accepted_port = Array[StringName]([&"Port"])
+refuse_port = Array[StringName]([])
 connected = Dictionary[SubResource("GDScript_u06mr"), SubResource("GDScript_j1ehs")]({})
 coord = Vector2i(-1, 1)
 position = Vector2(88, 22)

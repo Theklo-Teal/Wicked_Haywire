@@ -68,39 +68,13 @@ class Port:
 		layer = cell.z
 		coord = Vector2i(cell.x, cell.y)
 	
-	@abstract func get_connected(from:NetVert=null) -> Array[NetVert]
-	@abstract func get_outgoing(from:NetVert=null) -> Array[NetVert]
-	@abstract func get_ingoing(from:NetVert=null) -> Array[NetVert]
-	@abstract func get_link(connection:NetVert) -> Link
-	@abstract func is_outgoing(connection:NetVert) -> Link
-	
 	## How to draw this object on the [code]canvas[/code].
 	@abstract func draw(canvas:Control)
 
 
 class Joint extends NetVert:
-	@export_storage var connected : Dictionary[Joint, Link]
-	
-	func get_connected(_from:NetVert=null) -> Array[NetVert]:
-		return connected.keys()
-	func get_ingoing(_from:NetVert=null) -> Array[NetVert]:
-		return connected.keys()
-	func get_outgoing(_from:NetVert=null) -> Array[NetVert]:
-		return connected.keys()
-	func get_link(connection:NetVert) -> Link:
-		return connected.get(connection, connection.connected.get(self, null))
-	func is_outgoing(connection:NetVert) -> Link:
-		return connected.get(connection, null)
-	
 	func draw(canvas:Control):
-		draw_wires(canvas)
 		draw_at(canvas, position)
-	
-	func draw_wires(canvas:Control):
-		for conn in connected:
-			if connected[conn] == null: continue
-			var wire = connected[conn]
-			wire.draw(canvas, G.chart.to_screen_coord(position), G.chart.to_screen_coord(conn.position))
 	
 	static func draw_at(canvas:Control, where:Vector2):
 		var color = G.appearance.color.inverted()
@@ -120,6 +94,27 @@ class Via extends Joint:
 			G.joint_rad - thick / 2.0 - G.clearance,
 			G.appearance.trace_primary,
 			false, thick)
+
+class Socket extends Joint:
+	enum {
+	HIZ,  ## Electrically isolated socket
+	SINK,  ## This socket reads a value
+	SOURCE,  ## This socket writes a value
+	BIDIR  ## This socket can relay a value
+	}
+	@export_enum("Hi-Z", "Sink", "Source", "Bidir") var mode : int
+	@export_group("Porting")
+	@export var port_class : StringName = "Port"  ## What kind of link is preferred if there's none when connecting this socket? It defines what format, protocol, and variable type the read and write values are.
+	@export var accepted_port : Array[StringName] = ["Port"]  ## When connecting to another socket, we assume we can connect to it, but something in our [code]refuse_link[/code] is its [code]link_class[/code] we refuse to connect. Adding it to this array, allows an exception to accept connection.
+	@export var refuse_port : Array[StringName]  ## When connecting to another socket, we assume we can connect to it, except if something in our [code]refuse_link[/code] is its [code]link_class[/code], so we refuse to connect. Unless, its [code]link_class[/code] is also in [code]accept_link[/code], so we excpetionally allow connection.
+
+	## This socket was used to read a Port.
+	func has_read(val):
+		pass
+	## This socket was used to write a Port.
+	func has_written(val):
+		pass
+
 
 class Link extends Resource:
 	## And object that defines the visual representation of the connection between NetVerts.

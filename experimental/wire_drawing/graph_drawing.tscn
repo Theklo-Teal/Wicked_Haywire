@@ -23,19 +23,15 @@ func _ready() -> void:
 		var coord = Vector2i(15, i + 5)
 		var sock = xSocket.new()
 		sock.mode = xSocket.INPUT if i % 2 == 0 else xSocket.OUTPUT
-		net.get_or_add_joint(coord, X.layer, sock)
+		net.get_or_add_joint(coord, sock)
 
 func _mouse_over_joint(where:Vector2):
 	var cell = X.to_grid(where).coord
-	cell = Vector3i(cell.x, cell.y, X.layer)
 	X.coord_joint = cell
-	X.sel_joint = net.netlist.joints.get(cell)
+	X.sel_joint = net.netlist.vias.get(cell)
 
-func _mouse_over_wire(where:Vector2):
-	X.info_wire = net.over_wire(where, X.layer)
-	if not X.info_wire.is_empty():
-		X.sel_wire = X.info_wire.wire
-		X.info_wire[\"bend\"] = X.sel_wire.bend
+func _mouse_over_wire(_where:Vector2):
+	X.info_wire = {}
 
 #func _resize_bend(wire:xNetBase.xWire, ini_bend:float, ini_pos:Vector2, end_pos:Vector2):
 		#var verts = wire.get_verts()
@@ -95,29 +91,30 @@ func _gui_input(event: InputEvent) -> void:
 						# Create Wire
 						if X.sel_joint != null:
 							var orig = X.sel_joint
-							X.sel_joint = net.get_or_add_joint(cell.coord, X.layer, xNetBase.xVia.new())
-							orig.connected[X.sel_joint] = xNetBase.xWire.new()
-							X.sel_joint.connected[orig] = null
-							orig.connected[X.sel_joint].chirality = Input.is_key_pressed(KEY_SHIFT)
-							orig.connected[X.sel_joint].bend = X.CELL_DIA
+							X.sel_joint = net.get_or_add_joint(cell.coord, xNetBase.xVia.new())
+							if orig != X.sel_joint:
+								var wire = xNetBase.xWire.new()
+								wire.chirality = Input.is_key_pressed(KEY_SHIFT)
+								wire.bend = X.CELL_DIA
+								net.make_link(orig, X.sel_joint, wire)
 						
 					MOUSE_BUTTON_RIGHT:
 						# Move Joint
 						if X.sel_joint != null:
-							var coord = Vector3i(cell.coord.x, cell.coord.y, X.layer)
-							if not net.netlist.joints.has(coord):
-								net.netlist.joints.erase(X.coord_joint)
-								net.netlist.joints[coord] = X.sel_joint
-								X.sel_joint.position = cell.position
+							if not net.netlist.vias.has(cell.coord):
+								net.netlist.vias.erase(X.cell_joint)
+								net.netlist.vias[cell.coord] = X.sel_joint
+								X.sel_joint.coord = cell.coord
 
 
 func _draw() -> void:
 	# Draw stuff on the netlist
-	for coord in net.netlist.joints:
-		if coord.z != X.layer:
-			continue
-		var joint = net.netlist.joints[coord]
-		joint.draw(self, joint == X.sel_joint)
+	for pair in net.netlist.links:
+		var joints = net.netlist.pairs[pair]
+		var wire = net.netlist.links[pair]
+		wire.draw(self, X.from_grid(joints[0].coord), X.from_grid(joints[1].coord))
+	for id in net.netlist.joints:
+		net.netlist.joints[id].draw(self)
 
 #var period : float = 0.33
 #var _elapsed : float = 0

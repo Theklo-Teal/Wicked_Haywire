@@ -2,7 +2,7 @@
 extends Control
 class_name FlowchartGizmo
 
-## A panel containing ChartSockets to be added to Flowchart and FlowchartNetwork.[br]
+## A panel containing FlowchartSockets to be added to Flowchart and FlowchartNetwork.[br]
 ## The size of a Gizmo is always a multiple of the grid snapping. Any sockets will
 ## also snap to the grid. Position is presumably snapped to the grid by Flowchart.
 ## You may see the available grid cells in editor if [code]show_grid[/code] is enabled.
@@ -41,7 +41,7 @@ signal finish_done
 		panels = _val
 		queue_redraw()
 
-@export var sockets : Dictionary[ChartSocket, Vector2i] : 
+@export var sockets : Dictionary[FlowchartSocket, Vector2i] : 
 	set(val):
 		queue_redraw()
 		val.erase(null)
@@ -53,9 +53,9 @@ signal finish_done
 			sock.position = get_socket_position_from_coord(coord)
 			_sockdex[get_socket_true_coord(coord)] = sock
 
-var _sockdex : Dictionary[Vector2i, ChartSocket]  # Back reference to find which socket is in at certain coord.
+var _sockdex : Dictionary[Vector2i, FlowchartSocket]  # Back reference to find which socket is in at certain coord.
 
-func _parti_registered(data:Dictionary) -> void:
+func _parti_registered(parti:SpatialPartition, data:Dictionary) -> void:
 	data.registry_acknowledged = true
 
 func _on_flowchart_mode_changed(mode:Flowchart.Mode):
@@ -93,7 +93,7 @@ func _on_resized():
 		var coord = sockets[sock]
 		_sockdex[get_socket_true_coord(coord)] = sock
 		sock.position = get_socket_position_from_coord(coord)
-	size = size.snappedf(G.snap * 2)
+	size = size.snappedf(G.snap)
 	_grid.x = floori(size.x / G.snap)
 	_grid.y = floori(size.y / G.snap)
 
@@ -128,9 +128,6 @@ func _draw() -> void:
 			for x : int in range(_grid.x + 1):
 				var pos = Vector2(x,y) * G.snap
 				draw_circle(pos, G.joint_rad, Color.HOT_PINK, false)
-	
-	for sock : ChartSocket in sockets:
-		sock.draw(self)
 
 #endregion
 
@@ -146,19 +143,19 @@ func get_socket_true_coord(socket_coord:Vector2i):
 func get_socket_position_from_coord(socket_coord:Vector2i) -> Vector2:
 	return get_socket_true_coord(socket_coord) * G.snap
 ## Get a socket position from its instance
-func get_socket_position(socket:ChartSocket) -> Vector2:
+func get_socket_position(socket:FlowchartSocket) -> Vector2:
 	var coord = sockets[socket]
 	return get_socket_position_from_coord(coord)
 
 
-func add_socket(socket : ChartSocket, coord := Vector2i.ZERO):
+func add_socket(socket : FlowchartSocket, coord := Vector2i.ZERO):
 	socket.coord = coord
 	socket.position = get_socket_position_from_coord(coord)
 	sockets[socket] = coord
 	_sockdex[get_socket_true_coord(coord)] = socket
 	queue_redraw()
 
-func rem_socket(_socket : ChartSocket):
+func rem_socket(_socket : FlowchartSocket):
 	pass
 	#if owner is Flowchart:
 		#owner.clear_wires(socket)
@@ -195,7 +192,7 @@ func _process(_delta: float) -> void:
 		mouse_moved = false
 		_on_mouse_stopped()
 
-var hover_socket : ChartSocket : 
+var hover_socket : FlowchartSocket : 
 	set(val):
 		if val != hover_socket:
 			queue_redraw()
@@ -246,7 +243,7 @@ func _gui_input(event: InputEvent) -> void:
 				elif existing < 0:
 					owner._selected = [self]
 
-func _on_socket_pressed(socket:ChartSocket):
+func _on_socket_pressed(socket:FlowchartSocket):
 	var sock_data = {
 		"gizmo":self,
 		"socket": socket,
@@ -255,7 +252,7 @@ func _on_socket_pressed(socket:ChartSocket):
 		}
 	if sock_data.socket != null:
 		owner.start_socket_wiring(sock_data)
-func _on_socket_released(socket:ChartSocket):
+func _on_socket_released(socket:FlowchartSocket):
 	var sock_data = {
 		"gizmo":self,
 		"socket": socket,

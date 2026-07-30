@@ -3,53 +3,22 @@ class_name xNetBase
 
 ## Definition of classes necessary to build a network.
 
-class xPort:
-	## Target for signals being conveyed during simulation using an Observer Pattern.
-	var value
-	var aggregate : Array
-	
-	## If the port has no values feeding in, what should it be read as?
-	static func default():
-		return 0
-	func integrate():
-		value = roundi(aggregate.reduce(func(sum, a):return sum + a, 0) / aggregate.size())
-	func read():
-		return value
-	func write(val):
-		aggregate.append(val)
-
-
 @abstract class xNetNode extends Resource:
-	## Anything that can be connected in a network, like sockets
-	## and wires.
-	@export_storage var connected : Dictionary[xNetNode, xWire]
-	@export_storage var position : Vector2
-	@export_storage var layer : int
-	
+	@export_storage var coord : Vector2i
 	var colors : Array[Color] = [Color.YELLOW, Color.GOLD, Color.GOLDENROD]
 	
-	@abstract func draw(canvas:Control, highlight:bool=false)
+	@abstract func draw(canvas:Control)
 
 class xJoint extends xNetNode:
-	func draw(canvas:Control, highlight:bool=false):
-		canvas.draw_circle(position, X.CELL_RAD, colors[1] if highlight else colors[2])
-		draw_wires(canvas)
-	
-	func draw_wires(canvas:Control):
-		for conn in connected:
-			if connected[conn] == null: continue
-			connected[conn].draw(canvas, position, conn.position)
-	
-	static func draw_at(canvas:Control, where:Vector2):
-		canvas.draw_circle(where, X.CELL_RAD, Color.YELLOW)
+	func draw(canvas:Control):
+		var where = X.from_grid(coord)
+		canvas.draw_circle(where, X.CELL_RAD, colors[1])
 
 class xVia extends xJoint:
 	@export var text : String
-	func draw(canvas:Control, highlight:bool=false):
+	func draw(canvas:Control):
 		var thick = X.CELL_RAD - X.VIA_RAD
-		canvas.draw_circle(position, X.CELL_RAD - X.VIA_RAD / 2.0, colors[1] if highlight else colors[2], false, thick)
-		draw_wires(canvas)
-
+		canvas.draw_circle(X.from_grid(coord), X.CELL_RAD - X.VIA_RAD / 2.0, colors[1], false, thick)
 
 class xWire:
 	## And object that defines the visual representation of the connection between NetNodes.

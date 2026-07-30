@@ -9,8 +9,7 @@ var appearance : FlowchartStyle = load("res://styles/flowchart/Blueprint.tres") 
 			if not appearance.changed.is_connected(chart._on_appearance_changed):
 				appearance.changed.connect(chart._on_appearance_changed)
 var layer : int = 0
-var wire_from : Dictionary
-
+ 
 var grid_changed := true
 var snap : int = 12 :  ## Size of grid snapping  cells. The snap grid is based on a rhombus. Refer to [code]to_grid()[/code] for more information.
 	set(val):
@@ -31,31 +30,29 @@ var clearance : int = 2 :  ## Minimum distance between conductors.
 
 var joint_rad : float  ## Radius of a joint that fits in a grid cell.
 
+func snap_grid(position:Vector2):
+	return position.snappedf(snap)
+
 ## Returns the actual space position snapped to the grid from a grid coordinate.
 func from_grid(coord:Vector2i) -> Vector2:
-	var pos := Vector2.ZERO
-	pos.x = 2 * snap * coord.x
-	pos.y = snap * coord.y
-	if coord.y % 2 == 0:  # Make cell position staggered between rows
-		pos.x += snap
-	return pos
+	return Vector2(coord) * snap
 
 ## Returns [code]coord[/code]
-func to_grid(position:Vector2) -> Dictionary:
+func to_grid(position:Vector2) -> Vector2i:
 	var coord := Vector2i(  ## Find cell coordinate in the grid
 		roundi(inverse_lerp(0, snap * 2, position.x)),
 		roundi(inverse_lerp(0, snap, position.y))
 		)
-	if coord.y % 2 == 0:
-		var offset = position.x - snap
-		coord.x = roundi(inverse_lerp(0, snap * 2, offset))
-	return {"position": from_grid(coord), "coord": coord}
+	return coord
 
 func _process(_delta: float) -> void:
 	if grid_changed:
 		grid_changed = false
-		joint_rad = snap / 2.0 #- clearance
+		joint_rad = snap / 2.0 - clearance
 		max_wire = clampi(max_wire, 0, snap - clearance * 2)
+		if chart is Flowchart:
+			chart.joint_rad = joint_rad
+			chart.max_wire = max_wire
 		#get_tree().call_group("grid_size_response", "on_grid_size_changed")
 
 

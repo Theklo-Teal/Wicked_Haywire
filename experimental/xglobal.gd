@@ -10,9 +10,8 @@ var WIRE_THICK = 8  ## The maximum thickness of a wire.
 const CLEARANCE = 4  ## Minimum distance between wires or sockets, so they don't touch.
 var CELL_SPACING = CELL_RAD + CLEARANCE + (WIRE_THICK / 2.0)
 
-var layer : int = 0  ## Which layer is visible.
 var sel_joint : xNetBase.xJoint
-var coord_joint : Vector3i  ## Grid coordinate of sel_joint at time of selecting it.
+var coord_joint : Vector2i  ## Grid coordinate of sel_joint at time of selecting it.
 var sel_wire : xNetBase.xWire
 var info_wire : Dictionary  ## Information about the sel_wire at the time of selecting it.
 var detach_wire := false

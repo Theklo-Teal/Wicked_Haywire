@@ -80,6 +80,20 @@ func _on_appearance_changed():
 	set(val):
 		G.clearance = val
 		clearance = G.clearance
+
+var joint_rad : float
+
+## Returns the actual space position snapped to the grid from a grid coordinate.
+func from_grid(coord:Vector2i) -> Vector2:
+	return Vector2(coord) * snap
+
+## Returns [code]coord[/code]
+func to_grid(position:Vector2) -> Vector2i:
+	var coord := Vector2i(  ## Find cell coordinate in the grid
+		roundi(inverse_lerp(0, snap * 2, position.x)),
+		roundi(inverse_lerp(0, snap, position.y))
+		)
+	return coord
 #endregion
 
 func _process(delta: float) -> void:
@@ -99,13 +113,12 @@ var gizmo_pallet : Dictionary[String, Resource]
 enum Mode{
 	EDITING,  ## Nodes being repositioned and sockets being connected.
 	SIMULAT,  ## Node children being interacted with and their state affected manually.
-	PLACING,  ## Adding a node to the Canvas #TODO Actualy implement this.
 }
 var mode : Mode : 
 	set(val):
 		mode = val
 		G._on_flowchart_mode_changed(mode)
-		for gizmo : FlowchartGizmo in $Network.netlist.gizmos.get(G.layer, []):
+		for gizmo : FlowchartGizmo in Net.netlist.gizmos.get(G.layer, []):
 			gizmo._on_flowchart_mode_changed(mode)
 
 func _ready() -> void:
@@ -123,15 +136,31 @@ func _ready() -> void:
 
 #region Drawing
 
-func draw_fore_geometry(viewed_canvas_rect:Rect2):
+func draw_back_geometry(viewed_canvas_rect:Rect2):
+	if OS.has_feature("editor_hint"): return
+
+func draw_fore_geometry(canvas:Control, viewed_canvas_rect:Rect2):
 	if OS.has_feature("editor_hint"): return
 	
-	for each in parti.wire.find_objects_simple(viewed_canvas_rect):
-		each.draw(self)
+	for joint in parti.joint.find_objects_simple(viewed_canvas_rect):
+		if joint is FlowchartSocket:
+			joint.draw(self)
 	
 	# Draw wire being pulled.
 	if wiring_allowed and not G.wire_from.is_empty():
-		NetBase.Link.draw_length(self, to_screen_coord(G.wire_from.global_position), get_local_mouse_position(), Input.is_key_pressed(KEY_SHIFT), G.snap)
+		NetBase.Link.draw_length(canvas, to_screen_coord(G.wire_from.global_position), get_local_mouse_position(), Input.is_key_pressed(KEY_SHIFT), G.snap)
+	
+	for gizmo in Net.netlist.gizmos.get_or_add(G.layer, []):
+		for sock in gizmo.sockets:
+			sock.draw(self)
+
+func draw_overlay(canvas:Control, _viewed_canvas_rect:Rect2):
+	if OS.has_feature("editor_hint"): return
+	
+	var where = G.snap_grid(get_local_mouse_position())
+	var clr = G.appearance.color.inverted()
+	clr.a = 0.4
+	canvas.draw_circle(where, G.joint_rad, clr)
 
 #endregion
 
@@ -148,7 +177,7 @@ func _gui_input(event: InputEvent) -> void:
 					if not is_moving_obj:
 						_selected.clear()
 					if wiring_allowed:
-						var via = $Network.netlist.joints.get(Vector3i(cell.coord.x, cell.coord.y, G.layer), null)
+						var via = Net.netlist.joints.get(Vector3i(cell.x, cell.y, G.layer), null)
 						if via != null:
 							start_via_wiring({
 								"socket": via,
@@ -207,7 +236,7 @@ func _input(event: InputEvent) -> void:
 				pass
 
 func obj_movement_modulate(new_position:Vector2) -> Vector2:
-	return G.to_grid(new_position).position
+	return G.snap_grid(new_position)
 
 func escape_key_action():
 	if not G.wire_from.is_empty():
@@ -267,9 +296,9 @@ func add_gizmo(res:String, where:=Vector2.ZERO) -> FlowchartGizmo:
 		gizmo = gizmo.new()
 	elif gizmo is PackedScene:
 		gizmo = gizmo.instantiate()
-	where = G.to_grid(where).position
+	where = G.snap_grid(where)
 	place_object(gizmo, where, parti.node)
-	$Network.netlist.gizmos.get_or_add(G.layer, []).append(gizmo)
+	Net.register_gizmo(gizmo, G.layer)
 	gizmo._on_flowchart_mode_changed(mode)
 	return gizmo
 
@@ -283,11 +312,8 @@ func rem_gizmo(_gizmo:FlowchartGizmo):
 	#node.queue_free()
 
 func add_via(where:Vector2) -> NetBase.Via:
-	var via := NetBase.Via.new()
-	var cell = G.to_grid(to_canvas_coord(where))
-	via.coord = cell.coord
-	place_object(via, via.position, parti.wire)
-	$Network.netlist.joints[Vector3i(via.coord.x, via.coord.y, G.layer)] = via
+	var via = Net.get_or_add_joint(to_canvas_coord(where), G.layer, Net.Via.new())
+	place_object(via, via.position, parti.joint)
 	queue_redraw()
 	return via
 
@@ -358,8 +384,8 @@ func pause_sim():
 func resume_sim():
 	sim_paused = false
 func reset_sim():
-	for link in $Network.the_links:
-		$Network.the_links[link] = link.default
+	for link in Net.the_links:
+		Net.the_links[link] = link.default
 
 var gizmos : Array[FlowchartGizmo]
 func _on_sim_update():
@@ -368,27 +394,27 @@ func _on_sim_update():
 	sim_cycle_started.emit()
 	
 	gizmos.clear()
-	for lay in $Network.netlist.gizmos:
-		gizmos.append_array($Network.netlist.gizmos[lay])
+	for lay in Net.netlist.gizmos:
+		gizmos.append_array(Net.netlist.gizmos[lay])
 	
-	$Network.cycle_begin()
+	Net.cycle_begin()
 	
 	if not (skip_cycle or sim_paused):
-		for port in $Network.ports:
+		for port in Net.ports:
 			for vert in port.verts:
 				vert.cycle_begin(port)
 		
 		sim_update_started.emit()
-		for port in $Network.ports:
+		for port in Net.ports:
 			for vert in port.verts:
 				vert.cycle_update(port)
 		sim_update_finish.emit()
 	
-		for port in $Network.ports:
+		for port in Net.ports:
 			for vert in port.verts:
 				vert.cycle_finish(port)
 	
-	$Network.cycle_finish()
+	Net.cycle_finish()
 	
 	sim_cycle_finish.emit()
 	in_a_cycle = false

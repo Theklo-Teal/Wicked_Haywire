@@ -11,12 +11,10 @@ enum {
 @export_enum("HIZ INPUT OUTPUT BIDIR",) var mode : int
 
 
-func draw(canvas:Control, highlight:bool=false):
+func draw(canvas:Control):
 	match mode:
 		INPUT:
-			canvas.draw_circle(position, X.CELL_RAD, colors[1] if highlight else colors[2])
+			canvas.draw_circle(X.from_grid(coord), X.CELL_RAD, colors[1])
 		OUTPUT:
-			var rect = Rect2(position - Vector2.ONE * X.CELL_RAD, Vector2.ONE * X.CELL_DIA).grow(-X.CLEARANCE / 2.0)
-			canvas.draw_rect(rect, colors[1] if highlight else colors[2])
-	
-	draw_wires(canvas)
+			var rect = Rect2(X.from_grid(coord) - Vector2.ONE * X.CELL_RAD, Vector2.ONE * X.CELL_DIA).grow(-X.CLEARANCE / 2.0)
+			canvas.draw_rect(rect, colors[1])

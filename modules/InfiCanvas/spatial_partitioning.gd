@@ -202,7 +202,7 @@ func add_object(obj, pos:Vector2) -> Dictionary:
 	quad.subdivide(obj_pos)
 	
 	if typeof(obj) == TYPE_OBJECT and obj.has_method("_parti_registered"):
-		obj._parti_registered(obj_intel[obj])
+		obj._parti_registered(self, obj_intel[obj])
 		
 	return obj_intel[obj]
 

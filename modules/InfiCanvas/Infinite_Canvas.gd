@@ -19,6 +19,8 @@ class_name InfiCanvas
 # Removed grid snapping as an intrinsic feature of the canvas. Deciding how inform every component what the grid size is was being an headache, so I leave it to extensions of InfiCanvas, which probably involves having grid size in a singleton.
 # SpatialPartition doesn't track position independently of the objects as it would when built into InfiCanvas. The position property of the object is used instead.
 # It isn't possible to define the rect of an object through overriding functions. The object should have a `get_rect()` method or `rect` property if that's relevant.
+# `fore_draw_geometry()` now is to be used to draw over registered child nodes.
+# `draw_overlay()` was added that redraws according to `overlay_mode`.
 
 #TODO Make zoom into the center
 #FIXME go_to(Vector2.ZERO) doesn't seem to work if InfiCanvas isn't root node.
@@ -33,6 +35,7 @@ const ZOOM_SPEED = 0.2
 
 var all_objs : Dictionary[Variant, SpatialPartition]  # Track which partitions objects are in.
 
+@export_enum("Mouse Motion", "Input Event", "Process", "Physics")  var overlay_mode : String = "Mouse Motion" ##  Method that updates the overlay. It will always update when this class redraws.
 @export_group("Appearance")
 @export_range(1, 200, 1, "or_greater") var cell_size : int = 50 :   ## The nominal size for the background pattern.
 	set(val):
@@ -72,6 +75,8 @@ enum CHIRAL{
 #region Boilerplate
 var _camera : Camera2D
 var _nodes : Node
+var forecanvas : Control
+var overlay : Control
 var center : Vector2
 func _init():
 	if not item_rect_changed.is_connected(_on_rect_changed):
@@ -92,9 +97,24 @@ func _init():
 	add_child(subviewportcontainer)
 	_nodes.owner = self
 	subviewportcontainer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	forecanvas = Control.new()
+	forecanvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(forecanvas)
+	forecanvas.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	forecanvas.draw.connect(_draw_fore_geometry)
+	overlay = Control.new()
+	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE 
+	add_child(overlay)
+	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	overlay.draw.connect(_draw_overlay)
 	
 	await ready
 	go_to(Vector2.ZERO)
+
+func _process(_delta: float) -> void:
+	if overlay_mode == "Process": overlay.queue_redraw()
+func _physics_process(_delta: float) -> void:
+	if overlay_mode == "Physics": overlay.queue_redraw()
 
 func _on_rect_changed():
 	center = get_rect().get_center()
@@ -141,6 +161,8 @@ func _gui_input(event: InputEvent) -> void:
 					origin.x -= SCROLL_SPEED.x
 
 func _input(event: InputEvent) -> void:
+	if overlay_mode == "Input Event": overlay.queue_redraw()
+	
 	if event is InputEventKey and event.is_released():
 		if event.keycode == KEY_ESCAPE:
 			escape_key_action()
@@ -161,6 +183,7 @@ func _input(event: InputEvent) -> void:
 					queue_redraw()
 	
 	if event is InputEventMouseMotion:
+		if overlay_mode == "Mouse Motion": overlay.queue_redraw()
 		if lasso_allowed and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 			queue_redraw()
 			
@@ -287,12 +310,13 @@ func remove_object(obj) -> Dictionary:
 #endregion
 
 #region Drawing Functions
+var view_rect : Rect2
 func _draw():
 	var local_origin = to_screen_coord(Vector2.ZERO)
 	var view_x = local_origin.x > 0 and local_origin.x < size.x
 	var view_y = local_origin.y > 0 and local_origin.y < size.y
 	
-	var view_rect = to_canvas_rect(Rect2(Vector2.ZERO, size))
+	view_rect = to_canvas_rect(Rect2(Vector2.ZERO, size))
 	
 	draw_background_pattern(local_origin, to_screen_coord(Vector2.ONE * cell_size, -origin).x)
 	draw_origin_axis(view_x, view_y, local_origin)
@@ -301,7 +325,8 @@ func _draw():
 	
 	draw_back_geometry(view_rect)
 	highlight_selection(_selected)
-	draw_fore_geometry(view_rect)
+	forecanvas.queue_redraw()
+	overlay.queue_redraw()
 	
 	if lasso_allowed and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 		draw_lasso()
@@ -426,14 +451,31 @@ func escape_key_action():
 
 ## Objects in partitions might not have an intrinsic visual representation, like Godot Nodes do.
 ## How you override [code]draw_*_geometry()[/code] defines how to interpret the object's data.[br]
+## This draws behind child nodes.
 @warning_ignore("unused_parameter")
 func draw_back_geometry(viewed_canvas_rect:Rect2):
 	pass
 
+func _draw_fore_geometry():
+	draw_fore_geometry(forecanvas, view_rect)
+
 ## Objects in partitions might not have an intrinsic visual representation, like Godot Nodes do.
 ## How you override [code]draw_*_geometry()[/code] defines how to interpret the object's data.[br]
+## This draws in front child nodes, by using draw calls on [code]canvas[/code].
 @warning_ignore("unused_parameter")
-func draw_fore_geometry(viewed_canvas_rect:Rect2):
+func draw_fore_geometry(canvas:Control, viewed_canvas_rect:Rect2):
+	pass
+
+@warning_ignore("unused_parameter")
+func _draw_overlay():
+	draw_overlay(overlay, view_rect)
+
+## This draws in front of everything, by using draw calls on [code]canvas[/code].[br]
+## This is similar to [code]draw_fore_geometry[/code], but updates independently,
+## intended for re-drawing at high frequency, like effects on mouse motion.[br]
+## See [code]overlay[/code] for more information.
+@warning_ignore("unused_parameter")
+func draw_overlay(canvas:Control, viewed_canvas_rect:Rect2):
 	pass
 
 #endregion

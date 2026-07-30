@@ -2,29 +2,13 @@
 
 [ext_resource type="Script" uid="uid://ch21vd3wceeie" path="res://modules/InfiCanvas/Flowchart/flowchart.gd" id="1_88cu4"]
 [ext_resource type="Script" uid="uid://d02c16crluegs" path="res://modules/InfiCanvas/spatial_partitioning.gd" id="2_3gi3x"]
-[ext_resource type="Script" uid="uid://ctv2i7rdaj44r" path="res://modules/InfiCanvas/Flowchart/networking.gd" id="2_gatyp"]
 
 [sub_resource type="Resource" id="Resource_3gi3x"]
 script = ExtResource("2_3gi3x")
 
-[sub_resource type="Resource" id="Resource_dvd76"]
+[sub_resource type="Resource" id="Resource_gatyp"]
 script = ExtResource("2_3gi3x")
-
-[sub_resource type="GDScript" id="GDScript_3gi3x"]
-resource_name = "overlay"
-script/source = "extends Control
-
-#FIXME The overlay cell doesn't match canvas cells depending on panning.
-
-func _input(event: InputEvent) -> void:
-	if event is InputEventMouseMotion:
-		queue_redraw()
-
-func _draw() -> void:
-	var color : Color = G.appearance.color.inverted()
-	color.a = 0.4
-	draw_circle(G.to_grid(get_local_mouse_position()).position, G.joint_rad, color)
-"
+metadata/_custom_type_script = "uid://d02c16crluegs"
 
 [node name="Flowchart" type="ColorRect" unique_id=117644141]
 anchors_preset = 15
@@ -36,13 +20,9 @@ color = Color(0.27387273, 0.27387273, 0.27387273, 1)
 script = ExtResource("1_88cu4")
 snap = 22
 parti = Dictionary[Variant, ExtResource("2_3gi3x")]({
-"node": SubResource("Resource_3gi3x"),
-"wire": SubResource("Resource_dvd76")
+"joint": SubResource("Resource_gatyp"),
+"node": SubResource("Resource_3gi3x")
 })
-
-[node name="Network" type="Node" parent="." unique_id=2002615217]
-script = ExtResource("2_gatyp")
-metadata/_custom_type_script = "uid://ctv2i7rdaj44r"
 
 [node name="VBoxContainer" type="VBoxContainer" parent="." unique_id=2124179095]
 layout_mode = 1
@@ -94,14 +74,3 @@ item_4/text = "Diode"
 item_4/id = 4
 item_5/text = "Tri-State Buffer"
 item_5/id = 5
-
-[node name="Overlay" type="Control" parent="." unique_id=1695376126]
-visible = false
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 1
-script = SubResource("GDScript_3gi3x")
