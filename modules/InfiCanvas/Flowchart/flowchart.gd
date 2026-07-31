@@ -93,6 +93,7 @@ func _process(delta: float) -> void:
 
 #region Boilerplate
 var gizmo_pallet : Dictionary[String, Resource]
+var layer : int = 0
 
 enum Mode{
 	EDITING,  ## Nodes being repositioned and sockets being connected.
@@ -101,7 +102,7 @@ enum Mode{
 var mode : Mode : 
 	set(val):
 		mode = val
-		for gizmo : FlowchartGizmo in $Network.netlist.gizmos.get(G.layer, []):
+		for gizmo : FlowchartGizmo in $Network.netlist.gizmos.get(layer, []):
 			gizmo._on_flowchart_mode_changed(mode)
 
 func _ready() -> void:
@@ -133,12 +134,12 @@ func draw_fore_geometry(canvas:Control, viewed_canvas_rect:Rect2):
 	for gizmo : FlowchartGizmo in parti.node.find_objects_simple(viewed_canvas_rect):
 		for coord in gizmo._sockdex:
 			var socket = gizmo._sockdex[coord]
-			var where = from_grid(socket.coord) + gizmo.position
+			var where = from_grid(coord) + gizmo.position
 			socket.draw(canvas, to_screen_coord(where))
 	
 	# Draw wire being pulled.
-	#if wiring_allowed and not wire_from.is_empty():
-	#	NetBase.Link.draw_length(canvas, to_screen_coord(wire_from.global_position), get_local_mouse_position(), Input.is_key_pressed(KEY_SHIFT), G.snap)
+	if wiring_allowed and not wire_from.is_empty():
+		NetBase.Link.draw_length(canvas, to_screen_coord(wire_from.global_position), get_local_mouse_position(), Input.is_key_pressed(KEY_SHIFT), SNAP)
 
 func draw_overlay(canvas:Control, _viewed_canvas_rect:Rect2):
 	if OS.has_feature("editor_hint"): return
@@ -163,7 +164,7 @@ func _gui_input(event: InputEvent) -> void:
 					if not is_moving_obj:
 						_selected.clear()
 					if wiring_allowed:
-						var via = $Network.netlist.joints.get(Vector3i(cell.x, cell.y, G.layer), null)
+						var via = $Network.netlist.joints.get(Vector3i(cell.x, cell.y, layer), null)
 						if via != null:
 							start_via_wiring({
 								"socket": via,
@@ -217,9 +218,6 @@ func _input(event: InputEvent) -> void:
 			queue_redraw()
 		elif Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) and not is_moving_obj and move_obj_allowed:
 			selected_obj_movement_start()
-		#if is_moving_obj and move_obj_allowed:
-			#if not Input.is_key_pressed(KEY_SHIFT):
-				#pass
 
 func obj_movement_modulate(new_position:Vector2) -> Vector2:
 	return snap_grid(new_position)
@@ -284,7 +282,7 @@ func add_gizmo(res:String, where:=Vector2.ZERO) -> FlowchartGizmo:
 		gizmo = gizmo.instantiate()
 	where = snap_grid(where)
 	place_object(gizmo, where, parti.node)
-	$Network.register_gizmo(gizmo, G.layer)
+	$Network.register_gizmo(gizmo, layer)
 	gizmo._on_flowchart_mode_changed(mode)
 	return gizmo
 
@@ -298,7 +296,7 @@ func rem_gizmo(_gizmo:FlowchartGizmo):
 	#node.queue_free()
 
 func add_via(where:Vector2) -> NetBase.Via:
-	var via = $Network.get_or_add_joint(to_canvas_coord(where), G.layer, $Network.Via.new())
+	var via = $Network.get_or_add_joint(to_canvas_coord(where), layer, $Network.Via.new())
 	place_object(via, via.position, parti.joint)
 	queue_redraw()
 	return via

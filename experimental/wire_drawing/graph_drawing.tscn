@@ -1,131 +1,6 @@
 [gd_scene format=3 uid="uid://3wusasr1rrof"]
 
-[sub_resource type="GDScript" id="GDScript_u6phq"]
-script/source = "extends Control
-
-#TODO Ensure no wires are created where there is already a connection.
-#TODO Allow cycling selection through overlapping wires.
-#TODO Create wire from a socket, to empty space.
-#TODO Create wire from socket to socket.
-#TODO Wire deletion
-#TODO Wire detach
-#TODO Wire split
-#TODO Wire join
-#TODO Wire shifting (tentative)
-#TODO Wire merge (tentative)
-#TODO Check if wires adapt their shape to changes in neighbors
-
-var net := xNetwork.new()
-
-func _ready() -> void:
-	net.connections_changed.connect(func():queue_redraw())
-	for i in range(20):
-		var coord = Vector2i(15, i + 5)
-		var sock = xSocket.new()
-		sock.mode = xSocket.INPUT if i % 2 == 0 else xSocket.OUTPUT
-		net.get_or_add_joint(coord, sock)
-
-func _mouse_over_joint(where:Vector2):
-	var cell = X.to_grid(where).coord
-	X.coord_joint = cell
-	X.sel_joint = net.netlist.vias.get(cell)
-
-func _mouse_over_wire(_where:Vector2):
-	X.info_wire = {}
-
-#func _resize_bend(wire:xNetBase.xWire, ini_bend:float, ini_pos:Vector2, end_pos:Vector2):
-		#var verts = wire.get_verts()
-		#var short_vert = wire.get_segment_is(false)
-		#var rect = wire.get_rect()
-		#var axis = rect.size.min_axis_index()
-		#var dir = 1 if ini_pos[axis] > verts[short_vert][axis] else -1
-		#var delta = end_pos - ini_pos
-		#var dist : float = delta.length() * delta.sign()[axis] * dir * 2
-		#dist /= rect.size[axis]
-		#wire.bend = clamp(ini_bend + dist, 0, 1) 
-
-var start_drag : Vector2
-var was_drag : bool
-func _gui_input(event: InputEvent) -> void:
-	if event is InputEventKey and not event.is_echo():
-		match event.keycode:
-			KEY_DELETE:
-				if X.sel_wire != null:
-					# Delete wire selected.
-					pass
-			KEY_ESCAPE:
-				if was_drag and X.sel_wire != null:
-					# Delete wire being pulled.
-					pass
-	
-	if event is InputEventMouseMotion:
-		if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
-			was_drag = true
-		#if Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) and was_drag:
-			#if X.sel_joint != null and not X.sel_joint is xSocket:
-			#	pass
-			#elif not X.sel_wire == null:
-				#if floor(X.info_wire.subratio) == 1:  # Clicked on Bend
-					#_resize_bend(X.sel_wire, X.info_wire.bend, start_drag, event.position)
-				#else:
-					## Detach Wire
-					#if segm_info.subratio < 1:
-						#ref_segm.ori_position = event.position
-					#else:
-						#ref_segm.end_position = event.position
-	
-	if event is InputEventMouseButton and event.button_index in [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT]:
-		if event.is_pressed():
-			queue_redraw()
-			start_drag = event.position
-			X.sel_wire = null
-			X.sel_joint = null
-			_mouse_over_joint(event.position)
-		elif event.is_released():
-			if was_drag:
-				was_drag = false
-				queue_redraw()
-				var cell = X.to_grid(event.position)
-				match event.button_index:
-					MOUSE_BUTTON_LEFT:
-						# Create Wire
-						if X.sel_joint != null:
-							var orig = X.sel_joint
-							X.sel_joint = net.get_or_add_joint(cell.coord, xNetBase.xVia.new())
-							if orig != X.sel_joint:
-								var wire = xNetBase.xWire.new()
-								wire.chirality = Input.is_key_pressed(KEY_SHIFT)
-								wire.bend = X.CELL_DIA
-								net.make_link(orig, X.sel_joint, wire)
-						
-					MOUSE_BUTTON_RIGHT:
-						# Move Joint
-						if X.sel_joint != null:
-							if not net.netlist.vias.has(cell.coord):
-								net.netlist.vias.erase(X.cell_joint)
-								net.netlist.vias[cell.coord] = X.sel_joint
-								X.sel_joint.coord = cell.coord
-
-
-func _draw() -> void:
-	# Draw stuff on the netlist
-	for pair in net.netlist.links:
-		var joints = net.netlist.pairs[pair]
-		var wire = net.netlist.links[pair]
-		wire.draw(self, X.from_grid(joints[0].coord), X.from_grid(joints[1].coord))
-	for id in net.netlist.joints:
-		net.netlist.joints[id].draw(self)
-
-#var period : float = 0.33
-#var _elapsed : float = 0
-#func _process(delta: float) -> void:
-	#_elapsed += delta
-	#if _elapsed > period:
-		#_elapsed = 0
-		#net.setup_cycle()
-		#net.setup_cycle()
-		#net.finish_cycle()
-"
+[ext_resource type="Script" uid="uid://bertinef8cpb2" path="res://experimental/wire_drawing/graph_draw.gd" id="1_snbji"]
 
 [sub_resource type="GDScript" id="GDScript_08qwr"]
 script/source = "extends Control
@@ -150,30 +25,29 @@ func _draw() -> void:
 	# Cell Highlight
 	var clr = Color.WHITE
 	clr.a = 0.3
-	var grid = X.to_grid(get_local_mouse_position())
-	draw_circle(grid.position, X.CELL_RAD, clr)
+	var grid = xGraphDraw.snap_grid(get_local_mouse_position())
+	draw_circle(grid, xGraphDraw.CELL_DIA / 2.0, clr)
 
 	# Wire being pulled
-	if get_parent().was_drag and X.sel_joint != null and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
-		var start = X.from_grid(Vector2i(X.coord_joint.x, X.coord_joint.y))
-		var stop = X.to_grid(get_local_mouse_position()).position
-		xNetBase.xWire.draw_length(self, start, stop, Input.is_key_pressed(KEY_SHIFT), X.CELL_DIA)
+	if get_parent().was_drag and get_parent().sel_joint != null and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		var start = xGraphDraw.from_grid(Vector2i(get_parent().coord_joint.x, get_parent().coord_joint.y))
+		var stop = xGraphDraw.snap_grid(get_local_mouse_position())
+		xNetBase.xWire.draw_length(self, start, stop, Input.is_key_pressed(KEY_SHIFT), xGraphDraw.CELL_DIA)
 	
 	#Joint being moved
-	if get_parent().was_drag and X.sel_joint != null and not X.sel_joint is xSocket and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
+	if get_parent().was_drag and get_parent().sel_joint != null and not get_parent().sel_joint is xSocket and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
 		@warning_ignore(\"static_called_on_instance\")
-		X.sel_joint.draw_at(self, X.to_grid(get_global_mouse_position()).position)
-	
+		get_parent().sel_joint.draw(self, xGraphDraw.snap_grid(get_global_mouse_position()), true)
 "
 
-[node name="Control" type="ColorRect" unique_id=1374459806]
+[node name="GraphDrawing" type="ColorRect" unique_id=1374459806]
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 color = Color(0.17903998, 0.36, 0.15120001, 1)
-script = SubResource("GDScript_u6phq")
+script = ExtResource("1_snbji")
 
 [node name="Control" type="Control" parent="." unique_id=1374362918]
 layout_mode = 1

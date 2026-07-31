@@ -7,18 +7,17 @@ class_name xNetBase
 	@export_storage var coord : Vector2i
 	var colors : Array[Color] = [Color.YELLOW, Color.GOLD, Color.GOLDENROD]
 	
-	@abstract func draw(canvas:Control)
+	@abstract func draw(canvas:Control, position:Vector2, highlighted:=false)
 
 class xJoint extends xNetNode:
-	func draw(canvas:Control):
-		var where = X.from_grid(coord)
-		canvas.draw_circle(where, X.CELL_RAD, colors[1])
+	func draw(canvas:Control, position:Vector2, _highlighted:=false):
+		canvas.draw_circle(position, xGraphDraw.CELL_DIA / 2.0, colors[1])
 
 class xVia extends xJoint:
 	@export var text : String
-	func draw(canvas:Control):
-		var thick = X.CELL_RAD - X.VIA_RAD
-		canvas.draw_circle(X.from_grid(coord), X.CELL_RAD - X.VIA_RAD / 2.0, colors[1], false, thick)
+	func draw(canvas:Control, position:Vector2, highlighted:=false):
+		var color = colors[1] if highlighted else colors[2]
+		canvas.draw_circle(position, xGraphDraw.CELL_DIA / 3.0, color, false, 5)
 
 class xWire:
 	## And object that defines the visual representation of the connection between NetNodes.
@@ -32,21 +31,22 @@ class xWire:
 	@export_storage var chirality : bool  ## In M.HANDI "true" means clockwise. In M.LENG "true" means longest segment first.
 	@export_storage var bend : float  ## Defines the diagonal cutting the corner.
 
-	func draw(canvas:Control, start:Vector2, stop:Vector2):
-		canvas.draw_polyline(get_verts(start, stop), Color.GOLDENROD, X.WIRE_THICK)
+	func draw(canvas:Control, start:Vector2, stop:Vector2, highlighted:=false):
+		var color = Color.GOLD if highlighted else Color.GOLDENROD
+		canvas.draw_polyline(get_verts(start, stop), color, xGraphDraw.WIRE_THICK)
 	
 	static func draw_chiral(canvas:Control, start:Vector2, stop:Vector2, clockwise:bool, bending:float):
 		var middle = find_bend_chi(start, stop, clockwise)
-		canvas.draw_polyline(get_verts_from(start, middle, stop, bending), Color.GOLDENROD, X.WIRE_THICK)
+		canvas.draw_polyline(get_verts_from(start, middle, stop, bending), Color.GOLDENROD, xGraphDraw.WIRE_THICK)
 	
 	static func draw_length(canvas:Control, start:Vector2, stop:Vector2, longest:bool, bending:float):
 		var middle = find_bend_len(start, stop, longest)
-		canvas.draw_polyline(get_verts_from(start, middle, stop, bending), Color.GOLDENROD, X.WIRE_THICK)
+		canvas.draw_polyline(get_verts_from(start, middle, stop, bending), Color.GOLDENROD, xGraphDraw.WIRE_THICK)
 	
 	### Given a a rectangle without [code]abs()[/code], draw on canvas such as the first line is either the longest or shortest.
 	#static func draw_length(canvas:Control, box:Rect2, short:bool, clr:=Color.GOLDENROD):
-		#var c = get_corners_len(box.size, short)
-		#draw_along(canvas, box.abs(), c[0], c[1], c[2], 1, clr)
+		#var c = get_corners_len(boxGraphDraw.size, short)
+		#draw_along(canvas, boxGraphDraw.abs(), c[0], c[1], c[2], 1, clr)
 	
 	## Returns the coordinate of the middle vertex, neglecting [code]bend[/code].
 	func find_bend(start:Vector2, stop:Vector2) -> Vector2:
@@ -117,7 +117,7 @@ class xWire:
 				# Even after finding a matching segment, we keep iterating through
 				# all segments so we can find the total length of the wire.
 				continue
-			if along < 1 and along > 0 and prox < X.CELL_DIA / 2.0:
+			if along < 1 and along > 0 and prox < xGraphDraw.CELL_DIA / 2.0:
 				# We don't want to accept distances further than a segment's
 				# length, which happens when clicking near the mid corner as if
 				# bend ratio was 1.

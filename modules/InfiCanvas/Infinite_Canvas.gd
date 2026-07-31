@@ -3,7 +3,7 @@ extends ColorRect
 class_name InfiCanvas
 
 ## A window to an area that has as much space as you need.[br]
-## It takes SpatialPartition instances to track contained objects and quickly find them or cull them (implemented by an user's extension).[br]
+## It takes SpatialPartition instances to track contained objects and quickly find them or cull them (implemented by extending this class).[br]
 ## Use [code]place_object()[/code] for what is to be added to the canvas, then override [code]draw_*_geometry()[/code] to tell how to display that object with custom draw calls if necessary.[br]
 ## You can find the objects in view by applying the provided [code]canvas_rect[/code] to [code]SpatialPartition.find_objects_*()[/code.[br]
 ## Other UI details like the background pattern and the compass arrow can also be changed by overriding their functions.[br]
@@ -12,6 +12,7 @@ class_name InfiCanvas
 ## If you are seeing background patterns being drawn outside the visible area, set "Layout/Clip Contents" in the inspector.
 
 # MODIFICATIONS
+# Inverted direction of zoom with the mouse wheel
 # Panning respects zoom.
 # The `parti` dictionary accepts any type of key. Useful to have a choice between Enum/Ints or Strings as keys.
 # Updated documentation.
@@ -311,20 +312,20 @@ func remove_object(obj) -> Dictionary:
 #endregion
 
 #region Drawing Functions
-var view_rect : Rect2
+var _view_rect : Rect2
 func _draw():
 	var local_origin = to_screen_coord(Vector2.ZERO)
 	var view_x = local_origin.x > 0 and local_origin.x < size.x
 	var view_y = local_origin.y > 0 and local_origin.y < size.y
 	
-	view_rect = to_canvas_rect(Rect2(Vector2.ZERO, size))
+	_view_rect = to_canvas_rect(Rect2(Vector2.ZERO, size))
 	
 	draw_background_pattern(local_origin, to_screen_coord(Vector2.ONE * cell_size, -origin).x)
 	draw_origin_axis(view_x, view_y, local_origin)
 	if not (view_x and view_y):
 		draw_compass()
 	
-	draw_back_geometry(view_rect)
+	draw_back_geometry(_view_rect)
 	highlight_selection(_selected)
 	forecanvas.queue_redraw()
 	overlay.queue_redraw()
@@ -342,8 +343,8 @@ func _draw():
 		## `find_objects_zealous()` will return the objects which bounding rect is completely inside the blue.
 		
 		
-		var start = parti[0 as Variant].make_partition_id(view_rect.position) - Vector2i.ONE * 1
-		var stop = parti[0 as Variant].make_partition_id(view_rect.end) + Vector2i.ONE * 1
+		var start = parti[0 as Variant].make_partition_id(_view_rect.position) - Vector2i.ONE * 1
+		var stop = parti[0 as Variant].make_partition_id(_view_rect.end) + Vector2i.ONE * 1
 		var parti_size = Vector2.ONE * parti[0 as Variant].root_size
 		for x in range(start.x, stop.x):
 			for y in range(start.y, stop.y):
@@ -356,7 +357,7 @@ func _draw():
 					c = Color.DARK_RED
 				rect = to_screen_rect(rect).grow(-6)
 				draw_rect(rect, c, false, 6)
-		draw_rect(to_screen_rect(view_rect).grow(-20), Color.BLUE, false, 2)
+		draw_rect(to_screen_rect(_view_rect).grow(-20), Color.BLUE, false, 2)
 
 ## The grid pattern, or whatever else, if overriden.
 func draw_background_pattern(offset:Vector2, spacing:float):
@@ -426,6 +427,8 @@ func highlight_selection(selected_objs:Array):
 func get_obj_data(obj) -> Dictionary:
 	return all_objs[obj].get_obj_data(obj)
 
+
+## Return a Rect2 for object, enabling a way to tell if an object still counts as within selection, even if it's origin coordinate would be excluded.
 func get_obj_rect(obj) -> Rect2:
 	return all_objs[obj].get_obj_rect(obj)
 
@@ -458,7 +461,7 @@ func draw_back_geometry(viewed_canvas_rect:Rect2):
 	pass
 
 func _draw_fore_geometry():
-	draw_fore_geometry(forecanvas, view_rect)
+	draw_fore_geometry(forecanvas, _view_rect)
 
 ## Objects in partitions might not have an intrinsic visual representation, like Godot Nodes do.
 ## How you override [code]draw_*_geometry()[/code] defines how to interpret the object's data.[br]
@@ -469,7 +472,7 @@ func draw_fore_geometry(canvas:Control, viewed_canvas_rect:Rect2):
 
 @warning_ignore("unused_parameter")
 func _draw_overlay():
-	draw_overlay(overlay, view_rect)
+	draw_overlay(overlay, _view_rect)
 
 ## This draws in front of everything, by using draw calls on [code]canvas[/code].[br]
 ## This is similar to [code]draw_fore_geometry[/code], but updates independently,

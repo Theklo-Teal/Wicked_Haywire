@@ -1,0 +1,178 @@
+extends Control
+class_name xGraphDraw
+
+#TODO Ensure no wires are created where there is already a connection.
+#TODO Allow cycling selection through overlapping wires.
+#TODO Resize Bend
+#TODO Wire deletion
+#TODO Wire detach
+#TODO Wire split
+#TODO Wire join
+#TODO Wire shifting (tentative)
+#TODO Wire merge (tentative)
+
+const CELL_DIA = 20  ## Size of row cells.
+const VIA_RAD = 7  ## Hole size inside sockets
+const WIRE_THICK = 8  ## The maximum thickness of a wire.
+
+var sel_joint : xNetBase.xJoint
+var coord_joint : Vector2i  ## Grid coordinate of sel_joint at time of selecting it.
+var sel_wire : Dictionary  ## Information about the sel_wire at the time of selecting it.
+var detach_wire := false
+
+static func snap_grid(point:Vector2) -> Vector2:
+	return point.snappedf(CELL_DIA)
+
+static func from_grid(coord:Vector2i) -> Vector2:
+	return Vector2(coord) * CELL_DIA
+
+## Returns the grid cell the point falls into
+static func to_grid(point:Vector2) -> Vector2i:
+	return Vector2i(  ## Find cell coordinate on the grid
+		roundi(inverse_lerp(0, CELL_DIA, point.x)),
+		roundi(inverse_lerp(0, CELL_DIA, point.y))
+		)
+
+var net := xNetwork.new()
+
+func _ready() -> void:
+	net.connections_changed.connect(func():queue_redraw())
+	for i in range(0, 20, 2):
+		var coord = Vector2i(15, i + 5)
+		var sock = xSocket.new()
+		sock.mode = xSocket.INPUT
+		net.get_or_add_joint(coord, sock)
+	for i in range(0, 20, 2):
+		var coord = Vector2i(16, i + 6)
+		var sock = xSocket.new()
+		sock.mode = xSocket.OUTPUT
+		net.get_or_add_joint(coord, sock)
+
+func _mouse_over_joint(where:Vector2):
+	var cell = to_grid(where)
+	coord_joint = cell
+	sel_joint = net.netlist.vias.get(cell, null)
+
+func _mouse_over_wire(where:Vector2):
+	for pair in net.netlist.links:
+		var joints = net.netlist.pairs[pair]
+		var wire = net.netlist.links[pair]
+		sel_wire = wire.near(where, wire.get_verts(from_grid(joints[0].coord), from_grid(joints[1].coord)))
+		if not sel_wire.is_empty():
+			sel_wire["pair_hash"] = pair
+			sel_wire["bend"] = wire.bend
+			break
+
+func _resize_bend(ini_pos:Vector2, end_pos:Vector2):
+		var ini_bend : float = sel_wire.bend
+		var wire : xNetBase.xWire = net.netlist.links.get(sel_wire.pair_hash)
+		var joints = net.netlist.pairs[sel_wire.pair_hash]
+		var verts = wire.get_verts(from_grid(joints[0].coord), from_grid(joints[1].coord))
+		var rect = (joints[0].coord - joints[1].coord).abs()
+		#var short_vert = verts
+		#var rect = wire.get_rect()
+		#var axis = rect.size.min_axis_index()
+		#var dir = 1 if ini_pos[axis] > verts[short_vert][axis] else -1
+		#var delta = end_pos - ini_pos
+		#var dist : float = delta.length() * delta.sign()[axis] * dir * 2
+		#dist /= rect.size[axis]
+		#wire.bend = clamp(ini_bend + dist, 0, 1) 
+
+func _splice_wire() -> xNetBase.xJoint:
+	var new_joint := xNetBase.xVia.new()
+	var wire : xNetBase.xWire = net.netlist.links.get(sel_wire.pair_hash)
+	var joints = net.netlist.pairs[sel_wire.pair_hash]
+	var middle = wire.find_bend(from_grid(joints[0].coord), from_grid(joints[1].coord))
+	var segm_ratio : float = sel_wire.subratio - floor(sel_wire.subratio)
+	var where : Vector2
+	if sel_wire.subratio > 1:
+		where = middle.lerp(from_grid(joints[1].coord), segm_ratio)
+	else:
+		where = from_grid(joints[0].coord).lerp(middle, segm_ratio)
+	new_joint.coord = to_grid(where)
+	new_joint = net.get_or_add_joint(new_joint.coord, new_joint)
+	net.rem_link_joints(joints[0], joints[1])
+	net.make_link(joints[0], new_joint, wire)
+	net.make_link(new_joint, joints[1], wire)
+	return new_joint
+
+var start_drag : Vector2
+var was_drag : bool
+func _gui_input(event: InputEvent) -> void:
+	if event is InputEventKey and not event.is_echo():
+		#FIXME Not getting key inputs!
+		match event.keycode:
+			KEY_DELETE:
+				if not sel_wire.is_empty():
+					net.rem_link_hash(sel_wire.pair_hash)
+			KEY_ESCAPE:
+				if was_drag and not sel_wire.is_empty():
+					# Delete wire being pulled.
+					pass
+	
+	if event is InputEventMouseMotion:
+		if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
+			was_drag = true
+			if not sel_wire.is_empty():
+				sel_joint = _splice_wire()
+		if Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) and was_drag:
+			if sel_joint != null:
+				queue_redraw()
+	
+	if event is InputEventMouseButton and event.button_index in [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT]:
+		if event.is_pressed():
+			queue_redraw()
+			start_drag = event.position
+			sel_wire.clear()
+			_mouse_over_joint(event.position)
+			if sel_joint == null:
+				_mouse_over_wire(event.position)
+				if not sel_wire.is_empty():
+					if floori(sel_wire.subratio) == 1:
+						_resize_bend(start_drag, event.position)
+						
+		elif event.is_released():
+			if was_drag:
+				was_drag = false
+				queue_redraw()
+				var cell = to_grid(event.position)
+				match event.button_index:
+					MOUSE_BUTTON_LEFT:
+						# Create Wire
+						if sel_joint != null:
+							var orig = sel_joint
+							sel_joint = net.get_or_add_joint(cell, xNetBase.xVia.new())
+							if orig != sel_joint:
+								var wire = xNetBase.xWire.new()
+								wire.chirality = Input.is_key_pressed(KEY_SHIFT)
+								wire.bend = CELL_DIA
+								net.make_link(orig, sel_joint, wire)
+						
+					MOUSE_BUTTON_RIGHT:
+						# Move Joint
+						if sel_joint != null and not sel_joint is xSocket:
+							if not net.netlist.vias.has(cell):
+								net.netlist.vias.erase(coord_joint)
+								net.netlist.vias[cell] = sel_joint
+								sel_joint.coord = cell
+
+func _draw() -> void:
+	# Draw stuff on the netlist
+	for pair in net.netlist.links:
+		var joints = net.netlist.pairs[pair]
+		var wire = net.netlist.links[pair]
+		wire.draw(self, from_grid(joints[0].coord), from_grid(joints[1].coord), sel_wire.get("pair_hash", 0) == pair)
+	for id in net.netlist.joints:
+		var joint = net.netlist.joints[id]
+		if joint == sel_joint and was_drag: continue
+		joint.draw(self, from_grid(joint.coord), sel_joint == joint)
+
+#var period : float = 0.33
+#var _elapsed : float = 0
+#func _process(delta: float) -> void:
+	#_elapsed += delta
+	#if _elapsed > period:
+		#_elapsed = 0
+		#net.setup_cycle()
+		#net.setup_cycle()
+		#net.finish_cycle()
