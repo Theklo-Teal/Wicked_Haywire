@@ -20,8 +20,8 @@ func _init() -> void:
 class NetData extends Resource:
 	## We have network elements in here, so they can be serialized and interchanged
 	## with loading and saving.
-	@export_storage var joints : Dictionary[int, Joint]  ## Find joint from their hashes.
 	@export_storage var vias : Dictionary[Vector3i, Joint]  ## For free standing joints.
+	@export_storage var joints : Dictionary[int, Joint]  ## Find joint from their hashes.
 	@export_storage var pairs : Dictionary[int, Array]  ## The link hash according to the joints involved. The order encodes the orientation of the link.
 	@export_storage var links : Dictionary[int, Link]  ## The key is the XOR of hashes of two joints. The value is the Link instance representing that. 	
 	@export_storage var gizmos : Dictionary[int, Array]  ## An array of Gizmo for a given layer.

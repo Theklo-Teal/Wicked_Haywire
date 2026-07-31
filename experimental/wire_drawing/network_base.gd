@@ -19,7 +19,7 @@ class xVia extends xJoint:
 		var color = colors[1] if highlighted else colors[2]
 		canvas.draw_circle(position, xGraphDraw.CELL_DIA / 3.0, color, false, 5)
 
-class xWire:
+class xWire extends Resource:
 	## And object that defines the visual representation of the connection between NetNodes.
 	
 	enum M {  ## The method used to find the bend corner in the middle of a wire.
@@ -146,9 +146,9 @@ class xWire:
 		var middle = lengs[0] / total
 		var where : Vector2
 		if ratio > middle:
-			var subratio = remap(ratio * total, 0, total, 0, lengs[1])
+			var subratio = remap(ratio, middle, 1, 0, 1)
 			where = verts[1].lerp(verts[2], subratio)
 		else:
-			var subratio = remap(ratio * total, 0, lengs[0], 0, 1)
+			var subratio = remap(ratio, 0, middle, 0, 1)
 			where = verts[0].lerp(verts[1], subratio)
 		return where

@@ -46,6 +46,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+focus_mode = 2
 color = Color(0.17903998, 0.36, 0.15120001, 1)
 script = ExtResource("1_snbji")
 

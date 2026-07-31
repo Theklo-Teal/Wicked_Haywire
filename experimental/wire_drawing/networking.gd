@@ -33,7 +33,7 @@ class xNetData extends Resource:
 func get_connections(joint:xJoint, outgoing:=true, ingoing:=true) -> Array[xJoint]:
 	var conns : Array[xJoint]
 	var id = hash(joint)
-	for pair in netlist.links:
+	for pair in netlist.pairs:
 		var other = pair ^ id
 		if other in netlist.joints:
 			if (netlist.pairs[pair][0] == joint and outgoing) or \
@@ -70,7 +70,7 @@ func rem_joint_at(coord:Vector2i):
 	var joint = netlist.vias.get(coord)
 	if joint == null: return
 	rem_joint(joint)
-	
+
 func rem_joint(joint:xJoint):
 	var conns = get_links(joint)
 	var id = hash(joint)
@@ -92,5 +92,10 @@ func rem_link_joints(j1:xJoint, j2:xJoint):
 	rem_link_hash(pair_hash(j1, j2))
 
 func rem_link_hash(pair:int):
-	netlist.pairs.erase(pair)
 	netlist.links.erase(pair)
+	for joint in netlist.pairs[pair]:
+		if get_connections(joint).is_empty():
+			netlist.joints.erase(hash(joint))
+			netlist.vias.erase(joint.coord)
+	netlist.pairs.erase(pair)
+	

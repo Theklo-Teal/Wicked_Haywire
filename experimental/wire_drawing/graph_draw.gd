@@ -1,15 +1,12 @@
-extends Control
+extends ColorRect
 class_name xGraphDraw
 
-#TODO Ensure no wires are created where there is already a connection.
 #TODO Allow cycling selection through overlapping wires.
-#TODO Resize Bend
-#TODO Wire deletion
-#TODO Wire detach
-#TODO Wire split
-#TODO Wire join
+#TODO Wire detach (tentative)
 #TODO Wire shifting (tentative)
 #TODO Wire merge (tentative)
+
+#FIXME deletion creates invalid pair hashes.
 
 const CELL_DIA = 20  ## Size of row cells.
 const VIA_RAD = 7  ## Hole size inside sockets
@@ -85,20 +82,31 @@ func _splice_wire() -> xNetBase.xJoint:
 	var joints = net.netlist.pairs[sel_wire.pair_hash]
 	var where = wire.position_along(sel_wire.ratio, from_grid(joints[0].coord), from_grid(joints[1].coord))
 	new_joint.coord = to_grid(where)
-	new_joint = net.get_or_add_joint(new_joint.coord, new_joint)
-	#net.rem_link_joints(joints[0], joints[1])
-	#net.make_link(joints[0], new_joint, wire)
-	#net.make_link(new_joint, joints[1], wire)
+	new_joint = net.get_or_add_joint(new_joint.coord, new_joint) as xNetBase.xJoint
+	net.rem_link_joints(joints[0], joints[1])
+	net.make_link(joints[0], new_joint, wire)
+	net.make_link(new_joint, joints[1], wire.duplicate())
 	return new_joint
+
+
+func _on_drag_threshold(left:bool, _right:bool):
+	if not sel_wire.is_empty() and left:
+		if floori(sel_wire.subratio) != 1:
+			sel_joint = _splice_wire()
+
 
 var start_drag : Vector2
 var was_drag : bool
+var past_threshold : bool
 func _gui_input(event: InputEvent) -> void:
 	if event is InputEventKey and not event.is_echo():
 		#FIXME Not getting key inputs!
 		match event.keycode:
 			KEY_DELETE:
-				if not sel_wire.is_empty():
+				queue_redraw()
+				if sel_joint != null:
+					net.rem_joint(sel_joint)
+				elif not sel_wire.is_empty():
 					net.rem_link_hash(sel_wire.pair_hash)
 			KEY_ESCAPE:
 				if was_drag and not sel_wire.is_empty():
@@ -109,13 +117,13 @@ func _gui_input(event: InputEvent) -> void:
 		if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
 			was_drag = true
 			if not sel_wire.is_empty():
+				if abs((start_drag - event.position).length()) > CELL_DIA and not past_threshold:
+					past_threshold = true
+					_on_drag_threshold(Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT), Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT))
 				if floori(sel_wire.subratio) == 1:
 					_resize_bend(start_drag, event.position)
 					queue_redraw()
-				elif abs((start_drag - event.position).length()) > CELL_DIA:
-					sel_joint = _splice_wire()
 		if Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
-			was_drag = true
 			if sel_joint != null:
 				queue_redraw()
 	
@@ -123,7 +131,6 @@ func _gui_input(event: InputEvent) -> void:
 		if event.is_pressed():
 			queue_redraw()
 			start_drag = event.position
-			sel_wire.clear()
 			_mouse_over_joint(event.position)
 			if sel_joint == null:
 				_mouse_over_wire(event.position)
@@ -131,20 +138,25 @@ func _gui_input(event: InputEvent) -> void:
 		elif event.is_released():
 			if was_drag:
 				was_drag = false
+				past_threshold = false
 				queue_redraw()
 				var cell = to_grid(event.position)
 				match event.button_index:
 					MOUSE_BUTTON_LEFT:
 						# Create Wire
-						if sel_joint != null:
-							var orig = sel_joint
-							sel_joint = net.get_or_add_joint(cell, xNetBase.xVia.new())
-							if orig != sel_joint:
-								var wire = xNetBase.xWire.new()
-								wire.chirality = Input.is_key_pressed(KEY_SHIFT)
-								wire.bend = CELL_DIA
-								net.make_link(orig, sel_joint, wire)
-						
+						var orig_joint = sel_joint
+						if orig_joint != null:
+							_mouse_over_joint(event.position)
+							if sel_joint == null:
+								_mouse_over_wire(event.position)
+							if sel_wire.is_empty() or floori(sel_wire.subratio) == 1:
+								sel_joint = net.get_or_add_joint(cell, xNetBase.xVia.new())
+							else:
+								sel_joint = _splice_wire()
+							var wire = xNetBase.xWire.new()
+							wire.chirality = Input.is_key_pressed(KEY_SHIFT)
+							wire.bend = CELL_DIA
+							net.make_link(orig_joint, sel_joint, wire)
 					MOUSE_BUTTON_RIGHT:
 						# Move Joint
 						if sel_joint != null and not sel_joint is xSocket:
@@ -161,7 +173,7 @@ func _draw() -> void:
 		wire.draw(self, from_grid(joints[0].coord), from_grid(joints[1].coord), sel_wire.get("pair_hash", 0) == pair)
 	for id in net.netlist.joints:
 		var joint = net.netlist.joints[id]
-		if joint == sel_joint and was_drag: continue
+		if joint == sel_joint and was_drag and not joint is xSocket: continue
 		joint.draw(self, from_grid(joint.coord), sel_joint == joint)
 
 #var period : float = 0.33
