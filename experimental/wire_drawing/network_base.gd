@@ -100,7 +100,7 @@ class xWire:
 		var total : float = 0.0  # Total wire length.
 		var accum : float = 0.0  # Accumulated distance along the path to the point.
 		var subratio : float = 0.0  # Distance along path, but as a ratio of each segment.
-		for c in range(verts.size()):
+		for c in range(verts.size() - 1):
 			var n = (c + 1) % verts.size()
 			var v1 = verts[c]
 			var v2 = verts[n]
@@ -137,3 +137,18 @@ class xWire:
 			"ratio": ratio,
 			"subratio" : subratio,
 			}
+	
+	## Find a coordinate over the wire, at given distance along it.
+	func position_along(ratio:float, start:Vector2, stop:Vector2) -> Vector2:
+		var verts = [start, find_bend(start,stop), stop]
+		var lengs = [(verts[0] - verts[1]).length(), (verts[1] - verts[2]).length()]
+		var total = lengs[0] + lengs[1]
+		var middle = lengs[0] / total
+		var where : Vector2
+		if ratio > middle:
+			var subratio = remap(ratio * total, 0, total, 0, lengs[1])
+			where = verts[1].lerp(verts[2], subratio)
+		else:
+			var subratio = remap(ratio * total, 0, lengs[0], 0, 1)
+			where = verts[0].lerp(verts[1], subratio)
+		return where

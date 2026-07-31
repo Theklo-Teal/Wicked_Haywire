@@ -178,7 +178,7 @@ class Link extends Resource:
 		var total : float = 0.0  # Total wire length.
 		var accum : float = 0.0  # Accumulated distance along the path to the point.
 		var subratio : float = 0.0  # Distance along path, but as a ratio of each segment.
-		for c in range(verts.size()):
+		for c in range(verts.size() - 1):
 			var n = (c + 1) % verts.size()
 			var v1 = verts[c]
 			var v2 = verts[n]

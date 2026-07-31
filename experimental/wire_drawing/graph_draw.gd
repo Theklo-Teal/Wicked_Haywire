@@ -65,35 +65,30 @@ func _mouse_over_wire(where:Vector2):
 
 func _resize_bend(ini_pos:Vector2, end_pos:Vector2):
 		var ini_bend : float = sel_wire.bend
+		var delta = end_pos - ini_pos
+		
 		var wire : xNetBase.xWire = net.netlist.links.get(sel_wire.pair_hash)
 		var joints = net.netlist.pairs[sel_wire.pair_hash]
-		var verts = wire.get_verts(from_grid(joints[0].coord), from_grid(joints[1].coord))
-		var rect = (joints[0].coord - joints[1].coord).abs()
-		#var short_vert = verts
-		#var rect = wire.get_rect()
-		#var axis = rect.size.min_axis_index()
-		#var dir = 1 if ini_pos[axis] > verts[short_vert][axis] else -1
-		#var delta = end_pos - ini_pos
-		#var dist : float = delta.length() * delta.sign()[axis] * dir * 2
-		#dist /= rect.size[axis]
-		#wire.bend = clamp(ini_bend + dist, 0, 1) 
+		var diff = from_grid(joints[0].coord - joints[1].coord)
+		var diff_abs = diff.abs()
+		var short_axis = diff_abs.min_axis_index()
+		var shortest = diff_abs[short_axis]
+		var dir = 1 if diff[short_axis] > 0 else -1
+		
+		delta = delta.length() * -delta.sign()[short_axis] * dir * 2
+		wire.bend = clamp(ini_bend + delta, CELL_DIA, shortest)
+
 
 func _splice_wire() -> xNetBase.xJoint:
 	var new_joint := xNetBase.xVia.new()
 	var wire : xNetBase.xWire = net.netlist.links.get(sel_wire.pair_hash)
 	var joints = net.netlist.pairs[sel_wire.pair_hash]
-	var middle = wire.find_bend(from_grid(joints[0].coord), from_grid(joints[1].coord))
-	var segm_ratio : float = sel_wire.subratio - floor(sel_wire.subratio)
-	var where : Vector2
-	if sel_wire.subratio > 1:
-		where = middle.lerp(from_grid(joints[1].coord), segm_ratio)
-	else:
-		where = from_grid(joints[0].coord).lerp(middle, segm_ratio)
+	var where = wire.position_along(sel_wire.ratio, from_grid(joints[0].coord), from_grid(joints[1].coord))
 	new_joint.coord = to_grid(where)
 	new_joint = net.get_or_add_joint(new_joint.coord, new_joint)
-	net.rem_link_joints(joints[0], joints[1])
-	net.make_link(joints[0], new_joint, wire)
-	net.make_link(new_joint, joints[1], wire)
+	#net.rem_link_joints(joints[0], joints[1])
+	#net.make_link(joints[0], new_joint, wire)
+	#net.make_link(new_joint, joints[1], wire)
 	return new_joint
 
 var start_drag : Vector2
@@ -114,8 +109,13 @@ func _gui_input(event: InputEvent) -> void:
 		if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
 			was_drag = true
 			if not sel_wire.is_empty():
-				sel_joint = _splice_wire()
-		if Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) and was_drag:
+				if floori(sel_wire.subratio) == 1:
+					_resize_bend(start_drag, event.position)
+					queue_redraw()
+				elif abs((start_drag - event.position).length()) > CELL_DIA:
+					sel_joint = _splice_wire()
+		if Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
+			was_drag = true
 			if sel_joint != null:
 				queue_redraw()
 	
@@ -127,10 +127,7 @@ func _gui_input(event: InputEvent) -> void:
 			_mouse_over_joint(event.position)
 			if sel_joint == null:
 				_mouse_over_wire(event.position)
-				if not sel_wire.is_empty():
-					if floori(sel_wire.subratio) == 1:
-						_resize_bend(start_drag, event.position)
-						
+			
 		elif event.is_released():
 			if was_drag:
 				was_drag = false
