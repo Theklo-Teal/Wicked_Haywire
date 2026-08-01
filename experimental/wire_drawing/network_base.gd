@@ -3,34 +3,60 @@ class_name xNetBase
 
 ## Definition of classes necessary to build a network.
 
-@abstract class xNetNode extends Resource:
-	@export_storage var coord : Vector2i
-	var colors : Array[Color] = [Color.YELLOW, Color.GOLD, Color.GOLDENROD]
+@abstract class xNetVert extends Resource:
+	## Base class for a graph vertex in a network
 	
+	@export_storage var coord : Vector2i
+	
+	var colors : Array[Color] = [Color.YELLOW, Color.GOLD, Color.GOLDENROD]
 	@abstract func draw(canvas:Control, position:Vector2, highlighted:=false)
+	
+	var _link_count : int = 0
+	func size() -> int: return _link_count
+	## A connection originated from this node
+	func connecter(with:xNetVert):
+		_link_count += 1
+		_connecter(with)
+	## A connection destination is this node
+	func connectee(with:xNetVert):
+		_link_count += 1
+		_connectee(with)
+	func disconnected(from:xNetVert):
+		_link_count -= 1
+		_disconnected(from)
+	
+	@warning_ignore("unused_parameter")
+	## A connection originated from this node
+	func _connecter(with:xNetVert):
+		pass
+	@warning_ignore("unused_parameter")
+	## A connection destination is this node
+	func _connectee(with:xNetVert):
+		pass
+	@warning_ignore("unused_parameter")
+	func _disconnected(from:xNetVert):
+		pass
 
-class xJoint extends xNetNode:
-	func draw(canvas:Control, position:Vector2, _highlighted:=false):
-		canvas.draw_circle(position, xGraphDraw.CELL_DIA / 2.0, colors[1])
-
-class xVia extends xJoint:
-	@export var text : String
-	func draw(canvas:Control, position:Vector2, highlighted:=false):
-		var color = colors[1] if highlighted else colors[2]
-		canvas.draw_circle(position, xGraphDraw.CELL_DIA / 3.0, color, false, 5)
 
 class xWire extends Resource:
 	## And object that defines the visual representation of the connection between NetNodes.
 	
-	enum M {  ## The method used to find the bend corner in the middle of a wire.
-		HANDI,  ## Handiness, if clockwise, or counterclockwise of the origin ending.
-		LENG,  ## By Length, whether the longest or shortest segment comes from the origin ending. 
-		}
-	
-	@export_storage var mode := M.LENG
-	@export_storage var chirality : bool  ## In M.HANDI "true" means clockwise. In M.LENG "true" means longest segment first.
+	@export_storage var chirality : bool  ## "true" means the wire runs clockwise around the corners of an imaginary rectangle.
 	@export_storage var bend : float  ## Defines the diagonal cutting the corner.
-
+	
+	#region Constructors
+	static func from_chi(clockwise:bool) -> xWire:
+		var wire = xWire.new()
+		wire.chirality = clockwise
+		return wire
+	
+	static func from_len(start:Vector2, stop:Vector2, longest:bool) -> xWire:
+		var wire = xWire.new()
+		wire.set_chi_from_len(start, stop, longest)
+		return wire
+	#endregion
+	
+	#region Drawing
 	func draw(canvas:Control, start:Vector2, stop:Vector2, highlighted:=false):
 		var color = Color.GOLD if highlighted else Color.GOLDENROD
 		canvas.draw_polyline(get_verts(start, stop), color, xGraphDraw.WIRE_THICK)
@@ -42,48 +68,52 @@ class xWire extends Resource:
 	static func draw_length(canvas:Control, start:Vector2, stop:Vector2, longest:bool, bending:float):
 		var middle = find_bend_len(start, stop, longest)
 		canvas.draw_polyline(get_verts_from(start, middle, stop, bending), Color.GOLDENROD, xGraphDraw.WIRE_THICK)
+	#endregion
 	
-	### Given a a rectangle without [code]abs()[/code], draw on canvas such as the first line is either the longest or shortest.
-	#static func draw_length(canvas:Control, box:Rect2, short:bool, clr:=Color.GOLDENROD):
-		#var c = get_corners_len(boxGraphDraw.size, short)
-		#draw_along(canvas, boxGraphDraw.abs(), c[0], c[1], c[2], 1, clr)
-	
-	## Returns the coordinate of the middle vertex, neglecting [code]bend[/code].
-	func find_bend(start:Vector2, stop:Vector2) -> Vector2:
-		match mode:
-			M.HANDI:
-				return find_bend_chi(start, stop, chirality)
-			M.LENG:
-				return find_bend_len(start, stop, chirality)
-		return start.lerp(stop, 0.5)
+	## Set handiness of the wire, given whether we want the first segment to be the longest.
+	func set_chi_from_len(start:Vector2, stop:Vector2, longest:bool):
+		chirality = chi_from_len(start, stop, longest)
 	
 	## Returns all the vertices to draw this wire, including the diagonal cutting the bend.
 	func get_verts(start:Vector2, stop:Vector2) -> PackedVector2Array:
 		var middle := find_bend(start, stop)
 		return get_verts_from(start, middle, stop, bend)
 	
+	## Returns the coordinate of the middle vertex from [code]chirality[/code], neglecting [code]bend[/code].
+	func find_bend(start:Vector2, stop:Vector2) -> Vector2:
+		return find_bend_chi(start, stop, chirality)
+	
+	## Returns the coordinate of the middle vertex, neglecting [code]bend[/code].
 	static func find_bend_chi(start:Vector2, stop:Vector2, clockwise:bool) -> Vector2:
 		var diff = (stop - start)
 		var diff_sign = diff.sign()
 		var which = ((diff_sign.x != diff_sign.y) != clockwise) as int
 		return [Vector2(start.x, stop.y), Vector2(stop.x, start.y)][which]
 	
+	## Returns the coordinate of the middle vertex according to whether the first segment is [code]longest[/code], neglecting [code]bend[/code].
 	static func find_bend_len(start:Vector2, stop:Vector2, longest:bool) -> Vector2:
-		var diff = (stop - start)
-		var diff_abs = diff.abs()
-		var axis = diff_abs.max_axis_index() if longest else diff_abs.min_axis_index()
-		return [Vector2(start.x, stop.y), Vector2(stop.x, start.y)][axis]
+		return find_bend_chi(start, stop, chi_from_len(start, stop, longest))
 	
 	static func get_verts_from(start:Vector2, middle:Vector2, stop:Vector2, bending:float) -> PackedVector2Array:
 		var verts : PackedVector2Array = [start]
-		var segms = [(start - middle), (stop - middle)]
-		var shortest = 0 if segms[0].length_squared() < segms[1].length_squared() else 1
-		var bend_dist = min(bending, segms[shortest].length())
-		segms[0] = segms[0].normalized() * bend_dist + middle
-		segms[1] = segms[1].normalized() * bend_dist + middle
-		verts.append_array(segms)
+		if bending >= 1:
+			var segms = [(start - middle), (stop - middle)]
+			var shortest = 0 if segms[0].length_squared() < segms[1].length_squared() else 1
+			var bend_dist = min(bending, segms[shortest].length())
+			segms[0] = segms[0].normalized() * bend_dist + middle
+			segms[1] = segms[1].normalized() * bend_dist + middle
+			verts.append_array(segms)
+		else:
+			verts.append(middle)
 		verts.append(stop)
 		return verts
+	
+	## Return the chirality of the wire given whether the first segment is the longest.
+	static func chi_from_len(start:Vector2, stop:Vector2, longest:bool) -> bool:
+		var diff = (stop - start)
+		var long = diff.abs().max_axis_index()
+		var signs = diff.sign()
+		return ((signs.x == signs.y) and (long == 0)) != longest
 	
 	## Returns a dictionary of data about where the point is on the wire:[br]
 	## [code]length[/code] - Total length of the wire.[br]

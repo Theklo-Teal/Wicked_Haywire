@@ -1,3 +1,14 @@
+Making technology visible, so it's understandable.
 
 Device panel design:
 https://en.wikipedia.org/wiki/Neumorphism
+
+Gizmo ideas:
+	Info Panel/Note - point to a joint and show text
+	Ammeter - Count Gizmos between two joints.
+	Diode - Acts as HiZ in one direction, but allow signals in the other
+	Hi-Z Switch - Disable pin sets connections to Hi-Z
+	Monostable - A pulse flips output, which then returns after a set time.
+
+Cabling/Bundle/Combiner/Splitter Is implemented as a Via connected to a bus and relays to other wires
+certain bits specified in options. Effectively wire taps.

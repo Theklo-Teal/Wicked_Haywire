@@ -29,15 +29,15 @@ func _draw() -> void:
 	draw_circle(grid, xGraphDraw.CELL_DIA / 2.0, clr)
 
 	# Wire being pulled
-	if get_parent().was_drag and get_parent().sel_joint != null and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+	if get_parent().was_drag and get_parent().sel_vert != null and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 		var start = xGraphDraw.from_grid(Vector2i(get_parent().coord_joint.x, get_parent().coord_joint.y))
 		var stop = xGraphDraw.snap_grid(get_local_mouse_position())
 		xNetBase.xWire.draw_length(self, start, stop, Input.is_key_pressed(KEY_SHIFT), xGraphDraw.CELL_DIA)
 	
 	#Joint being moved
-	if get_parent().was_drag and get_parent().sel_joint != null and not get_parent().sel_joint is xSocket and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
+	if get_parent().was_drag and get_parent().sel_vert != null and not get_parent().sel_vert is xNetVerts.xSocket and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
 		@warning_ignore(\"static_called_on_instance\")
-		get_parent().sel_joint.draw(self, xGraphDraw.snap_grid(get_global_mouse_position()), true)
+		get_parent().sel_vert.draw(self, xGraphDraw.snap_grid(get_global_mouse_position()), true)
 "
 
 [node name="GraphDrawing" type="ColorRect" unique_id=1374459806]
@@ -59,3 +59,35 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 1
 script = SubResource("GDScript_08qwr")
+
+[node name="MarginContainer" type="MarginContainer" parent="." unique_id=1957211559]
+clip_contents = true
+custom_minimum_size = Vector2(260, 0)
+layout_mode = 1
+anchors_preset = 9
+anchor_bottom = 1.0
+offset_right = 1.0
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 0
+theme_override_constants/margin_bottom = 12
+
+[node name="Label" type="RichTextLabel" parent="MarginContainer" unique_id=618982696]
+layout_mode = 2
+mouse_filter = 2
+text = "Click and drag from an existing Socket to start a wire.
+
+The wire can be released on empty space, creating a Joint, from which other wires can be created.
+
+The shape of the wire can be alternated by holding the SHIFT key.
+
+Dragging from the diagonal corner of a wire allows that diagonal to be resized.
+
+Clicking wires or sockets allows them to be deleted with the \"Delete\" key.
+
+The Right Mouse Button can be used to move joints to different coordinates.
+
+Joints can never overlap."
+autowrap_mode = 2

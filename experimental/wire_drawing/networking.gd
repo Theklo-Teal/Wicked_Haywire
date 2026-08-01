@@ -1,19 +1,25 @@
 extends xNetAnalysis
 class_name xNetwork
 
-## A network is composed of netlists which are isolated graphs. sockets are
-## connected by Wires and wires refer to a Port where sockets emit to or receive
-## signals from. Ports shared between Wires mean they have a tunnel between them.
-## NOTE: Changes to the positioning of objects representing graph nodes should be
-## done here to account in indexing Dictionaries and propagate changes throughout
-## the affected network graphs.
+## The Network uses an interchangeable Netlist which stores all the information needed
+## to reconstruct graphs. A network being defined as a collection of graphs, where
+## vertices in a graph are isolated from vertices of other graphs.[br]
+## This class doesn't provide ways to determinate which vertices are in the same graph,
+## but includes a Crawler and function that can be used to figure that out.[br]
+## In NetData, the resource of the netlist, connections (graph edges) are represented
+## by pairs of vertices. The hashes of these vertices undergo a XOR operation returning
+## a unique hash (or ID) for each connection. That ID is then the key of a Dictionary
+## to a Wire object which is intended to be queried when drawing on screen.[br]
+## If the directionality of the connection is important (like when deciding which
+## vert to draw a Wire from), NetData containt a Dictionary that takes a connection
+## ID and returns the pair of verts, the first being the origin of a connection.
+## This can also be used to quickly tell which verts are between the connection.[br]
+## If a vert in a connection is known, it's also possible to find the other one
+## by performing a XOR operation of the vert hash and the connection ID. The
+## resulting hash can be used as a key to find the other vert.
 
-@warning_ignore("unused_signal")
-signal connections_changed  ## Whenever the wiring on Joints changes, this is called.
 
 var netlist : xNetData
-
-#var changed : Array[xJoint]  ## Joints that have connections changed.
 
 func _init() -> void:
 	if netlist == null:
@@ -22,80 +28,87 @@ func _init() -> void:
 class xNetData extends Resource:
 	## We have network elements in here, so they can be serialized and interchanged
 	## with loading and saving.
-	@export_storage var vias : Dictionary[Vector2i, xJoint]  ## For free standing joints.
-	@export_storage var joints : Dictionary[int, xJoint]
-	@export_storage var pairs : Dictionary[int, Array]
-	@export_storage var links : Dictionary[int, xWire]
+	@export_storage var vias : Dictionary[Vector2i, xNetVert]  ## This is an index of verts that can be used to search them by grid coordinate.
+	@export_storage var verts : Dictionary[int, xNetVert]  ## The hash of each vert.
+	@export_storage var pairs : Dictionary[int, Array]  ## The hash of a connection to the pair of verts it relates to.
+	@export_storage var links : Dictionary[int, xWire]  ## The hash of a connection to a Wire object, used to draw that connection on screen.
 
 
-## Return the joints the given one leads to. Optionally you may select whether to
-## get only those originating [code]joint[/code] or ending in it.
-func get_connections(joint:xJoint, outgoing:=true, ingoing:=true) -> Array[xJoint]:
-	var conns : Array[xJoint]
-	var id = hash(joint)
-	for pair in netlist.pairs:
-		var other = pair ^ id
-		if other in netlist.joints:
-			if (netlist.pairs[pair][0] == joint and outgoing) or \
-			(netlist.pairs[pair][1] == joint and ingoing):
-				conns.append(netlist.joints[other])
+## Return the verts the given one leads to. Optionally you may select whether to
+## get only those originating [code]vert[/code] or ending in it.
+func get_connections(vert:xNetVert, outgoing:=true, ingoing:=true) -> Array[xNetVert]:
+	var conns : Array[xNetVert]
+	var max_count = vert.size()
+	var count : int = 0
+	for pair_hash in netlist.pairs:
+		var pair = netlist.pairs[pair_hash]
+		if vert in pair:
+			count += 1
+			if (pair[0] == vert and outgoing):
+				conns.append(pair[1])
+			elif (pair[1] == vert and ingoing):
+				conns.append(pair[0])
+		if count >= max_count: break
 	return conns
 
-## Return the pair hashes of connections to the given joint. Optionally you may
-## select whether to get only those originating [code]joint[/code] or ending in it.
-func get_links(joint:xJoint, outgoing:=true, ingoing:=true) -> PackedInt32Array:
-	var conns : PackedInt32Array
-	var id = hash(joint)
-	for pair in netlist.links:
-		var other = pair ^ id
-		if other in netlist.joints:
-			if (netlist.pairs[pair][0] == joint and outgoing) or \
-			(netlist.pairs[pair][1] == joint and ingoing):
-				conns.append(pair)
+## Return the pair hashes of connections to the given vert. Optionally you may
+## select whether to get only those originating [code]vert[/code] or ending in it.
+func get_links(vert:xNetVert, outgoing:=true, ingoing:=true) -> PackedInt64Array:
+	var conns : Array[int]
+	var max_count = vert.size()
+	var count : int = 0
+	for pair_hash in netlist.pairs:
+		var pair = netlist.pairs[pair_hash]
+		if vert in pair:
+			count += 1
+			if (pair[0] == vert and outgoing) or (pair[1] == vert and ingoing):
+				conns.append(pair_hash)
+		if count >= max_count: break
 	return conns
 
 
-func get_or_add_joint(coord:Vector2i, new_joint:xJoint) -> xJoint:
+func get_or_add_vert(coord:Vector2i, new_vert:xNetVert) -> xNetVert:
 	if coord in netlist.vias:
 		return netlist.vias[coord]
 	
-	netlist.vias[coord] = new_joint
-	new_joint.coord = coord
+	netlist.vias[coord] = new_vert
+	new_vert.coord = coord
 	
-	var id = hash(new_joint)
-	netlist.joints[id] = new_joint
-	return new_joint
+	var id = hash(new_vert)
+	netlist.verts[id] = new_vert
+	return new_vert
 
-func rem_joint_at(coord:Vector2i):
-	var joint = netlist.vias.get(coord)
-	if joint == null: return
-	rem_joint(joint)
+func rem_vert_at(coord:Vector2i):
+	var vert = netlist.vias.get(coord)
+	if vert == null: return
+	rem_vert(vert)
 
-func rem_joint(joint:xJoint):
-	var conns = get_links(joint)
-	var id = hash(joint)
-	netlist.vias.erase(joint.coord)
-	netlist.joints.erase(id)
-	for pair in conns:
-		netlist.links.erase(pair)
-		netlist.pairs.erase(pair)
+func rem_vert(vert:xNetVert):
+	var conns = get_links(vert)
+	var id = hash(vert)
+	for pair_hash in conns:
+		netlist.links.erase(pair_hash)
+		netlist.pairs.erase(pair_hash)
+	netlist.vias.erase(vert.coord)
+	netlist.verts.erase(id)
 
-func pair_hash(j1:xJoint, j2:xJoint) -> int:
+func make_pair_hash(j1:xNetVert, j2:xNetVert) -> int:
 	return hash(j1) ^ hash(j2)
 
-func make_link(j1:xJoint, j2:xJoint, link:xWire):
-	var pair = pair_hash(j1, j2)
+func make_link(j1:xNetVert, j2:xNetVert, link:xWire):
+	var pair = make_pair_hash(j1, j2)
 	netlist.pairs[pair] = [j1, j2]
 	netlist.links[pair] = link
+	j1.connecter(j2)
+	j2.connectee(j1)
 
-func rem_link_joints(j1:xJoint, j2:xJoint):
-	rem_link_hash(pair_hash(j1, j2))
+func rem_link_verts(j1:xNetVert, j2:xNetVert):
+	rem_link_hash(make_pair_hash(j1, j2))
 
-func rem_link_hash(pair:int):
-	netlist.links.erase(pair)
-	for joint in netlist.pairs[pair]:
-		if get_connections(joint).is_empty():
-			netlist.joints.erase(hash(joint))
-			netlist.vias.erase(joint.coord)
-	netlist.pairs.erase(pair)
-	
+func rem_link_hash(pair_hash:int):
+	if not pair_hash in netlist.links: return
+	var conns = netlist.pairs[pair_hash]
+	netlist.links.erase(pair_hash)
+	netlist.pairs.erase(pair_hash)
+	conns[0].disconnected(conns[1])
+	conns[1].disconnected(conns[0])
