@@ -52,7 +52,7 @@ signal finish_done
 			_sockdex[get_socket_true_coord(coord)] = sock
 
 var _sockdex : Dictionary[Vector2i, GizmoSocket]  # Back reference to find which socket is in at certain coord. Coordinates are wrapped, so if they are negative in [code]sockets[/code] they will be positive here.
-
+@onready var socket_menu := PopupMenu.new()
 
 func _parti_registered(_parti:SpatialPartition, data:Dictionary) -> void:
 	data.registry_acknowledged = true
@@ -183,6 +183,10 @@ func _init() -> void:
 	mouse_entered.connect(func():_mouse_hover = true)
 	mouse_exited.connect(_on_mouse_exit)
 	_on_resized()
+	
+	await ready
+	add_child(socket_menu, false, Node.INTERNAL_MODE_FRONT)
+	socket_menu.add_check_item("Show State")
 
 func _on_mouse_exit():
 	_mouse_hover = false
@@ -229,15 +233,20 @@ func _input(event: InputEvent) -> void:
 			mouse_moving = true
 			queue_redraw()
 		if event is InputEventMouseButton and owner is Flowchart:
-			if hover_socket != null and event.button_index == MOUSE_BUTTON_LEFT:
-				if event.is_pressed():
-					queue_redraw()
-					hover_socket.pressed = true
-					_on_socket_pressed(hover_socket)
-				elif event.is_released():
-					queue_redraw()
-					hover_socket.pressed = false
-					_on_socket_released(hover_socket)
+			if hover_socket != null:
+				if event.button_index == MOUSE_BUTTON_LEFT:
+					if event.is_pressed():
+						queue_redraw()
+						hover_socket.pressed = true
+						_on_socket_pressed(hover_socket)
+					elif event.is_released():
+						queue_redraw()
+						hover_socket.pressed = false
+						_on_socket_released(hover_socket)
+				elif event.button_index == MOUSE_BUTTON_RIGHT and owner.mode == Flowchart.Mode.EDITING:
+					# Show popup menu for hover_socket
+					var where = owner.to_screen_coord(position + get_socket_position(hover_socket))
+					socket_menu.popup(Rect2(where, Vector2.ZERO))
 
 func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:

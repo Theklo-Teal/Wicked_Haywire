@@ -21,8 +21,10 @@ script/source = "extends Node
 var mode : StringName = \"idle\"
 @onready var modes := {
 	\"idle\":IdleMode.new(get_parent(), get_parent().get_node(\"Network\"), set_mode),
-	\"via\":WireMode.new(get_parent(), get_parent().get_node(\"Network\"), set_mode),
-	\"wire\":WireMode.new(get_parent(), get_parent().get_node(\"Network\"), set_mode),
+	#\"via\":ViaMode.new(get_parent(), get_parent().get_node(\"Network\"), set_mode),
+	\"wire_create\":WireCreate.new(get_parent(), get_parent().get_node(\"Network\"), set_mode),
+	\"wire_split\":WireSplit.new(get_parent(), get_parent().get_node(\"Network\"), set_mode),
+	\"wire_bend\":WireBend.new(get_parent(), get_parent().get_node(\"Network\"), set_mode),
 	}
 
 func at(who:String):
@@ -45,8 +47,6 @@ class InputMode:
 		me = this
 		switch = switcher
 		net = network
-	func cancel():
-		switch.call(\"idle\")
 	
 	func grid_mouse() -> Vector2i:
 		return Flowchart.to_grid(me.to_canvas_coord(me.get_local_mouse_position()))
@@ -54,6 +54,17 @@ class InputMode:
 		return me.to_canvas_coord(me.get_local_mouse_position())
 	func screen_mouse() -> Vector2:
 		return me.get_local_mouse_position()
+	
+	func joint_canvas_coord(joint:NetBase.Joint) -> Vector2i:
+		var coord = joint.coord
+		var gizmo : FlowchartGizmo = net.netlist.sockets.get(joint)
+		if gizmo == null:
+			return coord
+		else:
+			return gizmo.get_socket_true_coord(coord) + Flowchart.to_grid(gizmo.position)
+	
+	func joint_canvas_position(joint:NetBase.Joint) -> Vector2:
+		return Flowchart.from_grid(joint_canvas_coord(joint))
 	
 	func mouse_over_vert():
 		var cell = grid_mouse()
@@ -64,95 +75,171 @@ class InputMode:
 		var conns : PackedInt64Array
 		for via in me.parti.joint.find_objects_simple(me._view_rect):
 			conns.append_array(net.netlist.get_links(via, true, false))
+		for gizmo in me.parti.node.find_objects(me._view_rect):
+			for sock in gizmo.sockets:
+				conns.append_array(net.netlist.get_links(sock, true, false))
 		for link in conns:
 			var wire = net.netlist.links[link]
 			var pair = net.netlist.pairs[link]
-			var pos1 = Flowchart.from_grid(pair[0].coord)
-			var pos2 = Flowchart.from_grid(pair[2].coord)
-			me.sel_wire = wire.near(canvas_mouse(), pos1, pos2)
-			if not me.sel_wire.is_empty(): break
+			me.sel_wire = wire.near(canvas_mouse(), joint_canvas_position(pair[0]), joint_canvas_position(pair[1]))
+			if not me.sel_wire.is_empty():
+				me.sel_wire[\"wire\"] = wire
+				me.sel_wire[\"pair_hash\"] = link
+				me.sel_wire[\"ini_bend\"] = wire.bend
+				break
 	
-	func enter():
-		pass
-	func exit():
-		pass
+	func cancel():pass
+	func enter(): pass
+	func exit(): pass
 	
-	func mouse_move(left:bool, right:bool, shift:bool, ctrl:bool):
-		pass
+	func shifted(pressed:bool): pass
+	func ctrled(pressed:bool): pass
 	
-	func mouse_press(button:MouseButton, shift:bool, ctrl:bool):
-		pass
-	func mouse_release(button:MouseButton, shift:bool, ctrl:bool):
-		pass
+	func mouse_move(left:bool, right:bool, shift:bool, ctrl:bool): pass
+	func mouse_press(button:MouseButton, shift:bool, ctrl:bool): pass
+	func mouse_release(button:MouseButton, shift:bool, ctrl:bool): pass
 @warning_ignore_restore(\"unused_parameter\")
 
 
 class IdleMode extends InputMode:
+	func cancel():
+		if not me.sel_wire.is_empty(): me.sel_wire.clear()
+		else: me.sel_vert = null
+		me.queue_redraw()
+	
 	func enter():
+		me.queue_redraw()
 		me.move_obj_allowed = true
 		me.lasso_allowed = true
 		me.wiring_allowed = true
+	
+	var motion_trigger_armed : String = \"\"
+	func mouse_move(left:bool, right:bool, _shift:bool, _ctrl:bool):
+		if not (left or right): return
+		# For if we only want to perform an action if the mouse dragged far enough
+		if not motion_trigger_armed.is_empty():
+			var diff = me.ini_mouse - screen_mouse()
+			if max(diff.x, diff.y) >= Flowchart.SNAP:
+				switch.call(motion_trigger_armed)
 	
 	func mouse_press(button:MouseButton, _shift:bool, _ctrl:bool):
 		match button:
 			MOUSE_BUTTON_LEFT:
 				mouse_over_vert()
-				if me.sel_vert == null:
-					mouse_over_wire()
-					if not me.sel_wire.is_empty() and me.wiring_allowed:
-						pass
-						#switch.call(\"wire\")
-				else:
-					pass
-					#switch.call(\"via\")
+				mouse_over_wire()
+				if me.wiring_allowed:
+					if me.sel_vert == null:
+						if not me.sel_wire.is_empty():
+							if floori(me.sel_wire.subratio) == 1:
+								switch.call(\"wire_bend\")
+							else:
+								motion_trigger_armed = \"wire_split\"
+					else:
+						switch.call(\"wire_create\")
+				
 				
 			MOUSE_BUTTON_RIGHT:
-				mouse_over_vert()
-				if me.sel_vert == null:
-					mouse_over_wire()
-					if me.sel_wire.is_empty():
-						me.add_gizmo(\"bogus\", canvas_mouse())
-						#me.get_node(\"Canvas_Menu\").popup(Rect2(screen_mouse(), Vector2.ZERO))
+				if me.sel_wire.is_empty() and me.sel_vert == null:
+					me.add_gizmo(\"bogus\", canvas_mouse())
+					#me.get_node(\"Canvas_Menu\").popup(Rect2(screen_mouse(), Vector2.ZERO))
 				else:
 					#TODO Show via menu
 					pass
 	
 	func mouse_release(button:MouseButton, _shift:bool, _ctrl:bool):
+		motion_trigger_armed = \"\"
+		
+		# Lasso Selection
 		if button == MOUSE_BUTTON_LEFT and me.lasso_canvas_rect.size > Flowchart.MINIMUM_LASSO:
 			if me.lasso_allowed:
-				#TODO Find out why lasso_mode doesn't change.
 				if me.lasso_mode:
 					me._selected += me.parti.node.find_objects_tolerant(me.lasso_canvas_rect)
 				else:
 					me._selected += me.parti.node.find_objects_zealous(me.lasso_canvas_rect)
 
-
-class ViaMode extends InputMode:
-	func mouse_move(left:bool, right:bool, shift:bool, ctrl:bool):
-		pass
-
 class WireMode extends InputMode:
+	func cancel():
+		me.wire_from.clear()
+		switch.call(\"idle\")
+		
 	func enter():
-		print(\"wiring\")
 		me.move_obj_allowed = false
 		me.lasso_allowed = false
-		
-		var cell = grid_mouse()
-		var via = net.netlist.vias.get(Vector3i(cell.x, cell.y, me.layer), null)
-		if via != null:
-			me.start_via_wiring({
-				\"netvert\": via,
-				\"canvas_position\": cell,
-				})
 	
+	func mouse_release(_button:MouseButton, shift:bool, _ctrl:bool):
+		mouse_over_wire()
+		var via : NetBase.Joint
+		if me.sel_wire.is_empty(): via = me.add_via(canvas_mouse())
+		else: via = split_wire().netvert
+		
+		var wire : NetBase.Link = net.linking(me.wire_from.netvert, via)
+		var pos1 = joint_canvas_position(me.wire_from.netvert)
+		var pos2 = joint_canvas_coord(via)
+		wire.set_chi_from_len(pos1, pos2, shift)
+		wire.bend = Flowchart.SNAP
+		
+		switch.call(\"idle\")
+	
+	func split_wire() -> Dictionary:
+		var new_joint := FlowchartVia.new()
+		var wire0 : NetBase.Link = net.netlist.links.get(me.sel_wire.pair_hash)
+		var joints = net.netlist.pairs[me.sel_wire.pair_hash]
+		var where = wire0.position_along(me.sel_wire.ratio, Flowchart.from_grid(joints[0].coord), Flowchart.from_grid(joints[1].coord))
+		var cell = Flowchart.to_grid(where)
+		new_joint = net.get_or_add_vert(new_joint.coord, me.layer, new_joint)
+		net.unlink_verts(joints[0], joints[1])
+		var wire1 = net.linking(joints[0], new_joint)
+		var wire2 = net.linking(new_joint, joints[1])
+		wire1.chirality = wire0.chirality
+		wire2.chirality = wire0.chirality
+		wire1.bend = wire0.bend
+		wire2.bend = wire0.bend
+		me.sel_wire.clear()
+		return {\"netvert\": new_joint, \"coord\": cell, \"canvas_position\": where}
+
+
+class WireCreate extends WireMode:
+	func enter():
+		super()
+		if not me.sel_vert is GizmoSocket:
+			me.wire_from = {
+				\"netvert\": me.sel_vert,
+				\"canvas_position\": canvas_mouse(),
+				}
+		
 	func mouse_move(left:bool, right:bool, _shift:bool, _ctrl:bool):
-		if me.wire_from.is_empty(): return
-		if not(left and right): return
+		if not(left or right): return
 		me.queue_redraw()
 	
-	func mouse_release(button:MouseButton, _shift:bool, _ctrl:bool):
-		if button == MOUSE_BUTTON_LEFT:
-			me.stop_canvas_wiring(grid_mouse())
+	func shifted(_pressed:bool):
+		me.queue_redraw()
+
+class WireSplit extends WireMode:
+	func enter():
+		super()
+		me.wire_from = split_wire()
+
+
+class WireBend extends WireMode:
+	
+	func mouse_move(left:bool, right:bool, _shift:bool, _ctrl:bool):
+		if not(left or right): return
+		me.queue_redraw()
+		
+		var ini_bend : float = me.sel_wire.ini_bend
+		var delta = me.get_local_mouse_position() - me.ini_mouse
+		var wire : NetBase.Link = net.netlist.links.get(me.sel_wire.pair_hash)
+		var joints = net.netlist.pairs[me.sel_wire.pair_hash]
+		var diff = joint_canvas_position(joints[0]) - joint_canvas_position(joints[1])
+		var diff_abs = diff.abs()
+		var short_axis = diff_abs.min_axis_index()
+		var shortest = diff_abs[short_axis]
+		var dir = 1 if diff[short_axis] > 0 else -1
+		
+		delta = delta.length() * -delta.sign()[short_axis] * dir * 2
+		wire.bend = clamp(ini_bend + delta, Flowchart.SNAP, shortest)
+	
+	func mouse_release(_button:MouseButton, _shift:bool, _ctrl:bool):
 		switch.call(\"idle\")
 "
 
@@ -169,6 +256,7 @@ parti = Dictionary[Variant, ExtResource("2_3gi3x")]({
 "joint": SubResource("Resource_gatyp"),
 "node": SubResource("Resource_3gi3x")
 })
+chirality = 1
 
 [node name="Input" type="Node" parent="." unique_id=514495943]
 script = SubResource("GDScript_x8yhq")

@@ -10,4 +10,5 @@ class_name FlowchartVia
 
 func draw(canvas:Control, where:Vector2):
 	var color = G.appearance.trace_secondary
+	if canvas is Flowchart and canvas.sel_vert == self: color = G.appearance.trace_primary
 	canvas.draw_circle(where, Flowchart.JOINT_RAD, color, false, 4)

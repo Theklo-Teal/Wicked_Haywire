@@ -151,8 +151,9 @@ class Link extends Resource:
 	#endregion
 	
 	#region Drawing
-	func draw(canvas:Control, start:Vector2, stop:Vector2, highlighted:=false):
-		var color = Color.GOLD if highlighted else Color.GOLDENROD
+	func draw(canvas:Control, start:Vector2, stop:Vector2):
+		var color = Color.GOLDENROD
+		if canvas is Flowchart and canvas.sel_wire.get("wire", null) == self: color = Color.GOLD
 		canvas.draw_polyline(get_verts(start, stop), color, Flowchart.MAX_WIRE)
 	
 	static func draw_chiral(canvas:Control, start:Vector2, stop:Vector2, clockwise:bool, bending:float):

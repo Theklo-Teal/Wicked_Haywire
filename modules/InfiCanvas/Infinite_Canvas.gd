@@ -180,6 +180,7 @@ func _input(event: InputEvent) -> void:
 	
 	if event is InputEventMouseMotion:
 		if overlay_mode == "Mouse Motion": overlay.queue_redraw()
+		
 		if lasso_allowed and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 			queue_redraw()
 			

@@ -162,13 +162,14 @@ func draw_fore_geometry(canvas:Control, viewed_canvas_rect:Rect2):
 		var pos2 = $Network.netlist.sockets.get(pair[1]).get_socket_canvas_position(pair[1]) if pair[1] in $Network.netlist.sockets else from_grid(pair[1].coord)
 		wire.draw(canvas, to_screen_coord(pos1), to_screen_coord(pos2))
 	
-	# Draw wire being pulled.
-	if $Input.at("wire") and not wire_from.is_empty():
-		NetBase.Link.draw_length(canvas, to_screen_coord(wire_from.canvas_position), get_local_mouse_position(), Input.is_key_pressed(KEY_SHIFT), SNAP)
-
 func draw_overlay(canvas:Control, _viewed_canvas_rect:Rect2):
 	if OS.has_feature("editor_hint"): return
 	
+	# Draw wire being pulled.
+	if $Input.at("wire_create") and not wire_from.is_empty():
+		NetBase.Link.draw_length(canvas, to_screen_coord(wire_from.canvas_position), get_local_mouse_position(), Input.is_key_pressed(KEY_SHIFT), SNAP)
+	
+	# Highlight grid cell under mouse.
 	var where = snap_grid(get_local_mouse_position())
 	var clr = G.appearance.color.inverted()
 	clr.a = 0.4
@@ -182,15 +183,13 @@ func _gui_input(event: InputEvent) -> void:
 	
 	if event is InputEventMouseButton:
 		if event.is_pressed():
-			if event.button_index == MOUSE_BUTTON_LEFT:
-				if not is_moving_obj:
-					_selected.clear()
-			else:
-				$Input.now().mouse_press(
-					event.button_index,
-					Input.is_key_pressed(KEY_SHIFT),
-					Input.is_key_pressed(KEY_CTRL),
-					)
+			if event.button_index == MOUSE_BUTTON_LEFT and not is_moving_obj:
+				_selected.clear()
+			$Input.now().mouse_press(
+				event.button_index,
+				Input.is_key_pressed(KEY_SHIFT),
+				Input.is_key_pressed(KEY_CTRL),
+				)
 		if event.is_released():
 			$Input.now().mouse_release(
 				event.button_index,
@@ -207,8 +206,9 @@ func _input(event: InputEvent) -> void:
 				if each is FlowchartGizmo:
 					rem_gizmo(each)
 		if event.keycode == KEY_SHIFT:
-			if $Input.at("wire"):
-				queue_redraw()
+			$Input.now().shifted(event.is_pressed())
+		if event.keycode == KEY_CTRL:
+			$Input.now().ctrled(event.is_pressed())
 	
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_LEFT:
@@ -217,7 +217,7 @@ func _input(event: InputEvent) -> void:
 				selected_obj_movement_stop()
 	
 	if event is InputEventMouseMotion:
-		if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) and not is_moving_obj and move_obj_allowed:
+		if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) and not is_moving_obj and not _selected.is_empty():
 			selected_obj_movement_start()
 		elif not is_moving_obj:
 			$Input.now().mouse_move(Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT), 
@@ -232,9 +232,7 @@ func obj_movement_modulate(object, new_position:Vector2) -> Vector2:
 	return new_position
 
 func escape_key_action():
-	if not wire_from.is_empty():
-		wire_from.clear()
-		return
+	$Input.now().cancel()
 	super()
 
 func set_selected(val:Array):
@@ -325,45 +323,12 @@ var sel_vert : NetBase.NetVert
 ## Gizmo socket has started a wire.
 func start_socket_wiring(sock_data:Dictionary):
 	wire_from = sock_data
+	sel_vert = sock_data.netvert
+	$Input.set_mode("wire_create")
 
 ## Wire stopped at a Gizmo socket.
 func stop_socket_wiring(sock_data:Dictionary):
-	if wire_from.netvert == sock_data.netvert: return
-	var pos1 = wire_from.canvas_position
-	var pos2 = sock_data.canvas_position
-	var wire : NetBase.Link = $Network.linking(wire_from.netvert, sock_data.netvert)
-	wire.set_chi_from_len(pos1, pos2, Input.is_key_pressed(KEY_SHIFT))
-	wire.bend = SNAP
-	
-	wire_from.clear()
-	queue_redraw()
-
-## Wire stopped on empty canvas.
-func stop_canvas_wiring(where:Vector2):
-	var via : FlowchartVia = add_via(where)
-	var pos1 = wire_from.canvas_position
-	var pos2 = from_grid(via.coord)
-	var wire : NetBase.Link = $Network.linking(wire_from.netvert, via)
-	wire.set_chi_from_len(pos1, pos2, Input.is_key_pressed(KEY_SHIFT))
-	wire.bend = SNAP
-	
-	wire_from.clear()
-	queue_redraw()
-
-func start_via_wiring(vert_data:Dictionary):
-	wire_from = vert_data
-	queue_redraw()
-
-func stop_via_wiring(vert_data:Dictionary):
-	if wire_from.netvert == vert_data.netvert: return
-	var pos1 = wire_from.canvas_position
-	var pos2 = vert_data.canvas_position
-	var wire : NetBase.Link = $Network.linking(wire_from.netvert, vert_data.netvert)
-	wire.set_chi_from_len(pos1, pos2, Input.is_key_pressed(KEY_SHIFT))
-	wire.bend = SNAP
-	
-	wire_from.clear()
-	queue_redraw()
+	pass
 
 #endregion
 
