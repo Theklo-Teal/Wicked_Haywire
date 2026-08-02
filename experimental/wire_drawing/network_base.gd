@@ -176,9 +176,9 @@ class xWire extends Resource:
 		var middle = lengs[0] / total
 		var where : Vector2
 		if ratio > middle:
-			var subratio = remap(ratio, middle, 1, 0, 1)
+			var subratio = inverse_lerp(middle, 1, ratio)
 			where = verts[1].lerp(verts[2], subratio)
 		else:
-			var subratio = remap(ratio, 0, middle, 0, 1)
+			var subratio = inverse_lerp(0, middle, ratio)
 			where = verts[0].lerp(verts[1], subratio)
 		return where

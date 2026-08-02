@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://ce32nv1ktqx4r"]
 
-[ext_resource type="Script" uid="uid://cpnm2e7cu1v48" path="res://modules/InfiCanvas/Flowchart/Gizmos/condition_check.gd" id="1_ugl36"]
-[ext_resource type="Script" uid="uid://ddaiqnfpchm0j" path="res://modules/InfiCanvas/Flowchart/Joints/flowchart_socket.gd" id="2_1elvd"]
+[ext_resource type="Script" uid="uid://cpnm2e7cu1v48" path="res://modules/Flowchart/Gizmos/condition_check.gd" id="1_ugl36"]
+[ext_resource type="Script" uid="uid://ddaiqnfpchm0j" path="res://modules/Flowchart/Joints/flowchart_socket.gd" id="2_1elvd"]
 [ext_resource type="Script" path="res://modules/InfiCanvas/Flowchart/Joints/socket_source.gd" id="3_ugl36"]
 [ext_resource type="Script" path="res://modules/InfiCanvas/Flowchart/Joints/socket_sink.gd" id="3_v1goa"]
 

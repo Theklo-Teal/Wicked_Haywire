@@ -12,16 +12,7 @@ class_name InfiCanvas
 ## If you are seeing background patterns being drawn outside the visible area, set "Layout/Clip Contents" in the inspector.
 
 # MODIFICATIONS
-# Inverted direction of zoom with the mouse wheel
-# Panning respects zoom.
-# The `parti` dictionary accepts any type of key. Useful to have a choice between Enum/Ints or Strings as keys.
-# Updated documentation.
-# Spatial partitioning is now handled as a Resource of class_name `SpatialPartition`. So now it's simpler to maintain and multiple partitions for different objects can be managed with more control.
-# Removed grid snapping as an intrinsic feature of the canvas. Deciding how inform every component what the grid size is was being an headache, so I leave it to extensions of InfiCanvas, which probably involves having grid size in a singleton.
-# SpatialPartition doesn't track position independently of the objects as it would when built into InfiCanvas. The position property of the object is used instead.
-# It isn't possible to define the rect of an object through overriding functions. The object should have a `get_rect()` method or `rect` property if that's relevant.
-# `fore_draw_geometry()` now is to be used to draw over registered child nodes.
-# `draw_overlay()` was added that redraws according to `overlay_mode`.
+# Modulation of object positioning can now vary according to what object is it.
 
 #TODO Make zoom into the center
 #FIXME go_to(Vector2.ZERO) doesn't seem to work if InfiCanvas isn't root node.
@@ -32,7 +23,11 @@ const MINIMUM_LASSO = Vector2(16,16)  # A lasso operation is only performed if i
 const SCROLL_SPEED = Vector2(20, 20)
 const ZOOM_SPEED = 0.2
 
-@export var parti : Dictionary[Variant, SpatialPartition] ## Partition spaces available, indexed by a String or an Enum.
+@export var parti : Dictionary[Variant, SpatialPartition] :  ## Partition spaces available, indexed by a String or an Enum.
+	set(val):
+		parti = val
+		if not parti.has(0):
+			parti[0 as Variant] = SpatialPartition.new()
 
 var all_objs : Dictionary[Variant, SpatialPartition]  # Track which partitions objects are in.
 
@@ -208,12 +203,13 @@ func _input(event: InputEvent) -> void:
 			for i in range(_selected.size()):
 				var obj = _selected[i]
 				var data : Dictionary = get_obj_data(obj)
-				data.position = obj_movement_modulate(_selected_positions[i] + displacement / zoom)
+				data.position = obj_movement_modulate(_selected[i], _selected_positions[i] + displacement / zoom)
 				if "position" in obj:
 					obj.position = data.position
 
 ## Override this function to implement things like grid snapping.
-func obj_movement_modulate(new_position:Vector2) -> Vector2:
+@warning_ignore("unused_parameter")
+func obj_movement_modulate(object, new_position:Vector2) -> Vector2:
 	return new_position
 
 ## Call this function if selected objects are about to be moved.
@@ -302,6 +298,8 @@ func place_object(obj, canvas_coord:Vector2, partition:SpatialPartition=parti[0 
 		obj.owner = self
 	return data
 
+## Removes an object from its partition. If the object is a Godot node, it must
+## be [code]queue_free()[code] independently.
 func remove_object(obj) -> Dictionary:
 	var partition = all_objs.get(obj, parti[0 as Variant])
 	all_objs.erase(obj)
@@ -341,7 +339,6 @@ func _draw():
 		## `find_objects_simple()` will return those which top-left corner (position coordinate) stay inside the blue.
 		## `find_objects_tolerant()` will return the objects which bounding rect still touches the blue, but not if completely outside.
 		## `find_objects_zealous()` will return the objects which bounding rect is completely inside the blue.
-		
 		
 		var start = parti[0 as Variant].make_partition_id(_view_rect.position) - Vector2i.ONE * 1
 		var stop = parti[0 as Variant].make_partition_id(_view_rect.end) + Vector2i.ONE * 1

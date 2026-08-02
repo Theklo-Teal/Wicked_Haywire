@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://dwy8v5p2vu3mn"]
 
 [ext_resource type="Texture2D" uid="uid://bliggdgfw3v4k" path="res://Wicked_Haywire_Logo.png" id="1_1bvp3"]
-[ext_resource type="PackedScene" uid="uid://bnatph83g21s6" path="res://modules/InfiCanvas/Flowchart/Flowchart.tscn" id="1_ig7tw"]
+[ext_resource type="PackedScene" uid="uid://bnatph83g21s6" path="res://modules/Flowchart/Flowchart.tscn" id="1_ig7tw"]
 [ext_resource type="Texture2D" uid="uid://buorl1ocq0h64" path="res://assets/flags.png" id="1_lquwl"]
 [ext_resource type="Script" uid="uid://b07ljhmg8l7ne" path="res://modules/Sidebar.gd" id="6_7mycd"]
 [ext_resource type="Shader" uid="uid://d1gg4mr8iu7ia" path="res://modules/SidebarTray_Glass.gdshader" id="6_272bh"]

@@ -17,7 +17,6 @@ class_name FlowchartGizmo
 ## during simulation add the metadata "edit_only_control" instead.[br]
 ## You may have controls hide when disabled with the metadata "hide_on_disable".
 
-#FIXME Socket resources are shared by all instances of same chart node!
 
 signal update_done
 signal begin_done
@@ -89,13 +88,15 @@ func _on_flowchart_mode_changed(mode:Flowchart.Mode):
 var _grid : Vector2i
 func _on_resized():
 	custom_minimum_size = custom_minimum_size.max(Vector2.ONE * Flowchart.SNAP)
+	size = size.snappedf(Flowchart.SNAP)
+	_grid.x = floori(size.x / Flowchart.SNAP)
+	_grid.y = floori(size.y / Flowchart.SNAP)
+	
+	_sockdex.clear()
 	for sock in sockets:
 		var coord = sockets[sock]
 		_sockdex[get_socket_true_coord(coord)] = sock
 		sock.position = get_socket_position_from_coord(coord)
-	size = size.snappedf(Flowchart.SNAP)
-	_grid.x = floori(size.x / Flowchart.SNAP)
-	_grid.y = floori(size.y / Flowchart.SNAP)
 
 #region Drawing Background
 func _draw() -> void:
@@ -122,15 +123,21 @@ func _draw() -> void:
 		
 		draw_style_box(style, rect)
 	
-	# Visual helper to tell the grid cells
 	if OS.has_feature("editor_hint"):
+		# Visual helper to tell the grid cells
 		if show_grid:
-			for y : int in range(_grid.y + 1):
-				for x : int in range(_grid.x + 1):
-					var pos = Vector2(x,y) * Flowchart.SNAP
+			for y : int in range(_grid.y):
+				for x : int in range(_grid.x):
+					var pos = Flowchart.from_grid(Vector2i(x,y)) + Vector2(0.5, 0.5) * Flowchart.SNAP
 					draw_circle(pos, Flowchart.JOINT_RAD, Color.HOT_PINK, false)
+	
+	if owner is Flowchart:
+		# Allow socket effects to update when it's the Flowchart drawing them.
+		owner.queue_redraw()
+	else:
+		# Autonomous drawing sockets ifoutside a Flowchart
 		for coord in _sockdex:
-			var where = Flowchart.from_grid(coord)
+			var where = get_socket_position_from_coord(coord)
 			_sockdex[coord].draw(self, where)
 #endregion
 
@@ -138,18 +145,19 @@ func _draw() -> void:
 # Get the grid coord of socket, after computing negative values
 func get_socket_true_coord(socket_coord:Vector2i):
 	@warning_ignore("integer_division")
-	socket_coord.x = wrapi(socket_coord.x, 0, _grid.x + 1)
+	socket_coord.x = wrapi(socket_coord.x, 0, _grid.x)
 	@warning_ignore("integer_division")
-	socket_coord.y = wrapi(socket_coord.y, 0, _grid.y + 1)
+	socket_coord.y = wrapi(socket_coord.y, 0, _grid.y)
 	return socket_coord
 ## Get a socket position from its Grid Coordinate, negative values wrap around to stay contained in the Gizmo.
 func get_socket_position_from_coord(socket_coord:Vector2i) -> Vector2:
-	return get_socket_true_coord(socket_coord) * Flowchart.SNAP
+	return Flowchart.from_grid(get_socket_true_coord(socket_coord)) + Vector2(0.5, 0.5) * Flowchart.SNAP
 ## Get a socket position from its instance
 func get_socket_position(socket:GizmoSocket) -> Vector2:
 	var coord = sockets[socket]
 	return get_socket_position_from_coord(coord)
-
+func get_socket_canvas_position(socket:GizmoSocket) -> Vector2:
+	return position + get_socket_position(socket)
 
 func add_socket(socket : GizmoSocket, coord := Vector2i.ZERO):
 	socket.coord = coord
@@ -202,9 +210,7 @@ var hover_socket : GizmoSocket :
 		hover_socket = val
 func _on_mouse_stopped():
 	# Check if mouse is over a socket.
-	var cell := Vector2i(get_local_mouse_position())
-	cell.x = roundi(inverse_lerp(0, Flowchart.SNAP, cell.x))
-	cell.y = roundi(inverse_lerp(0, Flowchart.SNAP, cell.y))
+	var cell := Flowchart.to_grid(get_local_mouse_position() - Vector2(0.5, 0.5) * Flowchart.SNAP)
 	var sock = _sockdex.get(cell)
 	if hover_socket != null and hover_socket != sock:
 		queue_redraw()
@@ -248,22 +254,19 @@ func _gui_input(event: InputEvent) -> void:
 
 func _on_socket_pressed(socket:GizmoSocket):
 	var sock_data = {
-		"gizmo":self,
-		"socket": socket,
-		"local_position": get_socket_position(socket),
-		"global_position": get_socket_position(socket) + position,
+		"netvert": socket,
+		"canvas_position": get_socket_position(socket) + position,
 		}
-	if sock_data.socket != null:
+	if sock_data.netvert != null:
 		owner.start_socket_wiring(sock_data)
 func _on_socket_released(socket:GizmoSocket):
-	var sock_data = {
-		"gizmo":self,
-		"socket": socket,
-		"local_position": get_socket_position(socket),
-		"global_position": get_socket_position(socket) + position,
-		}
-	if sock_data.socket != null:
-		owner.stop_socket_wiring(sock_data)
+	pass
+	#var sock_data = {
+		#"netvert": socket,
+		#"canvas_position": get_socket_position(socket) + position,
+		#}
+	#if sock_data.netvert != null:
+		#owner.stop_socket_wiring(sock_data)
 
 #endregion
 

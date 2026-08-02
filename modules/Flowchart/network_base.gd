@@ -53,9 +53,13 @@ class Port:
 @abstract class NetVert extends Resource:
 	## Anything that can be connected in a network, like joints
 	## and wires.
-	@export_storage var position : Vector2  ## This allows the socket to be found by spatial partitioning.
-	@export_storage var coord : Vector2i
+	
 	@export_storage var layer : int
+	@export_storage var coord : Vector2i : 
+		set(val):
+			coord = val
+			position = Flowchart.from_grid(val)
+	@export_storage var position : Vector2  ## This allows the socket to be found by spatial partitioning.
 	
 	## Returns both grid coordinate and layer as the same data type.
 	func get_cell() -> Vector3i:
@@ -65,21 +69,45 @@ class Port:
 		layer = cell.z
 		coord = Vector2i(cell.x, cell.y)
 	
+	func _init() -> void:
+		resource_local_to_scene = true
+	
 	## How to draw this object on the [code]canvas[/code].
 	@abstract func draw(canvas:Control, where:Vector2)
 
+
+	var _link_count : int = 0
+	## Get how many NetVert are connected to this one.
+	func conns() -> int: return _link_count
+	## A connection originated from this node
+	func connecter(with:NetVert):
+			_link_count += 1
+			_connecter(with)
+	## A connection destination is this node
+	func connectee(with:NetVert):
+			_link_count += 1
+			_connectee(with)
+	func disconnected(from:NetVert):
+			_link_count -= 1
+			_disconnected(from)
+		
+	@warning_ignore("unused_parameter")
+	## A connection originated from this node
+	func _connecter(with:NetVert):
+			pass
+	@warning_ignore("unused_parameter")
+	## A connection destination is this node
+	func _connectee(with:NetVert):
+			pass
+	@warning_ignore("unused_parameter")
+	func _disconnected(from:NetVert):
+			pass
 
 class Joint extends NetVert:
 	func draw(canvas:Control, where:Vector2):
 		var color = G.appearance.color.inverted()
 		color.a = 0.4
-		canvas.draw_circle(where, G.joint_rad, color)
-
-class Via extends Joint:
-	## A simple Joint that isn't associated with Gizmos and to be used
-	## as the ending of a wire and labelled to create a tunnel connection.
-	
-	@export var text : String = ""
+		canvas.draw_circle(where, Flowchart.JOINT_RAD, color)
 
 class Socket extends Joint:
 	enum {
@@ -95,73 +123,91 @@ class Socket extends Joint:
 	@export var refuse_port : Array[StringName]  ## When connecting to another socket, we assume we can connect to it, except if something in our [code]refuse_link[/code] is its [code]link_class[/code], so we refuse to connect. Unless, its [code]link_class[/code] is also in [code]accept_link[/code], so we excpetionally allow connection.
 
 	## This socket was used to read a Port.
+	@warning_ignore("unused_parameter")
 	func has_read(val):
 		pass
 	## This socket was used to write a Port.
+	@warning_ignore("unused_parameter")
 	func has_written(val):
 		pass
 
 
 class Link extends Resource:
 	## And object that defines the visual representation of the connection between NetVerts.
-	enum M {  ## The method used to find the bend corner in the middle of a wire.
-		HANDI,  ## Handiness, if clockwise, or counterclockwise of the origin ending.
-		LENG,  ## By Length, whether the longest or shortest segment comes from the origin ending. 
-		}
-	@export_storage var mode := M.LENG
-	@export_storage var chirality : bool  ## In M.HANDI "true" means clockwise. In M.LENG "true" means longest segment first.
-	@export_storage var bend : float :  ## Number from 0 to 1 as ratio, where 1 is the length of of shortest segment. It defines the diagonal segment of a corner.
-		set(val):
-			bend = clamp(val, 0, 1)
+
+	@export_storage var chirality : bool  ## "true" means the wire runs clockwise around the corners of an imaginary rectangle.
+	@export_storage var bend : float  ## Defines the distance of the diagonal cutting the corner.
 	
-	func draw(canvas:Control, start:Vector2, stop:Vector2):
-		canvas.draw_polyline(get_verts(start, stop), G.appearance.trace_primary, G.max_wire)
+	#region Constructors
+	static func from_chi(clockwise:bool) -> Link:
+		var wire = Link.new()
+		wire.chirality = clockwise
+		return wire
 	
-	static func draw_chiral(canvas:Control, start:Vector2, stop:Vector2, clockwise:bool, bend_dist:float):
+	static func from_len(start:Vector2, stop:Vector2, longest:bool) -> Link:
+		var wire = Link.new()
+		wire.set_chi_from_len(start, stop, longest)
+		return wire
+	#endregion
+	
+	#region Drawing
+	func draw(canvas:Control, start:Vector2, stop:Vector2, highlighted:=false):
+		var color = Color.GOLD if highlighted else Color.GOLDENROD
+		canvas.draw_polyline(get_verts(start, stop), color, Flowchart.MAX_WIRE)
+	
+	static func draw_chiral(canvas:Control, start:Vector2, stop:Vector2, clockwise:bool, bending:float):
 		var middle = find_bend_chi(start, stop, clockwise)
-		canvas.draw_polyline(get_verts_from(start, middle, stop, bend_dist), G.appearance.trace_primary, G.max_wire)
+		canvas.draw_polyline(get_verts_from(start, middle, stop, bending), Color.GOLDENROD, Flowchart.MAX_WIRE)
 	
-	static func draw_length(canvas:Control, start:Vector2, stop:Vector2, longest:bool, bend_dist:float):
+	static func draw_length(canvas:Control, start:Vector2, stop:Vector2, longest:bool, bending:float):
 		var middle = find_bend_len(start, stop, longest)
-		canvas.draw_polyline(get_verts_from(start, middle, stop, bend_dist), G.appearance.trace_primary, G.max_wire)
+		canvas.draw_polyline(get_verts_from(start, middle, stop, bending), Color.GOLDENROD, Flowchart.MAX_WIRE)
+	#endregion
 	
-	## Returns the coordinate of the middle vertex, neglecting [code]bend[/code].
-	func find_bend(start:Vector2, stop:Vector2) -> Vector2:
-		match mode:
-			M.HANDI:
-				return find_bend_chi(start, stop, chirality)
-			M.LENG:
-				return find_bend_len(start, stop, chirality)
-		return start.lerp(stop, 0.5)
+	## Set handiness of the wire, given whether we want the first segment to be the longest.
+	func set_chi_from_len(start:Vector2, stop:Vector2, longest:bool):
+		chirality = chi_from_len(start, stop, longest)
 	
 	## Returns all the vertices to draw this wire, including the diagonal cutting the bend.
 	func get_verts(start:Vector2, stop:Vector2) -> PackedVector2Array:
 		var middle := find_bend(start, stop)
 		return get_verts_from(start, middle, stop, bend)
 	
+	## Returns the coordinate of the middle vertex from [code]chirality[/code], neglecting [code]bend[/code].
+	func find_bend(start:Vector2, stop:Vector2) -> Vector2:
+		return find_bend_chi(start, stop, chirality)
+	
+	## Returns the coordinate of the middle vertex, neglecting [code]bend[/code].
 	static func find_bend_chi(start:Vector2, stop:Vector2, clockwise:bool) -> Vector2:
 		var diff = (stop - start)
 		var diff_sign = diff.sign()
 		var which = ((diff_sign.x != diff_sign.y) != clockwise) as int
 		return [Vector2(start.x, stop.y), Vector2(stop.x, start.y)][which]
 	
+	## Returns the coordinate of the middle vertex according to whether the first segment is [code]longest[/code], neglecting [code]bend[/code].
 	static func find_bend_len(start:Vector2, stop:Vector2, longest:bool) -> Vector2:
-		var diff = (stop - start)
-		var diff_abs = diff.abs()
-		var axis = diff_abs.max_axis_index() if longest else diff_abs.min_axis_index()
-		return [Vector2(start.x, stop.y), Vector2(stop.x, start.y)][axis]
+		return find_bend_chi(start, stop, chi_from_len(start, stop, longest))
 	
-	static func get_verts_from(start:Vector2, middle:Vector2, stop:Vector2, bend_dist:float) -> PackedVector2Array:
+	static func get_verts_from(start:Vector2, middle:Vector2, stop:Vector2, bending:float) -> PackedVector2Array:
 		var verts : PackedVector2Array = [start]
-		var box = (start - stop).abs()
-		var short_axis : int = box.min_axis_index()  # Figure out the maximum bend_dist.
-		var segms = [(start - middle), (stop - middle)]
-		var segm_norm = [segms[0].normalized(), segms[1].normalized()]
-		bend_dist = clampf(bend_dist, G.snap, box[short_axis])
-		verts.append(segm_norm[0] * bend_dist + middle)
-		verts.append(segm_norm[1] * bend_dist + middle)
+		if bending >= 1:
+			var segms = [(start - middle), (stop - middle)]
+			var shortest = 0 if segms[0].length_squared() < segms[1].length_squared() else 1
+			var bend_dist = min(bending, segms[shortest].length())
+			segms[0] = segms[0].normalized() * bend_dist + middle
+			segms[1] = segms[1].normalized() * bend_dist + middle
+			verts.append_array(segms)
+		else:
+			verts.append(middle)
 		verts.append(stop)
 		return verts
+	
+	## Return the chirality of the wire given whether the first segment is the longest.
+	static func chi_from_len(start:Vector2, stop:Vector2, longest:bool) -> bool:
+		var diff = (stop - start)
+		var long = diff.abs().max_axis_index()
+		var signs = diff.sign()
+		return ((signs.x == signs.y) and (long == 0)) != longest
 	
 	## Returns a dictionary of data about where the point is on the wire:[br]
 	## [code]length[/code] - Total length of the wire.[br]
@@ -173,7 +219,8 @@ class Link extends Resource:
 	## Returns empty if the point is not over the lines drawn by the wire segment.
 	## This includes around the mid corner, if there's a diagonal bend so nothing
 	## drawn there.
-	func near(point:Vector2, verts:PackedVector2Array) -> Dictionary:
+	func near(point:Vector2, start:Vector2, stop:Vector2) -> Dictionary:
+		var verts : PackedVector2Array = get_verts(start, stop)
 		var solved : bool  # A segment under the point has been found.
 		var total : float = 0.0  # Total wire length.
 		var accum : float = 0.0  # Accumulated distance along the path to the point.
@@ -195,7 +242,7 @@ class Link extends Resource:
 				# Even after finding a matching segment, we keep iterating through
 				# all segments so we can find the total length of the wire.
 				continue
-			if along < 1 and along > 0 and prox < G.snap / 2.0:
+			if along < 1 and along > 0 and prox < Flowchart.SNAP / 2.0:
 				# We don't want to accept distances further than a segment's
 				# length, which happens when clicking near the mid corner as if
 				# bend ratio was 1.
@@ -215,3 +262,18 @@ class Link extends Resource:
 			"ratio": ratio,
 			"subratio" : subratio,
 			}
+	
+	## Find a coordinate over the wire, at given distance along it.
+	func position_along(ratio:float, start:Vector2, stop:Vector2) -> Vector2:
+		var verts = [start, find_bend(start,stop), stop]
+		var lengs = [(verts[0] - verts[1]).length(), (verts[1] - verts[2]).length()]
+		var total = lengs[0] + lengs[1]
+		var middle = lengs[0] / total
+		var where : Vector2
+		if ratio > middle:
+			var subratio = inverse_lerp(middle, 1, ratio)
+			where = verts[1].lerp(verts[2], subratio)
+		else:
+			var subratio = inverse_lerp(0, middle, ratio)
+			where = verts[0].lerp(verts[1], subratio)
+		return where

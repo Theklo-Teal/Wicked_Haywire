@@ -8,7 +8,9 @@ Gizmo ideas:
 	Ammeter - Count Gizmos between two joints.
 	Diode - Acts as HiZ in one direction, but allow signals in the other
 	Hi-Z Switch - Disable pin sets connections to Hi-Z
+	Gate - Combines Diode, Hi-Z Switch and can also be a buffer
 	Monostable - A pulse flips output, which then returns after a set time.
+	Bus Match - Compares input with given value, outputting high if they are equal.
 
 Cabling/Bundle/Combiner/Splitter Is implemented as a Via connected to a bus and relays to other wires
 certain bits specified in options. Effectively wire taps.
