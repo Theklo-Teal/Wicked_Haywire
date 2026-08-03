@@ -207,6 +207,8 @@ func _input(event: InputEvent) -> void:
 				data.position = obj_movement_modulate(_selected[i], _selected_positions[i] + displacement / zoom)
 				if "position" in obj:
 					obj.position = data.position
+					if obj.has_method("_canvas_repositioning"):
+						obj._canvas_repositioning(data)
 
 ## Override this function to implement things like grid snapping.
 @warning_ignore("unused_parameter")
@@ -237,8 +239,8 @@ func selected_obj_movement_stop():
 			var obj = _selected[i]
 			var data : Dictionary = get_obj_data(obj)
 			all_objs[obj].update_object(obj)
-			if obj.has_method("_canvas_reposition"):
-				obj._canvas_reposition(data)
+			if obj.has_method("_canvas_repositioned"):
+				obj._canvas_repositioned(data)
 
 func set_selected(val:Array):
 		_selected = val

@@ -73,7 +73,7 @@ class Port:
 		resource_local_to_scene = true
 	
 	## How to draw this object on the [code]canvas[/code].
-	@abstract func draw(canvas:Control, where:Vector2)
+	@abstract func draw(chart:Flowchart, canvas:Control, where:Vector2)
 
 
 	var _link_count : int = 0
@@ -104,7 +104,7 @@ class Port:
 			pass
 
 class Joint extends NetVert:
-	func draw(canvas:Control, where:Vector2):
+	func draw(chart:Flowchart, canvas:Control, where:Vector2):
 		var color = G.appearance.color.inverted()
 		color.a = 0.4
 		canvas.draw_circle(where, Flowchart.JOINT_RAD, color)
@@ -151,18 +151,19 @@ class Link extends Resource:
 	#endregion
 	
 	#region Drawing
-	func draw(canvas:Control, start:Vector2, stop:Vector2):
-		var color = Color.GOLDENROD
-		if canvas is Flowchart and canvas.sel_wire.get("wire", null) == self: color = Color.GOLD
+	func draw(chart:Flowchart, canvas:Control, start:Vector2, stop:Vector2):
+		var color = chart.trace_color_secondary
+		if chart.sel_wire.get("wire", null) == self: 
+			color = chart.trace_color_primary
 		canvas.draw_polyline(get_verts(start, stop), color, Flowchart.MAX_WIRE)
 	
-	static func draw_chiral(canvas:Control, start:Vector2, stop:Vector2, clockwise:bool, bending:float):
+	static func draw_chiral(canvas:Control, start:Vector2, stop:Vector2, clockwise:bool, bending:float, color:=Color.WHITE):
 		var middle = find_bend_chi(start, stop, clockwise)
-		canvas.draw_polyline(get_verts_from(start, middle, stop, bending), Color.GOLDENROD, Flowchart.MAX_WIRE)
+		canvas.draw_polyline(get_verts_from(start, middle, stop, bending), color, Flowchart.MAX_WIRE)
 	
-	static func draw_length(canvas:Control, start:Vector2, stop:Vector2, longest:bool, bending:float):
+	static func draw_length(canvas:Control, start:Vector2, stop:Vector2, longest:bool, bending:float, color:=Color.WHITE):
 		var middle = find_bend_len(start, stop, longest)
-		canvas.draw_polyline(get_verts_from(start, middle, stop, bending), Color.GOLDENROD, Flowchart.MAX_WIRE)
+		canvas.draw_polyline(get_verts_from(start, middle, stop, bending), color, Flowchart.MAX_WIRE)
 	#endregion
 	
 	## Set handiness of the wire, given whether we want the first segment to be the longest.
@@ -233,7 +234,7 @@ class Link extends Resource:
 			var segm = v1 - v2
 			var rel = (v1 - point)
 			var direct = segm.normalized()
-			var normal = Saliko.perpendicular(direct)
+			var normal = Vector2(-direct.y, direct.x)  # Get a perpendicular to `direct`
 			var leng = direct.dot(segm)  # Length of segment.
 			var dist = direct.dot(rel)  # Distance of point along the segment.
 			var along = inverse_lerp(0, leng, dist)  # Distance as a value from 0 to 1.
@@ -243,7 +244,7 @@ class Link extends Resource:
 				# Even after finding a matching segment, we keep iterating through
 				# all segments so we can find the total length of the wire.
 				continue
-			if along < 1 and along > 0 and prox < Flowchart.SNAP / 2.0:
+			if along < 1 and along > 0 and prox < (Flowchart.MAX_WIRE + Flowchart.CLEARANCE):
 				# We don't want to accept distances further than a segment's
 				# length, which happens when clicking near the mid corner as if
 				# bend ratio was 1.

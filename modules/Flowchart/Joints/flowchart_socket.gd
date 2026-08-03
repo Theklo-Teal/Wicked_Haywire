@@ -2,6 +2,8 @@
 extends NetBase.Socket
 class_name GizmoSocket
 
+## The type of joint meant to be part of Gizmos. It works a bit like Button node.
+
 var pressed : bool
 var hover : bool
 var bitwidth : int
@@ -9,7 +11,7 @@ var bitwidth : int
 @export var show_check : bool
 var checked : bool
 
-func draw(canvas:Control, where:Vector2):
+func draw(_chart:Flowchart, canvas:Control, where:Vector2):
 	var color = G.appearance.trace_primary if hover else G.appearance.trace_secondary
 	match mode:
 		HIZ:

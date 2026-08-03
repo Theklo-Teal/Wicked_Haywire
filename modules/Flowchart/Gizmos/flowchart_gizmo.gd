@@ -138,7 +138,7 @@ func _draw() -> void:
 		# Autonomous drawing sockets ifoutside a Flowchart
 		for coord in _sockdex:
 			var where = get_socket_position_from_coord(coord)
-			_sockdex[coord].draw(self, where)
+			_sockdex[coord].draw(null, self, where)
 #endregion
 
 #region Socket Managment
@@ -217,11 +217,9 @@ func _on_mouse_stopped():
 	var cell := Flowchart.to_grid(get_local_mouse_position() - Vector2(0.5, 0.5) * Flowchart.SNAP)
 	var sock = _sockdex.get(cell)
 	if hover_socket != null and hover_socket != sock:
-		queue_redraw()
 		hover_socket.hover = false
 		hover_socket = null
 	if sock != null:
-		queue_redraw()
 		hover_socket = sock
 		sock.hover = true
 
@@ -231,7 +229,6 @@ func _input(event: InputEvent) -> void:
 	if _mouse_hover and G.chart.mode == Flowchart.Mode.EDITING:
 		if event is InputEventMouseMotion:
 			mouse_moving = true
-			queue_redraw()
 		if event is InputEventMouseButton and owner is Flowchart:
 			if hover_socket != null:
 				if event.button_index == MOUSE_BUTTON_LEFT:
@@ -269,13 +266,12 @@ func _on_socket_pressed(socket:GizmoSocket):
 	if sock_data.netvert != null:
 		owner.start_socket_wiring(sock_data)
 func _on_socket_released(socket:GizmoSocket):
-	pass
-	#var sock_data = {
-		#"netvert": socket,
-		#"canvas_position": get_socket_position(socket) + position,
-		#}
-	#if sock_data.netvert != null:
-		#owner.stop_socket_wiring(sock_data)
+	var sock_data = {
+		"netvert": socket,
+		"canvas_position": get_socket_position(socket) + position,
+		}
+	if sock_data.netvert != null:
+		owner.stop_socket_wiring(sock_data)
 
 #endregion
 

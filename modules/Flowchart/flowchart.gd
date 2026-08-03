@@ -112,6 +112,9 @@ var mode : Mode :
 			gizmo._on_flowchart_mode_changed(mode)
 
 func _ready() -> void:
+	if not OS.has_feature("debug"): $coord.hide()
+	if OS.has_feature("editor_hint"): return
+	
 	G.chart = self
 	for gizmo_file in DirAccess.get_files_at("res://gizmos/"):
 		if not gizmo_file.get_extension() in ["gd", "tscn"]: continue
@@ -139,37 +142,44 @@ func draw_back_geometry(viewed_canvas_rect:Rect2):
 		if not joint is GizmoSocket:
 			if joint.layer == layer:
 				var where = from_grid(joint.coord)
-				joint.draw(self, to_screen_coord(where))
+				joint.draw(self, self, to_screen_coord(where))
 				for link in $Network.netlist.get_links(joint, true, false):
 					_visible_links.append(link)
 
 func draw_fore_geometry(canvas:Control, viewed_canvas_rect:Rect2):
 	if OS.has_feature("editor_hint"): return
 	
+	# Drawing Gizmo sockets
 	for gizmo : FlowchartGizmo in parti.node.find_objects_simple(viewed_canvas_rect):
 		for coord in gizmo._sockdex:
 			var socket = gizmo._sockdex[coord]
 			var where = gizmo.get_socket_canvas_position(socket)
-			socket.draw(canvas, to_screen_coord(where))
+			socket.draw(self, canvas, to_screen_coord(where))
 			for link in $Network.netlist.get_links(socket, true, false):
 				_visible_links.append(link)
 	
+	# Drawing Wires
 	for link in _visible_links:
 		var wire : NetBase.Link = $Network.netlist.links[link]
 		var pair : Array[NetBase.NetVert]
 		pair.assign($Network.netlist.pairs[link])
 		var pos1 = $Network.netlist.sockets.get(pair[0]).get_socket_canvas_position(pair[0]) if pair[0] in $Network.netlist.sockets else from_grid(pair[0].coord)
 		var pos2 = $Network.netlist.sockets.get(pair[1]).get_socket_canvas_position(pair[1]) if pair[1] in $Network.netlist.sockets else from_grid(pair[1].coord)
-		wire.draw(canvas, to_screen_coord(pos1), to_screen_coord(pos2))
+		wire.draw(self, canvas, to_screen_coord(pos1), to_screen_coord(pos2))
+	
 	
 func draw_overlay(canvas:Control, _viewed_canvas_rect:Rect2):
 	if OS.has_feature("editor_hint"): return
 	
+	$coord.text = str(to_canvas_coord(get_local_mouse_position()))
+	$coord.position = get_local_mouse_position() + Vector2(0, -24)
+	
 	# Draw wire being pulled.
-	if $Input.at("wire_create") and not wire_from.is_empty():
-		NetBase.Link.draw_length(canvas, to_screen_coord(wire_from.canvas_position), get_local_mouse_position(), Input.is_key_pressed(KEY_SHIFT), SNAP)
+	if $Input.at("wire_create") or $Input.at("wire_split") and not wire_from.is_empty():
+		NetBase.Link.draw_length(canvas, to_screen_coord(wire_from.canvas_position), get_local_mouse_position(), Input.is_key_pressed(KEY_SHIFT), SNAP, trace_color_highlight)
 	
 	# Highlight grid cell under mouse.
+	#FIXME The cell highlight doesn't align with other objects.
 	var where = snap_grid(get_local_mouse_position())
 	var clr = G.appearance.color.inverted()
 	clr.a = 0.4
@@ -185,13 +195,13 @@ func _gui_input(event: InputEvent) -> void:
 		if event.is_pressed():
 			if event.button_index == MOUSE_BUTTON_LEFT and not is_moving_obj:
 				_selected.clear()
-			$Input.now().mouse_press(
+			$Input.now().mouse_gui_press(
 				event.button_index,
 				Input.is_key_pressed(KEY_SHIFT),
 				Input.is_key_pressed(KEY_CTRL),
 				)
-		if event.is_released():
-			$Input.now().mouse_release(
+		elif event.is_released():
+			$Input.now().mouse_gui_release(
 				event.button_index,
 				Input.is_key_pressed(KEY_SHIFT),
 				Input.is_key_pressed(KEY_CTRL),
@@ -211,8 +221,20 @@ func _input(event: InputEvent) -> void:
 			$Input.now().ctrled(event.is_pressed())
 	
 	if event is InputEventMouseButton:
-		if event.button_index == MOUSE_BUTTON_LEFT:
-			if event.is_released():
+		if event.is_pressed():
+			$Input.now().mouse_press(
+				event.button_index,
+				Input.is_key_pressed(KEY_SHIFT),
+				Input.is_key_pressed(KEY_CTRL),
+				)
+		elif event.is_released():
+			$Input.now().mouse_release(
+				event.button_index,
+				Input.is_key_pressed(KEY_SHIFT),
+				Input.is_key_pressed(KEY_CTRL),
+				)
+		
+			if event.button_index == MOUSE_BUTTON_LEFT:
 				move_obj_allowed = true
 				selected_obj_movement_stop()
 	
@@ -229,7 +251,7 @@ func _input(event: InputEvent) -> void:
 func obj_movement_modulate(object, new_position:Vector2) -> Vector2:
 	if object is FlowchartGizmo:
 		return snap_grid(new_position) + Vector2(0.5, 0.5) * SNAP
-	return new_position
+	return snap_grid(new_position)
 
 func escape_key_action():
 	$Input.now().cancel()
@@ -328,8 +350,12 @@ func start_socket_wiring(sock_data:Dictionary):
 
 ## Wire stopped at a Gizmo socket.
 func stop_socket_wiring(sock_data:Dictionary):
-	pass
-
+	if sock_data.netvert == wire_from.netvert: return
+	if not ($Input.at("wire_create") or $Input.at("wire_split")): return
+	sel_vert = sock_data.netvert
+	$Input.now().finish_wiring(wire_from.netvert, sel_vert,
+		Input.is_key_pressed(KEY_SHIFT), Input.is_key_pressed(KEY_CTRL))
+	
 #endregion
 
 #region Simulation Implementation
