@@ -100,16 +100,8 @@ class InputMode:
 	## Control key changed
 	func ctrled(pressed:bool): pass
 	
-	var motion_trigger_armed : String = \"\"
-	
 	## Mouse motion in [code]_input()[/code].
-	func mouse_move(left:bool, right:bool, shift:bool, ctrl:bool):
-		if left or right:
-			# For if we only want to perform an action if the mouse dragged far enough
-			if not motion_trigger_armed.is_empty():
-				var diff = (me.ini_mouse - screen_mouse()).abs()
-				if max(diff.x, diff.y) >= Flowchart.SNAP:
-					switch.call(motion_trigger_armed)
+	func mouse_move(left:bool, right:bool, shift:bool, ctrl:bool): pass
 	## Mouse button pressed in [code]_gui_input()[/code].
 	func mouse_gui_press(button:MouseButton, shift:bool, ctrl:bool): pass
 	## Mouse button released in [code]_gui_input()[/code].
@@ -155,7 +147,7 @@ class IdleMode extends InputMode:
 			me._selected = moved_joint
 		return true
 	
-	
+	 
 	func mouse_gui_press(button:MouseButton, shift:bool, ctrl:bool):
 		me.sel_wire.clear() 
 		mouse_over_vert()
@@ -183,14 +175,7 @@ class IdleMode extends InputMode:
 							switch.call(\"wire_split\")
 					elif not me.sel_vert == null:
 						switch.call(\"wire_create\")
-	
-	func mouse_gui_release(button:MouseButton, _shift:bool, _ctrl:bool):
-		if button == MOUSE_BUTTON_LEFT:
-			motion_trigger_armed = \"\"
-	
-	func mouse_release(button:MouseButton, _shift:bool, _ctrl:bool):
-		if button == MOUSE_BUTTON_LEFT:
-			motion_trigger_armed = \"\"
+		
 		
 		# Lasso Selection
 		if button == MOUSE_BUTTON_LEFT:
@@ -212,10 +197,12 @@ class WireMode extends InputMode:
 	
 	func mouse_gui_release(button:MouseButton, shift:bool, ctrl:bool):
 		if not button == MOUSE_BUTTON_RIGHT: return
-		
 		if grid_mouse() == me.wire_from.get(\"coord\"): return
 		
-		# Finding the destination joint of a wire
+		var destin = find_joint()  # Finding the destination joint of a wire
+		finish_wiring(me.wire_from.netvert, destin, shift, ctrl)
+	
+	func find_joint() -> NetBase.Joint:
 		var via : NetBase.Joint
 		mouse_over_vert()
 		if me.sel_vert == null:
@@ -224,18 +211,11 @@ class WireMode extends InputMode:
 			else: via = split_wire().netvert
 		else:
 			via = me.sel_vert
+		if via == me.wire_from.netvert: return null
+		return via
 		
-		if via == me.wire_from.netvert: return
-		
-		finish_wiring(me.wire_from.netvert, via, shift, ctrl)
-	
-	func mouse_release(button:MouseButton, shift:bool, ctrl:bool):
-		if button != MOUSE_BUTTON_RIGHT: return
-		await me.get_tree().process_frame
-		if me.sel_vert is GizmoSocket:
-			finish_wiring(me.wire_from.netvert, me.sel_vert, shift, ctrl)
-	
 	func finish_wiring(origin:NetBase.Joint, destin:NetBase.Joint, shift:bool, _ctrl:bool):
+		me.wire_from.clear()
 		# Connect joints
 		var wire : NetBase.Link = net.linking(origin, destin)
 		var pos1 = joint_canvas_position(origin)

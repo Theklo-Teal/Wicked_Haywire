@@ -215,11 +215,13 @@ func _input(event: InputEvent) -> void:
 			if not sel_wire.is_empty():
 				$Network.netlist.pairs.erase(sel_wire.pair_hash)
 				$Network.netlist.links.erase(sel_wire.pair_hash)
-			for each in _selected:
-				if each is FlowchartGizmo:
-					rem_gizmo(each)
-				if each is FlowchartVia:
-					rem_via(each)
+				sel_wire.clear()
+			else:
+				for each in _selected:
+					if each is FlowchartGizmo:
+						rem_gizmo(each)
+					if each is FlowchartVia:
+						rem_via(each)
 			_selected.clear()
 			
 		if event.keycode == KEY_SHIFT:
@@ -365,10 +367,12 @@ func start_socket_wiring(sock_data:Dictionary):
 ## Wire stopped at a Gizmo socket.
 func stop_socket_wiring(sock_data:Dictionary):
 	if not ($Input.at("wire_create") or $Input.at("wire_split")): return
+	if wire_from.is_empty(): return
+	if sock_data.netvert == wire_from.netvert: return
 	sel_vert = sock_data.netvert
 	$Input.now().finish_wiring(wire_from.netvert, sel_vert,
 		Input.is_key_pressed(KEY_SHIFT), Input.is_key_pressed(KEY_CTRL))
-	
+
 #endregion
 
 #region Simulation Implementation
