@@ -47,10 +47,11 @@ func cycle_finish():
 
 func register_gizmo(gizmo:FlowchartGizmo, layer:int):
 	netlist.gizmos.get_or_add(layer, []).append(gizmo)
+	gizmo.layer = layer
 	for coord in gizmo._sockdex:
 		var socket = gizmo._sockdex[coord]
 		netlist.verts[hash(socket)] = socket
-		netlist.sockets[socket] = gizmo
+		netlist.sockets[socket as NetVert] = gizmo
 
 #TODO Remove Gizmo, unregistering its sockets
 func unregister_gizmo(gizmo:FlowchartGizmo, layer:int):

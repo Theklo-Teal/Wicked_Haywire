@@ -18,8 +18,6 @@ script = ExtResource("2_3gi3x")
 resource_name = "FlowchartInputFSM"
 script/source = "extends Node
 
-#TODO allow click-to-click wiring
-
 var mode : StringName = \"idle\"
 @onready var modes := {
 	\"idle\":IdleMode.new(get_parent(), get_parent().get_node(\"Network\"), set_mode),
@@ -102,8 +100,16 @@ class InputMode:
 	## Control key changed
 	func ctrled(pressed:bool): pass
 	
+	var motion_trigger_armed : String = \"\"
+	
 	## Mouse motion in [code]_input()[/code].
-	func mouse_move(left:bool, right:bool, shift:bool, ctrl:bool): pass
+	func mouse_move(left:bool, right:bool, shift:bool, ctrl:bool):
+		if left or right:
+			# For if we only want to perform an action if the mouse dragged far enough
+			if not motion_trigger_armed.is_empty():
+				var diff = (me.ini_mouse - screen_mouse()).abs()
+				if max(diff.x, diff.y) >= Flowchart.SNAP:
+					switch.call(motion_trigger_armed)
 	## Mouse button pressed in [code]_gui_input()[/code].
 	func mouse_gui_press(button:MouseButton, shift:bool, ctrl:bool): pass
 	## Mouse button released in [code]_gui_input()[/code].
@@ -127,22 +133,30 @@ class IdleMode extends InputMode:
 		me.lasso_allowed = true
 		me.wiring_allowed = true
 	
-	var motion_trigger_armed : String = \"\"
-	func mouse_move(left:bool, right:bool, _shift:bool, _ctrl:bool):
-		if not (left or right): return
-		# For if we only want to perform an action if the mouse dragged far enough
-		if not motion_trigger_armed.is_empty():
-			var diff = (me.ini_mouse - screen_mouse()).abs()
-			if max(diff.x, diff.y) >= Flowchart.SNAP:
-				switch.call(motion_trigger_armed)
-	
-	func mouse_gui_press(button:MouseButton, _shift:bool, _ctrl:bool):
+	func mouse_gui_press(button:MouseButton, shift:bool, ctrl:bool):
 		me.sel_wire.clear() 
 		mouse_over_vert()
 		if me.sel_vert == null: mouse_over_wire()
 		match button:
 			MOUSE_BUTTON_LEFT:
-				if me.wiring_allowed:
+				if ctrl:
+					var moved_joint : Array
+					if me.sel_vert == null:
+						if not me.sel_wire.is_empty():
+							moved_joint.assign( net.netlist.pairs.get(me.sel_wire.pair_hash).duplicate() )
+							# If the joint is part of a gizmo, we use the gizmo instead for repositioning.
+							moved_joint[0] = net.netlist.sockets.get(moved_joint[0], moved_joint[0])
+							moved_joint[1] = net.netlist.sockets.get(moved_joint[1], moved_joint[1])
+					else:
+						moved_joint = [me.sel_vert]
+					
+					if not moved_joint.is_empty():
+						if shift:
+							me._selected.append_array(moved_joint)
+						else:
+							me._selected = moved_joint
+				
+				elif me.wiring_allowed:
 					if me.sel_vert == null:
 						if not me.sel_wire.is_empty():
 							if floori(me.sel_wire.subratio) == 1:
@@ -164,6 +178,9 @@ class IdleMode extends InputMode:
 				pass
 	
 	func mouse_release(button:MouseButton, _shift:bool, _ctrl:bool):
+		if button == MOUSE_BUTTON_LEFT:
+			motion_trigger_armed = \"\"
+		
 		# Lasso Selection
 		if button == MOUSE_BUTTON_LEFT:
 			if me.lasso_allowed and me.lasso_canvas_rect.size > Flowchart.MINIMUM_LASSO:
@@ -182,8 +199,10 @@ class WireMode extends InputMode:
 		me.move_obj_allowed = false
 		me.lasso_allowed = false
 	
-	func mouse_gui_release(button:MouseButton, shift:bool, ctrl:bool):
+	func mouse_release(button:MouseButton, shift:bool, ctrl:bool):
 		if not button == MOUSE_BUTTON_LEFT: return
+		
+		if grid_mouse() == me.wire_from.get(\"coord\"): return
 		
 		# Finding the destination joint of a wire
 		var via : NetBase.Joint
@@ -194,9 +213,8 @@ class WireMode extends InputMode:
 			else: via = split_wire().netvert
 		else:
 			via = me.sel_vert
-		if via == me.wire_from.netvert: 
-			switch.call(\"idle\")
-			return
+		
+		if via == me.wire_from.netvert: return
 		
 		finish_wiring(me.wire_from.netvert, via, shift, ctrl)
 	
@@ -234,6 +252,7 @@ class WireCreate extends WireMode:
 		if not me.sel_vert is GizmoSocket:
 			me.wire_from = {
 				\"netvert\": me.sel_vert,
+				\"coord\": grid_mouse(),
 				\"canvas_position\": canvas_mouse(),
 				}
 	

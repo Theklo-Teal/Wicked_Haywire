@@ -52,6 +52,7 @@ signal finish_done
 			_sockdex[get_socket_true_coord(coord)] = sock
 
 var _sockdex : Dictionary[Vector2i, GizmoSocket]  # Back reference to find which socket is in at certain coord. Coordinates are wrapped, so if they are negative in [code]sockets[/code] they will be positive here.
+var layer : int = 0
 @onready var socket_menu := PopupMenu.new()
 
 func _parti_registered(_parti:SpatialPartition, data:Dictionary) -> void:
@@ -259,16 +260,20 @@ func _gui_input(event: InputEvent) -> void:
 					owner._selected = [self]
 
 func _on_socket_pressed(socket:GizmoSocket):
+	var pos = get_socket_canvas_position(socket)
 	var sock_data = {
 		"netvert": socket,
-		"canvas_position": get_socket_position(socket) + position,
+		"coord": Flowchart.to_grid(pos),
+		"canvas_position": pos,
 		}
 	if sock_data.netvert != null:
 		owner.start_socket_wiring(sock_data)
 func _on_socket_released(socket:GizmoSocket):
+	var pos = get_socket_canvas_position(socket)
 	var sock_data = {
 		"netvert": socket,
-		"canvas_position": get_socket_position(socket) + position,
+		"coord": Flowchart.to_grid(pos),
+		"canvas_position": pos,
 		}
 	if sock_data.netvert != null:
 		owner.stop_socket_wiring(sock_data)

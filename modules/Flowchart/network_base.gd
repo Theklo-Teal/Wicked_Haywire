@@ -134,7 +134,8 @@ class Socket extends Joint:
 
 class Link extends Resource:
 	## And object that defines the visual representation of the connection between NetVerts.
-
+	
+	@export_storage var pair_hash : int
 	@export_storage var chirality : bool  ## "true" means the wire runs clockwise around the corners of an imaginary rectangle.
 	@export_storage var bend : float  ## Defines the distance of the diagonal cutting the corner.
 	

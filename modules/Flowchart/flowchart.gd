@@ -211,10 +211,14 @@ func _input(event: InputEvent) -> void:
 	super(event)
 	
 	if event is InputEventKey and not event.is_echo():
-		if event.keycode == KEY_DELETE:
+		if event.keycode == KEY_DELETE and $Input.at("idle"):
 			for each in _selected:
 				if each is FlowchartGizmo:
 					rem_gizmo(each)
+				if each is FlowchartVia:
+					rem_via(each)
+			_selected.clear()
+				
 		if event.keycode == KEY_SHIFT:
 			$Input.now().shifted(event.is_pressed())
 		if event.keycode == KEY_CTRL:
@@ -248,6 +252,18 @@ func _input(event: InputEvent) -> void:
 				Input.is_key_pressed(KEY_CTRL),
 				)
 
+var past_via_coord : Dictionary[NetBase.Joint, Vector3i]
+func _selected_obj_movement_start(obj):
+	if obj is NetBase.Joint:
+		past_via_coord[obj] = Vector3i(obj.coord.x, obj.coord.y, obj.layer)
+func _selected_obj_movement_stop(obj):
+	if obj is NetBase.Joint:
+		$Network.netlist.vias.erase(past_via_coord[obj])
+		$Network.netlist.vias[Vector3i(obj.coord.x, obj.coord.y, obj.layer)] = obj
+func selected_obj_movement_stop():
+	super()
+	# Ensure the Dictionary doesn't just keep growing.
+	past_via_coord.clear()
 func obj_movement_modulate(object, new_position:Vector2) -> Vector2:
 	if object is FlowchartGizmo:
 		return snap_grid(new_position) + Vector2(0.5, 0.5) * SNAP
@@ -256,11 +272,6 @@ func obj_movement_modulate(object, new_position:Vector2) -> Vector2:
 func escape_key_action():
 	$Input.now().cancel()
 	super()
-
-func set_selected(val:Array):
-	super(val)
-	%LineEdit.hide()
-
 
 func _on_line_edit_submit(_txt:String):
 	match %LineEdit.placeholder_text:
@@ -316,20 +327,20 @@ func add_gizmo(res:String, where:=Vector2.ZERO) -> FlowchartGizmo:
 
 func rem_gizmo(gizmo:FlowchartGizmo):
 	queue_redraw()
-	$Network.rem_gizmo(gizmo)
+	$Network.unregister_gizmo(gizmo, layer)
 	remove_object(gizmo)
 	gizmo.queue_free()
 
 func add_via(where:Vector2) -> FlowchartVia:
+	queue_redraw()
 	var via = $Network.get_or_add_vert(where, layer, FlowchartVia.new())
 	place_object(via, via.position, parti.joint)
-	queue_redraw()
 	return via
 
 func rem_via(via:FlowchartVia):
+	queue_redraw()
 	$Network.rem_vert(via)
 	remove_object(via)
-	queue_redraw()
 
 #endregion
 

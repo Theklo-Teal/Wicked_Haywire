@@ -13,6 +13,7 @@ class_name InfiCanvas
 
 # MODIFICATIONS
 # Modulation of object positioning can now vary according to what object is it.
+# Added override functions for when starting or stopping to move an object.
 
 #TODO Make zoom into the center
 #FIXME go_to(Vector2.ZERO) doesn't seem to work if InfiCanvas isn't root node.
@@ -226,6 +227,12 @@ func selected_obj_movement_start():
 				_selected_positions.append(get_obj_rect(each).get_center())
 			else:
 				_selected_positions.append(get_obj_rect(each).position)
+			_selected_obj_movement_start(each)
+
+## Override this function to define what to do with an object being repositioned.
+@warning_ignore("unused_parameter")
+func _selected_obj_movement_start(obj):
+	pass
 
 ## You need to call this when the movement operations has finished.[br]
 ## This calls a [code]_canvas_reposition()[/code] method on each moved object,
@@ -241,11 +248,16 @@ func selected_obj_movement_stop():
 			all_objs[obj].update_object(obj)
 			if obj.has_method("_canvas_repositioned"):
 				obj._canvas_repositioned(data)
+			_selected_obj_movement_stop(obj)
 
+## Override this function to define what to do with an object after repositioned.
+@warning_ignore("unused_parameter")
+func _selected_obj_movement_stop(obj):
+	pass
+
+## Override this function if something is to happen when selecting objects.
 func set_selected(val:Array):
 		_selected = val
-		if not val.is_empty():
-			queue_redraw()  # Update the highlighting
 #endregion
 
 #region Canvas Handling

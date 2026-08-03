@@ -54,6 +54,9 @@ class NetData extends Resource:
 	func link_of(vert:NetVert, pair_hash:int) -> NetVert:
 		if not pair_hash in links: return null
 		return verts.get(hash(vert) ^ pair_hash, null)
+	
+	func joints_of(link:Link) -> Array[NetVert]:
+		return pairs.get(link.pair_hash, [])
 
 class Crawler:
 	## Travels through the network in steps, returning things of interest that it finds.[br]
