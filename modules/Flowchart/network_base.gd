@@ -36,8 +36,12 @@ func _cycle_finish():
 class Port:
 	## Target for signals being conveyed during simulation using an Observer Pattern.
 	
+	#var joints : Array[Joint]  ## Subscribed joints that will read and write this port.
 	var value
 	var aggregate : Array
+	
+	static func get_base_class() -> StringName:
+		return &"Port"
 	
 	## If the port has no values feeding in, what should it be read as?
 	static func default():
@@ -49,11 +53,16 @@ class Port:
 	func write(val):
 		aggregate.append(val)
 
+class BogusPort extends Port:
+	func _init():
+		value = 123
+
 
 @abstract class NetVert extends Resource:
 	## Anything that can be connected in a network, like joints
 	## and wires.
 	
+	var port : Port  ## Network Port this Vert is subscribed
 	@export_storage var layer : int
 	@export_storage var coord : Vector2i : 
 		set(val):

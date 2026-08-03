@@ -8,14 +8,45 @@ class_name FlowchartNetwork
 ## done here to account in indexing Dictionaries and propagate changes throughout
 ## the affected network graphs.
 
-@export var netlist : NetData
+@export var netlist : NetData : 
+	set(val):
+		if val == null: return
+		netlist = val
+		rebuild_network()
 
+var port_classes : Dictionary[StringName, Script]
 var ports : Array[Port]  ## Known Ports
 #var changed : Array[NetVert]  ## Joints that have connections changed.
 
 func _init() -> void:
 	if netlist == null:
 		netlist = NetData.new()
+	
+	@warning_ignore("static_called_on_instance")
+	for each in G.list_classes(true, true):
+		if each.base == "Port":
+			port_classes[each.name] = each.value
+
+func port_new(port_name:StringName) -> Port:
+	return port_classes[port_name].new()
+
+## Search the whole [code]netlist[/code] to figure out [code]ports[/code].
+func rebuild_network():
+	print("Rebuilding Network")
+	
+	var crawl = Crawler.new(netlist, netlist.sockets.keys())
+	while not crawl.breadth_traverse(Callable(), func(_curr, next): return next is FlowchartGizmo).is_empty():
+		continue
+	var accounted : Dictionary
+	for each : NetVert in crawl.finds:
+		if each is GizmoSocket:
+			if not crawl.root[each] in accounted:
+				var port = port_classes[each.port_class]
+				accounted[crawl.root[each]] = port.new()
+				ports.append(port)
+		#accounted[crawl.root[each]].joints.append(each)
+		each.port = accounted[crawl.root[each]]
+
 
 #region Simulation Stuff
 
@@ -50,6 +81,7 @@ func register_gizmo(gizmo:FlowchartGizmo, layer:int):
 	gizmo.layer = layer
 	for coord in gizmo._sockdex:
 		var socket = gizmo._sockdex[coord]
+		socket.port = port_new(socket.port_class)
 		netlist.verts[hash(socket)] = socket
 		netlist.sockets[socket as NetVert] = gizmo
 
@@ -99,6 +131,21 @@ func move_vert(vert:NetVert, where:Vector2) -> Error:
 	return OK
 
 func linking(v1: NetVert, v2: NetVert) -> Link:
+	if v1.port == null: 
+		v1.port = v2.port
+		# Propagate port of v2 to all Verts connected to v1
+		var crawl = Crawler.new(netlist, [v1])
+		while not crawl.breadth_traverse().is_empty():
+			for each : NetVert in crawl.iter_finds:
+				each.port = v2.port
+	elif v2.port != v1.port:
+		v2.port = v1.port
+		# Propagate port of v1 to all Verts connected to v2
+		var crawl = Crawler.new(netlist, [v2])
+		while not crawl.breadth_traverse().is_empty():
+			for each : NetVert in crawl.iter_finds:
+				each.port = v1.port
+	
 	var pair = make_pair_hash(v1, v2)
 	netlist.pairs[pair] = [v1, v2]
 	netlist.links[pair] = Link.new()

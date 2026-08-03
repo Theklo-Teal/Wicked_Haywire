@@ -54,6 +54,7 @@ signal finish_done
 var _sockdex : Dictionary[Vector2i, GizmoSocket]  # Back reference to find which socket is in at certain coord. Coordinates are wrapped, so if they are negative in [code]sockets[/code] they will be positive here.
 var layer : int = 0
 @onready var socket_menu := PopupMenu.new()
+@onready var socket_tooltip := PanelContainer.new()
 
 func _parti_registered(_parti:SpatialPartition, data:Dictionary) -> void:
 	data.registry_acknowledged = true
@@ -175,6 +176,11 @@ func rem_socket(_socket : GizmoSocket):
 	#_sockdex.erase(get_socket_true_coord(socket))
 	#sockets.erase(socket)
 	#queue_sort()
+
+func show_socket_tooltip(sock:GizmoSocket):
+	socket_tooltip.show()
+	socket_tooltip.position = sock.position + Vector2(16, 16)
+	socket_tooltip.get_node("Label").text = str(sock.port)
 #endregion
 
 #region Input Events
@@ -186,6 +192,14 @@ func _init() -> void:
 	_on_resized()
 	
 	await ready
+	add_child(socket_tooltip, false, Node.INTERNAL_MODE_FRONT)
+	socket_tooltip.hide()
+	socket_tooltip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var tooltip = Label.new()
+	tooltip.name = "Label"
+	tooltip.text = "TOOLTIPPED"
+	tooltip.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	socket_tooltip.add_child(tooltip)
 	add_child(socket_menu, false, Node.INTERNAL_MODE_FRONT)
 	socket_menu.add_check_item("Show State")
 
@@ -211,7 +225,9 @@ func _process(_delta: float) -> void:
 var hover_socket : GizmoSocket : 
 	set(val):
 		if val != hover_socket:
+			socket_tooltip.hide()
 			queue_redraw()
+		if val != null: show_socket_tooltip(val)
 		hover_socket = val
 func _on_mouse_stopped():
 	# Check if mouse is over a socket.
