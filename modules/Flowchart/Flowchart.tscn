@@ -133,49 +133,60 @@ class IdleMode extends InputMode:
 		me.lasso_allowed = true
 		me.wiring_allowed = true
 	
+	
+	func _on_selected_joint(shift:bool, _ctrl:bool) -> bool:
+		if me.sel_vert == null: return false
+		if shift:
+			me._selected.append( me.sel_vert )
+		else:
+			me._selected = [me.sel_vert]
+		return true
+	
+	func _on_selected_wire(shift:bool, _ctrl:bool) -> bool:
+		if me.sel_wire.is_empty(): return false
+		var moved_joint : Array
+		moved_joint.assign( net.netlist.pairs.get(me.sel_wire.pair_hash).duplicate() )
+		# If the joint is part of a gizmo, we use the gizmo instead for repositioning.
+		moved_joint[0] = net.netlist.sockets.get(moved_joint[0], moved_joint[0])
+		moved_joint[1] = net.netlist.sockets.get(moved_joint[1], moved_joint[1])
+		if shift:
+			me._selected.append_array(moved_joint)
+		else:
+			me._selected = moved_joint
+		return true
+	
+	
 	func mouse_gui_press(button:MouseButton, shift:bool, ctrl:bool):
 		me.sel_wire.clear() 
 		mouse_over_vert()
 		if me.sel_vert == null: mouse_over_wire()
 		match button:
 			MOUSE_BUTTON_LEFT:
-				if ctrl:
-					var moved_joint : Array
-					if me.sel_vert == null:
-						if not me.sel_wire.is_empty():
-							moved_joint.assign( net.netlist.pairs.get(me.sel_wire.pair_hash).duplicate() )
-							# If the joint is part of a gizmo, we use the gizmo instead for repositioning.
-							moved_joint[0] = net.netlist.sockets.get(moved_joint[0], moved_joint[0])
-							moved_joint[1] = net.netlist.sockets.get(moved_joint[1], moved_joint[1])
-					else:
-						moved_joint = [me.sel_vert]
-					
-					if not moved_joint.is_empty():
-						if shift:
-							me._selected.append_array(moved_joint)
-						else:
-							me._selected = moved_joint
-				
+				# Select and move things
+				if not _on_selected_joint(shift, ctrl):
+					if not _on_selected_wire(shift, ctrl):
+						pass
+			MOUSE_BUTTON_RIGHT:
+				if me.sel_vert == null and me.sel_wire.is_empty():
+					# Show Cnavas Popup
+					me.add_gizmo(\"bogus\", canvas_mouse())
+					#me.get_node(\"Canvas_Menu\").popup(Rect2(screen_mouse(), Vector2.ZERO))
+				elif ctrl:
+					# Alternate thing
+					pass
 				elif me.wiring_allowed:
-					if me.sel_vert == null:
-						if not me.sel_wire.is_empty():
-							if floori(me.sel_wire.subratio) == 1:
-								switch.call(\"wire_bend\")
-							else:
-								motion_trigger_armed = \"wire_split\"
-					else:
+					# Wire things
+					if not me.sel_wire.is_empty():
+						if floori(me.sel_wire.subratio) == 1:
+							switch.call(\"wire_bend\")
+						else:
+							switch.call(\"wire_split\")
+					elif not me.sel_vert == null:
 						switch.call(\"wire_create\")
-				
+	
 	func mouse_gui_release(button:MouseButton, _shift:bool, _ctrl:bool):
 		if button == MOUSE_BUTTON_LEFT:
 			motion_trigger_armed = \"\"
-		elif button == MOUSE_BUTTON_RIGHT:
-			if me.sel_wire.is_empty() and me.sel_vert == null:
-				me.add_gizmo(\"bogus\", canvas_mouse())
-				#me.get_node(\"Canvas_Menu\").popup(Rect2(screen_mouse(), Vector2.ZERO))
-			else:
-				#TODO Show via menu
-				pass
 	
 	func mouse_release(button:MouseButton, _shift:bool, _ctrl:bool):
 		if button == MOUSE_BUTTON_LEFT:
@@ -199,8 +210,8 @@ class WireMode extends InputMode:
 		me.move_obj_allowed = false
 		me.lasso_allowed = false
 	
-	func mouse_release(button:MouseButton, shift:bool, ctrl:bool):
-		if not button == MOUSE_BUTTON_LEFT: return
+	func mouse_gui_release(button:MouseButton, shift:bool, ctrl:bool):
+		if not button == MOUSE_BUTTON_RIGHT: return
 		
 		if grid_mouse() == me.wire_from.get(\"coord\"): return
 		
@@ -217,6 +228,12 @@ class WireMode extends InputMode:
 		if via == me.wire_from.netvert: return
 		
 		finish_wiring(me.wire_from.netvert, via, shift, ctrl)
+	
+	func mouse_release(button:MouseButton, shift:bool, ctrl:bool):
+		if button != MOUSE_BUTTON_RIGHT: return
+		await me.get_tree().process_frame
+		if me.sel_vert is GizmoSocket:
+			finish_wiring(me.wire_from.netvert, me.sel_vert, shift, ctrl)
 	
 	func finish_wiring(origin:NetBase.Joint, destin:NetBase.Joint, shift:bool, _ctrl:bool):
 		# Connect joints
@@ -263,7 +280,9 @@ class WireSplit extends WireMode:
 	func enter():
 		super()
 		me.wire_from = split_wire()
-
+	
+	func shifted(_pressed:bool):
+		me.queue_redraw()
 
 class WireBend extends WireMode:
 	

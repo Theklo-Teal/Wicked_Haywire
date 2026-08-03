@@ -179,8 +179,7 @@ func draw_overlay(canvas:Control, _viewed_canvas_rect:Rect2):
 		NetBase.Link.draw_length(canvas, to_screen_coord(wire_from.canvas_position), get_local_mouse_position(), Input.is_key_pressed(KEY_SHIFT), SNAP, trace_color_highlight)
 	
 	# Highlight grid cell under mouse.
-	#FIXME The cell highlight doesn't align with other objects.
-	var where = snap_grid(get_local_mouse_position())
+	var where = to_screen_coord(snap_grid(to_canvas_coord(get_local_mouse_position())) + Vector2(0.5, 0.5) * SNAP)
 	var clr = G.appearance.color.inverted()
 	clr.a = 0.4
 	canvas.draw_circle(where, JOINT_RAD, clr)
@@ -212,13 +211,17 @@ func _input(event: InputEvent) -> void:
 	
 	if event is InputEventKey and not event.is_echo():
 		if event.keycode == KEY_DELETE and $Input.at("idle"):
+			queue_redraw()
+			if not sel_wire.is_empty():
+				$Network.netlist.pairs.erase(sel_wire.pair_hash)
+				$Network.netlist.links.erase(sel_wire.pair_hash)
 			for each in _selected:
 				if each is FlowchartGizmo:
 					rem_gizmo(each)
 				if each is FlowchartVia:
 					rem_via(each)
 			_selected.clear()
-				
+			
 		if event.keycode == KEY_SHIFT:
 			$Input.now().shifted(event.is_pressed())
 		if event.keycode == KEY_CTRL:
@@ -266,7 +269,7 @@ func selected_obj_movement_stop():
 	past_via_coord.clear()
 func obj_movement_modulate(object, new_position:Vector2) -> Vector2:
 	if object is FlowchartGizmo:
-		return snap_grid(new_position) + Vector2(0.5, 0.5) * SNAP
+		return snap_grid(new_position)
 	return snap_grid(new_position)
 
 func escape_key_action():
@@ -361,7 +364,6 @@ func start_socket_wiring(sock_data:Dictionary):
 
 ## Wire stopped at a Gizmo socket.
 func stop_socket_wiring(sock_data:Dictionary):
-	if sock_data.netvert == wire_from.netvert: return
 	if not ($Input.at("wire_create") or $Input.at("wire_split")): return
 	sel_vert = sock_data.netvert
 	$Input.now().finish_wiring(wire_from.netvert, sel_vert,

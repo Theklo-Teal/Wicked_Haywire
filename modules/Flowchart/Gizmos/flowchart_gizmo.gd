@@ -232,19 +232,30 @@ func _input(event: InputEvent) -> void:
 			mouse_moving = true
 		if event is InputEventMouseButton and owner is Flowchart:
 			if hover_socket != null:
-				if event.button_index == MOUSE_BUTTON_LEFT:
+				if event.button_index == MOUSE_BUTTON_RIGHT:
+					if Input.is_key_pressed(KEY_CTRL):
+						if event.is_pressed():
+							#and owner.mode == Flowchart.Mode.EDITING
+							# Show popup menu for hover_socket
+							var where = owner.to_screen_coord(position + get_socket_position(hover_socket))
+							socket_menu.popup(Rect2(where, Vector2.ZERO))
+					else:
+						var pos = get_socket_canvas_position(hover_socket)
+						var sock_data = {
+								"netvert": hover_socket,
+								"coord": Flowchart.to_grid(pos),
+								"canvas_position": pos,
+								}
+						if sock_data.netvert != null:
+							if event.is_pressed(): owner.start_socket_wiring(sock_data)
+							elif event.is_released(): owner.stop_socket_wiring(sock_data)
+				elif event.button_index == MOUSE_BUTTON_LEFT:
 					if event.is_pressed():
-						queue_redraw()
 						hover_socket.pressed = true
 						_on_socket_pressed(hover_socket)
-					elif event.is_released():
-						queue_redraw()
+					else:
 						hover_socket.pressed = false
 						_on_socket_released(hover_socket)
-				elif event.button_index == MOUSE_BUTTON_RIGHT and owner.mode == Flowchart.Mode.EDITING:
-					# Show popup menu for hover_socket
-					var where = owner.to_screen_coord(position + get_socket_position(hover_socket))
-					socket_menu.popup(Rect2(where, Vector2.ZERO))
 
 func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
@@ -260,23 +271,9 @@ func _gui_input(event: InputEvent) -> void:
 					owner._selected = [self]
 
 func _on_socket_pressed(socket:GizmoSocket):
-	var pos = get_socket_canvas_position(socket)
-	var sock_data = {
-		"netvert": socket,
-		"coord": Flowchart.to_grid(pos),
-		"canvas_position": pos,
-		}
-	if sock_data.netvert != null:
-		owner.start_socket_wiring(sock_data)
+	pass
 func _on_socket_released(socket:GizmoSocket):
-	var pos = get_socket_canvas_position(socket)
-	var sock_data = {
-		"netvert": socket,
-		"coord": Flowchart.to_grid(pos),
-		"canvas_position": pos,
-		}
-	if sock_data.netvert != null:
-		owner.stop_socket_wiring(sock_data)
+	pass
 
 #endregion
 
