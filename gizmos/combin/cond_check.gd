@@ -4,6 +4,9 @@ extends Electronics
 static func toybox_included() -> bool:
 	return true
 
+func _ready() -> void:
+	update_layout()
+
 var inps : Array[GizmoSocket]
 var pos : GizmoSocket
 var neg : GizmoSocket
@@ -20,46 +23,82 @@ func _update_sockdex():
 	out_cluster = sockets[pos]
 
 
+#region Controls
+func _on_rule_option_item_selected(index: int) -> void:
+	if OS.has_feature("editor_hint"): return
+	rule = index
+	%rule_invert.text = NEG_RULE[rule]
+
+func _on_add_pressed() -> void:
+	var new_inp = GizmoSocket.new()
+	new_inp.mode = GizmoSocket.SINK
+	new_inp.coord.y = inps.size()
+	sockets[new_inp] = sockets[inps[0]]
+	inps.append(new_inp)
+	_update_sockdex()
+	update_layout()
+
+func _on_rem_pressed() -> void:
+	if inps.size() < 3:
+		return
+	var rem = inps.pop_back()
+	sockets.erase(rem)
+	_update_sockdex()
+	update_layout()
+#endregion
+
+
 #region Logic Rules
 enum {
 	AND,
 	OR,
-	XOR
+	XOR,
+	HIGH,
 }
-@export_enum("AND", "OR", "XOR") var rule : int = 0 : 
+@export_enum("AND", "OR", "XOR", "HIGH") var rule : int = 0 : 
 	set(val):
 		rule = val
-		%rule_option.select(rule)
 		update_layout()
+		if not is_node_ready(): await ready
+		%rule_option.select(rule)
+		
 
-const NEG_RULE = ["SOME", "NONE", "EVEN"]
+const NEG_RULE = ["SOME", "NONE", "EVEN", "LOW"]
 
-func _sim_update(_graph:FlowchartNetwork):
-	match rule:
-		AND:
-			pass
-		OR:
-			pass
-		XOR:
-			pass
+#func _sim_update(_graph:FlowchartNetwork):
+	#var words : PackedInt32Array
+	#for i in inps:
+		#words.append(i.read())
+	#
+	#var digit : int = -1
+	#var parallel : Array[bool]
+	#var inverted : Array[bool]
+	#parallel.resize(bitwidth)
+	#inverted.resize(bitwidth)
+	#for cnt in parallel_bit_count(words, bitwidth):
+		#match rule:
+			#AND:
+				#parallel[digit] = cnt == inps.size()
+				#inverted[digit] = not parallel[digit]
+			#OR:
+				#parallel[digit] = cnt != 0
+				#inverted[digit] = not parallel[digit]
+			#XOR:  # The intuitive form of the XOR which performs parity check.
+				#parallel[digit] = cnt % 2 == 0
+				#inverted[digit] = not parallel[digit]
+			#HIGH:  # A XOR as per IEC standard: Output High if only one input is high. The negated detects if only one input is low.
+				#parallel[digit] = cnt == 1
+				#inverted[digit] = bitwidth - cnt == 1
+	##pos.write(parallel_to_int(parallel))
+	##neg.write(invert)
 #endregion
 
 
 #region Layout Rules
-enum {
-	EAST,
-	SOUTH,
-	WEST,
-	NORTH
-}
 
-@export_enum("East", "South", "West", "North") var facing : int = 0 :
+@export var mirrored : bool = false :
 	set(val):
-		facing = val
-		update_layout()
-@export var mirror : bool = false :
-	set(val):
-		mirror = val
+		mirrored = val
 		update_layout()
 @export var spread : bool = false : 
 	set(val):
@@ -70,120 +109,30 @@ enum {
 		perpendicular = val
 		update_layout()
 
-const _horiz_panel := Rect2(0.5, 0.0, -1.5, -1.0)
-const _verti_panel := Rect2(0.0, 0.5, -1.0, -1.5)
+func _orientation(_prev:FACE, _towards:FACE) -> void:
+	pass
+
+func _mirror(axis_y:bool) -> void:
+	mirrored = not mirrored
+	match facing:
+		FACE.EAST:
+			if not axis_y:
+				facing = FACE.WEST
+		FACE.SOUTH:
+			if axis_y:
+				facing = FACE.NORTH
+		FACE.WEST:
+			if not axis_y:
+				facing = FACE.EAST
+		FACE.NORTH:
+			if axis_y:
+				facing = FACE.SOUTH
 
 func _update_layout():
-	%rule_invert.text = NEG_RULE[rule] if facing in [EAST, WEST] else ["↓", "↑"][(facing == NORTH) as int]
+	%rule_invert.text = NEG_RULE[rule] if facing in [FACE.EAST, FACE.WEST] else ["↓", "↑"][(facing == FACE.NORTH) as int]
 	%rule_invert.reset_size()
 	out_cluster.limit.y = _grid.size.y - 1
 	size = Vector2(5, 5) * Flowchart.SNAP
-	var inp_offset = (inps.size() - 2) * Flowchart.SNAP
-	match facing:
-		EAST:
-			size.y += inp_offset
-			panels = {_horiz_panel: 1 if mirror else 0}
-			out_cluster.perpendicular = false
-			in_cluster.perpendicular = false
-			out_cluster.mirror_y = true if mirror else false
-			in_cluster.mirror_y = false if mirror else true
-			if mirror:
-				out_cluster.coord = Vector2i(-1, -1)
-				in_cluster.coord = Vector2i(0, 0)
-			else:
-				out_cluster.coord = Vector2i(-1, 0)
-				in_cluster.coord = Vector2i(0, -1)
-		SOUTH:
-			size.x += inp_offset
-			panels = {_verti_panel: 0 if mirror else 1}
-			out_cluster.perpendicular = true
-			in_cluster.perpendicular = true
-			out_cluster.mirror_y = true if mirror else false
-			in_cluster.mirror_y = false if mirror else true
-			if mirror:
-				out_cluster.coord = Vector2i(0,-1)
-				in_cluster.coord = Vector2i(-1, 0)
-			else:
-				out_cluster.coord = Vector2i(-1,-1)
-				in_cluster.coord = Vector2i(0, 0)
-		WEST:
-			size.y += inp_offset
-			panels = {_horiz_panel: 1 if mirror else 0}
-			out_cluster.perpendicular = false
-			in_cluster.perpendicular = false
-			out_cluster.mirror_y = false if mirror else true
-			in_cluster.mirror_y = true if mirror else false
-			if mirror:
-				out_cluster.coord = Vector2i(0, 0)
-				in_cluster.coord = Vector2i(-1, -1)
-			else:
-				out_cluster.coord = Vector2i(0, -1)
-				in_cluster.coord = Vector2i(-1, 0)
-		NORTH:
-			size.x += inp_offset
-			panels = {_verti_panel: 0 if mirror else 1}
-			out_cluster.perpendicular = true
-			in_cluster.perpendicular = true
-			out_cluster.mirror_y = false if mirror else true
-			in_cluster.mirror_y = true if mirror else false
-			if mirror:
-				out_cluster.coord = Vector2i(-1, 0)
-				in_cluster.coord = Vector2i(0, -1)
-			else:
-				out_cluster.coord = Vector2i(0, 0)
-				in_cluster.coord = Vector2i(-1, -1)
-	_layout_widgets()
-
-func _layout_widgets():
-	var pos_coord = Vector2(out_cluster.transform_coord(pos.coord, get_bound_coord))
-	var neg_coord = Vector2(out_cluster.transform_coord(neg.coord, get_bound_coord))
-	var butts_coord = Vector2(in_cluster.transform_coord(inps[0].coord, get_bound_coord))
-	var opt_wid = Vector2(Flowchart.to_grid(%rule_option.size).x, 0)
-	var inv_wid = Vector2(Flowchart.to_grid(%rule_invert.size).x, 0)
-	var butts_wid = Vector2(Flowchart.to_grid(%buttons.size))
-	match facing:
-		EAST:
-			%rule_option.set_meta("grid_bound", pos_coord - opt_wid)
-			%rule_invert.set_meta("grid_bound", neg_coord - inv_wid)
-			var padding = 0.0 if mirror else -0.2
-			%buttons.set_meta("grid_bound", butts_coord + Vector2(1.5, padding))
-		WEST:
-			%rule_option.set_meta("grid_bound", pos_coord + Vector2(1, 0))
-			%rule_invert.set_meta("grid_bound", neg_coord + Vector2(1, 0))
-			var padding = 0.4 if mirror else -0.2
-			%buttons.set_meta("grid_bound", butts_coord - Vector2(butts_wid.x, padding))
-		SOUTH:
-			%rule_option.set_meta("grid_bound", neg_coord - Vector2(1, 1))
-			%rule_invert.set_meta("grid_bound", pos_coord - Vector2(-0.2, 1))
-			var padding = 1.2 - butts_wid.x if mirror else 0.2
-			%buttons.set_meta("grid_bound", butts_coord + Vector2(padding, 1.2))
-		NORTH:
-			%rule_option.set_meta("grid_bound", neg_coord + Vector2(-opt_wid.x / 2.0, 1))
-			%rule_invert.set_meta("grid_bound", pos_coord + Vector2(0.2, 1))
-			var padding = 0.2 if mirror else 1.2 - butts_wid.x
-			%buttons.set_meta("grid_bound", butts_coord + Vector2(padding, -1.5))
+	$layout_fsm.set_layout(facing)
 
 #endregion
-
-
-func _on_rule_option_item_selected(index: int) -> void:
-	if OS.has_feature("editor_hint"): return
-	rule = index
-	%rule_invert.text = NEG_RULE[rule]
-
-
-func _on_add_pressed() -> void:
-	var new_inp = GizmoSocket.new()
-	new_inp.mode = GizmoSocket.SINK
-	new_inp.coord.y = inps.size()
-	inps.append(new_inp)
-	_update_sockdex()
-	update_layout()
-
-
-func _on_rem_pressed() -> void:
-	if inps.size() < 2:
-		return
-	inps.pop_back()
-	_update_sockdex()
-	update_layout()

@@ -79,8 +79,8 @@ class Port:
 	
 	func write_none(data):
 		return data
-	func read_none():
-		return value
+	func read_none(data):
+		return data
 	
 	## Input data for the next state of the link. It returns an error code, if data isn't accepted.[br]
 	## Optionally, a write [code]filter[/code] of a Port class can be chosen, which transforms the format of the data before storing. An error is return if the requested filter doesn't exist.
@@ -182,7 +182,7 @@ class Socket extends Joint:
 			emit_changed()
 	
 	func read(filter:="none") -> Variant:
-		var val = port.call("read_"+filter, port.val)
+		var val = port.call("read_"+filter, port.value)
 		_read(val)
 		has_read.emit(val)
 		return val

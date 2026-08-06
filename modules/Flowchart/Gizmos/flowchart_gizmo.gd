@@ -28,7 +28,7 @@ func _update_sockdex():
 			cluster.changed.connect(_update_sockdex)
 		coord = local_socket_coord(sock)
 		_sockdex[coord] = sock
-		sock.position = get_canvas_position(coord)  # Set the position to the socket that's relevant for canvas drawing.
+		sock.position = Flowchart.from_grid(coord, true)  # Position on the Gizmo
 
 
 func _set_show_grid(val:bool):
@@ -147,11 +147,9 @@ var hover_socket : GizmoSocket :
 
 func _draw() -> void:
 	super()
-	if not owner is Flowchart:
-		# Autonomous drawing of sockets if outside a Flowchart
-		for coord in _sockdex:
-			var where = Flowchart.from_grid(coord, true)
-			_sockdex[coord].draw(null, self, where)
+	for coord in _sockdex:
+		var where = Flowchart.from_grid(coord, true)
+		_sockdex[coord].draw(owner if owner is Flowchart else null, self, where)
 
 
 #region Socket Managment

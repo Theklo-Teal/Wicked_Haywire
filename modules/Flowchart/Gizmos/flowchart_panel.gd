@@ -30,25 +30,37 @@ class_name FlowchartPanel
 
 signal sim_update_done
 
-@export var show_grid := false : set=_set_show_grid
-func _set_show_grid(val:bool):
-	show_grid = val
-	queue_redraw()
+enum FACE{
+	EAST,
+	SOUTH,
+	WEST,
+	NORTH
+}
+
+@export var facing : FACE = FACE.EAST :
+	set(val):
+		facing = val
+		update_layout()
 
 @export var panelstyle : Array[StyleBox] : 
 	set(val):
 		panelstyle = val
 		for each in val:
 			each.changed.connect(queue_redraw)
-@export var panels : Dictionary[Rect2, int] :  ## [Rect2] -> panelstyle_idx; Provides a rectangle to position a stylebox. This works as control interface to define which styleboxes to display depending on layout. If you don't want to show something, don't mention it!
+@export var panels : Dictionary[Vector4, int] :  ## [Vector4] -> panelstyle_idx; Tells the position and size of a stylebox by the distance of each side of a rectangle from the west and north edges. X is west side, Y is north side, Z is east side and W is bottom side.[br] This works as control interface to define which styleboxes to display depending on layout. If you don't want to show something, don't mention it!
 	set(val):
-		var _val : Dictionary[Rect2, int]
-		for rect in val:
-			var style_i = val[rect]
+		var _val : Dictionary[Vector4, int]
+		for box in val:
+			var style_i = val[box]
 			if style_i < panelstyle.size():
-				_val[rect] = style_i
+				_val[box] = style_i
 		panels = _val
 		queue_redraw()
+
+@export var show_grid := false : set=_set_show_grid
+func _set_show_grid(val:bool):
+	show_grid = val
+	queue_redraw()
 
 var layer : int = 0  ## Flowchart layer this Gizmo sits
 var _mouse_hover : bool : set=_set_mouse_hover
@@ -120,22 +132,25 @@ func get_bound_coord(coord:Vector2i) -> Vector2i:
 ## part allowing for an offset from that. Negative values wrap around the size
 ## of the panel grid.
 func get_bound_position(pos:Vector2, centered:=false) -> Vector2:
-	var pos_int = pos.floor()  # integer part of the values
-	var pos_dec = pos - pos_int  # decimal part of the values
+	pos.x = get_bound_distance(pos.x, false, centered)
+	pos.y = get_bound_distance(pos.y, true, centered)
+	return pos
+
+func get_bound_distance(dist:float, axis_y:bool, centered:=false) -> float:
+	var dist_int = floorf(abs(dist))  # integer part of the values
+	var dist_dec = dist - dist_int  # decimal part of the values
 	
 	# Scale with grid cell size.
-	pos = Flowchart.from_grid(pos_int, centered) + pos_dec * Flowchart.SNAP
+	dist = Flowchart.SNAP * (dist_int + (0.5 if centered else 0.0)) + dist_dec * Flowchart.SNAP
 	
 	# Limit magnitude to node size, both in negative
 	# and positive direction.
-	pos.x = clamp(pos.x, -size.x, size.x)
-	pos.y = clamp(pos.y, -size.y, size.y)
+	dist = clamp(dist, -size[int(axis_y)], size[int(axis_y)])
 	
 	# Make negatives count from the end.
-	pos.x = wrap(pos.x, 0.0, size.x + Flowchart.SNAP)
-	pos.y = wrap(pos.y, 0.0, size.y + Flowchart.SNAP)
+	dist = wrap(dist, 0.0, size[int(axis_y)] + Flowchart.SNAP)
 	
-	return pos
+	return dist
 #endregion
 
 func _gui_input(event: InputEvent) -> void:
@@ -169,6 +184,25 @@ func update_layout():
 	queue_redraw()
 	_layout_outdated = true
 
+func rotate(clockwise:bool) -> void:
+	orientation((facing + (1 if clockwise else -1)) % 4)
+	_rotate(clockwise)
+	update_layout()
+func mirror(axis_y:bool) -> void:
+	_mirror(axis_y)
+	update_layout()
+func orientation(towards:FACE) -> void:
+	var prev = facing
+	facing = towards
+	_orientation(prev, towards)
+	update_layout()
+func _rotate(clockwise:bool) -> void:
+	pass
+func _mirror(axis_y:bool) -> void:
+	pass
+func _orientation(previous:FACE, towards:FACE) -> void:
+	pass
+
 func _process(_delta: float) -> void:
 	if _layout_outdated:
 		if not is_node_ready():await ready
@@ -184,26 +218,15 @@ func _draw() -> void:
 			var where = get_bound_position(coord)
 			each.position = where
 	
-	for rect : Rect2 in panels:
-		var style = panelstyle[panels[rect]]
-		var pos_floor = rect.position.floor()
-		var siz_floor = rect.size.abs().floor()
-		var pos_deci = rect.position - pos_floor
-		var siz_deci = (rect.size.abs() - siz_floor) * rect.size.sign()
-		siz_floor *=  rect.size.sign()
+	for box : Vector4 in panels:
+		var style = panelstyle[panels[box]]
+		box.x = get_bound_distance(box.x, false, false)
+		box.y = get_bound_distance(box.y, true, false)
+		box.z = get_bound_distance(box.z, false, false)
+		box.w = get_bound_distance(box.w, true, false)
 		
-		# Scale to the grid
-		rect.position = pos_floor * Flowchart.SNAP + Flowchart.SNAP * pos_deci
-		rect.size = siz_floor * Flowchart.SNAP + Flowchart.SNAP * siz_deci
-		
-		rect.position.x = clamp(rect.position.x, -Flowchart.SNAP, size.x)
-		rect.position.y = clamp(rect.position.y, -Flowchart.SNAP, size.y)
-		
-		# Expand with node size.
-		var max_end = size + Vector2(2,2) * Flowchart.SNAP
-		rect.end.x = wrap(rect.end.x, rect.position.x + Flowchart.SNAP, max_end.x)
-		rect.end.y = wrap(rect.end.y, rect.position.y + Flowchart.SNAP, max_end.y)
-		
+		var rect = Rect2(box.x, box.y, 0, 0)
+		rect.end = Vector2(box.z, box.w)
 		draw_style_box(style, rect)
 	
 	if OS.has_feature("editor_hint"):
@@ -222,25 +245,27 @@ func _on_flowchart_mode_changed(mode:Flowchart.Mode):
 	match mode:
 		Flowchart.Mode.EDITING:
 			# Allow re-positioning and wiring
-			mouse_filter = Control.MOUSE_FILTER_STOP
+			mouse_filter = MOUSE_FILTER_STOP
 			for each in get_children():
+				if not each is Control: continue
 				if each.get_meta("edit_control", false) or each.get_meta("edit_only_control", false):
 					if each.get_meta("hide_on_disable", false):
 						each.show()
-					each.mouse_behavior_recursive = Control.MOUSE_BEHAVIOR_ENABLED
+					each.mouse_behavior_recursive = MOUSE_BEHAVIOR_ENABLED
 				else:
 					if each.get_meta("hide_on_disable", false):
 						each.hide()
-					each.mouse_behavior_recursive = Control.MOUSE_BEHAVIOR_DISABLED
+					each.mouse_behavior_recursive = MOUSE_BEHAVIOR_DISABLED
 		Flowchart.Mode.SIMULAT:
 			# Allow interacting which children UI
-			mouse_filter = Control.MOUSE_FILTER_IGNORE
+			mouse_filter = MOUSE_FILTER_IGNORE
 			for each in get_children():
+				if not each is Control: continue
 				if each.get_meta("edit_only_control", false):
 					if each.get_meta("hide_on_disable", false):
 						each.hide()
-					each.mouse_behavior_recursive = Control.MOUSE_BEHAVIOR_DISABLED
+					each.mouse_behavior_recursive = MOUSE_BEHAVIOR_DISABLED
 				else:
 					if each.get_meta("hide_on_disable", false):
 						each.show()
-					each.mouse_behavior_recursive = Control.MOUSE_BEHAVIOR_ENABLED
+					each.mouse_behavior_recursive = MOUSE_BEHAVIOR_ENABLED

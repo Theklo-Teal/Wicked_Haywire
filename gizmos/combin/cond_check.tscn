@@ -7,7 +7,7 @@
 [sub_resource type="Resource" id="Resource_jpdw3"]
 resource_local_to_scene = true
 script = ExtResource("2_tu3ol")
-mode = 0
+mode = 2
 port_class = &"Port"
 accepted_port = Array[StringName]([&"Port"])
 refuse_port = Array[StringName]([])
@@ -37,7 +37,7 @@ metadata/_custom_type_script = "uid://ddaiqnfpchm0j"
 [sub_resource type="Resource" id="Resource_4nbmf"]
 resource_local_to_scene = true
 script = ExtResource("2_tu3ol")
-mode = 0
+mode = 1
 port_class = &"Port"
 accepted_port = Array[StringName]([&"Port"])
 refuse_port = Array[StringName]([])
@@ -84,6 +84,124 @@ corner_radius_top_right = 18
 corner_radius_bottom_left = 18
 corner_detail = 1
 
+[sub_resource type="GDScript" id="GDScript_ax31v"]
+resource_name = "layout_fsm"
+script/source = "@tool
+extends Node
+
+var me : Electronics
+
+const _horiz_panel := Vector4(0.5, 0.0, -1.5, -1.0)
+const _verti_panel := Vector4(0.0, 0.5, -1.0, -1.5)
+
+var inp_offset : int
+var pos_coord : Vector2
+var neg_coord : Vector2
+var butts_coord : Vector2
+var opt_wid : Vector2
+var inv_wid : Vector2
+var butts_wid : Vector2
+
+func _ready() -> void:
+	me = get_parent()
+
+func set_layout(face:FlowchartPanel.FACE):
+	inp_offset = (me.inps.size() - 2) * Flowchart.SNAP
+	[east, south, west, north][face].call()
+	
+	pos_coord = Vector2(me.out_cluster.transform_coord(me.pos.coord, me.get_bound_coord))
+	neg_coord = Vector2(me.out_cluster.transform_coord(me.neg.coord, me.get_bound_coord))
+	butts_coord = Vector2(me.in_cluster.transform_coord(me.inps[0].coord, me.get_bound_coord))
+	opt_wid = Vector2(Flowchart.to_grid(me.get_node(\"%rule_option\").size).x, 0)
+	inv_wid = Vector2(Flowchart.to_grid(me.get_node(\"%rule_invert\").size).x, 0)
+	butts_wid = Vector2(Flowchart.to_grid(me.get_node(\"%buttons\").size))
+	
+	[widget_east, widget_south, widget_west, widget_north][face].call()
+
+func east():
+	me.size.y += inp_offset
+	me.panels = {_horiz_panel: 1 if me.mirrored else 0}
+	me.out_cluster.perpendicular = false
+	me.in_cluster.perpendicular = false
+	me.out_cluster.mirror_y = true if me.mirrored else false
+	me.in_cluster.mirror_y = false if me.mirrored else true
+	if me.mirrored:
+		me.out_cluster.coord = Vector2i(-1, -1)
+		me.in_cluster.coord = Vector2i(0, 0)
+	else:
+		me.out_cluster.coord = Vector2i(-1, 0)
+		me.in_cluster.coord = Vector2i(0, -1)
+
+func widget_east():
+	me.get_node(\"%rule_option\").set_meta(\"grid_bound\", pos_coord - opt_wid)
+	me.get_node(\"%rule_invert\").set_meta(\"grid_bound\", neg_coord - inv_wid)
+	var padding = 0.2 if me.mirrored else -0.6
+	me.get_node(\"%buttons\").set_meta(\"grid_bound\", butts_coord + Vector2(1.5, padding))
+
+
+func south():
+	me.size.x += inp_offset
+	me.panels = {_verti_panel: 0 if me.mirrored else 1}
+	me.out_cluster.perpendicular = true
+	me.in_cluster.perpendicular = true
+	me.out_cluster.mirror_y = true if me.mirrored else false
+	me.in_cluster.mirror_y = false if me.mirrored else true
+	if me.mirrored:
+		me.out_cluster.coord = Vector2i(0,-1)
+		me.in_cluster.coord = Vector2i(-1, 0)
+	else:
+		me.out_cluster.coord = Vector2i(-1,-1)
+		me.in_cluster.coord = Vector2i(0, 0)
+
+func widget_south():
+	me.get_node(\"%rule_option\").set_meta(\"grid_bound\", neg_coord - Vector2(1, 1))
+	me.get_node(\"%rule_invert\").set_meta(\"grid_bound\", pos_coord - Vector2(-0.2, 1))
+	var padding = 1.2 - butts_wid.x if me.mirrored else 0.2
+	me.get_node(\"%buttons\").set_meta(\"grid_bound\", butts_coord + Vector2(padding, 1.2))
+
+
+func west():
+	me.size.y += inp_offset
+	me.panels = {_horiz_panel: 1 if me.mirrored else 0}
+	me.out_cluster.perpendicular = false
+	me.in_cluster.perpendicular = false
+	me.out_cluster.mirror_y = false if me.mirrored else true
+	me.in_cluster.mirror_y = true if me.mirrored else false
+	if me.mirrored:
+		me.out_cluster.coord = Vector2i(0, 0)
+		me.in_cluster.coord = Vector2i(-1, -1)
+	else:
+		me.out_cluster.coord = Vector2i(0, -1)
+		me.in_cluster.coord = Vector2i(-1, 0)
+
+func widget_west():
+	me.get_node(\"%rule_option\").set_meta(\"grid_bound\", pos_coord + Vector2(1, 0 if me.mirrored else -0.2))
+	me.get_node(\"%rule_invert\").set_meta(\"grid_bound\", neg_coord + Vector2(1, 0))
+	var padding = 0.4 if me.mirrored else -0.2
+	me.get_node(\"%buttons\").set_meta(\"grid_bound\", butts_coord - Vector2(butts_wid.x, padding))
+
+
+func north():
+	me.size.x += inp_offset
+	me.panels = {_verti_panel: 0 if me.mirrored else 1}
+	me.out_cluster.perpendicular = true
+	me.in_cluster.perpendicular = true
+	me.out_cluster.mirror_y = false if me.mirrored else true
+	me.in_cluster.mirror_y = true if me.mirrored else false
+	if me.mirrored:
+		me.out_cluster.coord = Vector2i(-1, 0)
+		me.in_cluster.coord = Vector2i(0, -1)
+	else:
+		me.out_cluster.coord = Vector2i(0, 0)
+		me.in_cluster.coord = Vector2i(-1, -1)
+
+func widget_north():
+	me.get_node(\"%rule_option\").set_meta(\"grid_bound\", neg_coord + Vector2(-opt_wid.x / 2.0, 1))
+	me.get_node(\"%rule_invert\").set_meta(\"grid_bound\", pos_coord + Vector2(0.2, 1))
+	var padding = 0.2 if me.mirrored else 1.2 - butts_wid.x
+	me.get_node(\"%buttons\").set_meta(\"grid_bound\", butts_coord + Vector2(padding, -1.5))
+"
+
 [node name="CondCheck" type="Control" unique_id=689840977]
 custom_minimum_size = Vector2(32, 32)
 layout_mode = 3
@@ -91,7 +209,7 @@ anchors_preset = 0
 offset_right = 120.0
 offset_bottom = 120.0
 script = ExtResource("1_tu3ol")
-rule = 2
+rule = 1
 sockets = Dictionary[ExtResource("2_tu3ol"), ExtResource("3_52thn")]({
 SubResource("Resource_jpdw3"): SubResource("Resource_77rw7"),
 SubResource("Resource_bv002"): SubResource("Resource_77rw7"),
@@ -99,37 +217,40 @@ SubResource("Resource_4nbmf"): SubResource("Resource_tw8p5"),
 SubResource("Resource_afif4"): SubResource("Resource_tw8p5")
 })
 panelstyle = Array[StyleBox]([SubResource("StyleBoxFlat_tu3ol"), SubResource("StyleBoxFlat_52thn")])
-panels = Dictionary[Rect2, int]({
-Rect2(0.5, 0, -1.5, -1): 0
-})
 metadata/_custom_type_script = "uid://dxbdnxmvfy5cw"
+
+[node name="layout_fsm" type="Node" parent="." unique_id=2043962721]
+script = SubResource("GDScript_ax31v")
 
 [node name="rule_option" type="OptionButton" parent="." unique_id=263482967]
 unique_name_in_owner = true
 layout_mode = 1
 offset_left = 24.0
-offset_right = 93.0
+offset_right = 97.0
 offset_bottom = 31.0
 flat = true
-alignment = 2
-selected = 2
-item_count = 3
+selected = 1
+item_count = 4
 popup/item_0/text = "ALL"
 popup/item_0/id = 0
 popup/item_1/text = "ANY"
 popup/item_1/id = 1
 popup/item_2/text = "ODD"
 popup/item_2/id = 2
+popup/item_3/text = "HIGH"
+popup/item_3/id = 3
 metadata/grid_bound = Vector2(1, 0)
+metadata/edit_control = true
+metadata/edit_only_control = true
 
 [node name="rule_invert" type="Label" parent="." unique_id=1787863043]
 unique_name_in_owner = true
 layout_mode = 1
 offset_left = 48.0
 offset_top = 48.0
-offset_right = 89.0
+offset_right = 95.0
 offset_bottom = 71.0
-text = "EVEN"
+text = "NONE"
 horizontal_alignment = 1
 vertical_alignment = 1
 metadata/grid_bound = Vector2(2, 2)
@@ -138,11 +259,12 @@ metadata/grid_bound = Vector2(2, 2)
 unique_name_in_owner = true
 layout_mode = 1
 offset_left = 36.0
-offset_top = 91.2
+offset_top = 81.600006
 offset_right = 72.0
-offset_bottom = 122.2
-metadata/grid_bound = Vector2(1.5, 3.8)
+offset_bottom = 112.600006
+metadata/grid_bound = Vector2(1.5, 3.4)
 metadata/hide_on_disable = true
+metadata/edit_control = true
 
 [node name="Rem" type="Button" parent="buttons" unique_id=59083439]
 layout_mode = 2

@@ -99,7 +99,7 @@ func _process(delta: float) -> void:
 
 
 #region Boilerplate
-var gizmo_pallet : Dictionary[String, Resource]
+var gizmo_pallet : Dictionary[String, PackedScene]
 var layer : int = 0
 
 enum Mode{
@@ -162,8 +162,6 @@ func draw_fore_geometry(canvas:Control, viewed_canvas_rect:Rect2):
 		if gizmo.get("sockets") == null: continue
 		for coord in gizmo._sockdex:
 			var socket = gizmo._sockdex[coord]
-			var where = gizmo.canvas_socket_position(socket)
-			socket.draw(self, canvas, to_screen_coord(where))
 			for link in $Network.netlist.get_links(socket, true, false):
 				_visible_links.append(link)
 	
@@ -207,6 +205,9 @@ func _gui_input(event: InputEvent) -> void:
 		if event.is_pressed():
 			if event.button_index == MOUSE_BUTTON_LEFT and not is_moving_obj:
 				_selected.clear()
+				var grab_gizmo = G.grabbed_buttons.get_pressed_button()
+				if grab_gizmo != null:
+					add_gizmo(grab_gizmo.get_meta("name"), to_canvas_coord(event.position))
 			$Input.now().mouse_gui_press(
 				event.button_index,
 				Input.is_key_pressed(KEY_SHIFT),
@@ -284,6 +285,7 @@ func selected_obj_movement_stop():
 	past_via_coord.clear()
 func obj_movement_modulate(object, new_position:Vector2) -> Vector2:
 	if object is FlowchartPanel:
+		queue_redraw()  # Makes wires follow gizmo sockets.
 		return snap_grid(new_position)
 	return snap_grid(new_position)
 
@@ -318,20 +320,17 @@ func _on_origin_pressed():
 func _on_popup_pressed(idx:int):
 	match $Canvas_Menu.get_item_text(idx):
 		"Info Panel":
-			add_gizmo("_info_panel", to_canvas_coord(fin_mouse))
+			add_gizmo("_info_panel", to_canvas_coord(ini_mouse))
 		"Bundle":
-			add_gizmo("_bundle", to_canvas_coord(fin_mouse))
+			add_gizmo("_bundle", to_canvas_coord(ini_mouse))
 		"Gate":
-			add_gizmo("_buffer_gate", to_canvas_coord(fin_mouse))
+			add_gizmo("_buffer_gate", to_canvas_coord(ini_mouse))
 
 
 #region Gizmos
 func add_gizmo(res:String, where:=Vector2.ZERO) -> FlowchartPanel:
 	var gizmo = gizmo_pallet.get(res)
-	if gizmo is Script:
-		gizmo = gizmo.new()
-	elif gizmo is PackedScene:
-		gizmo = gizmo.instantiate()
+	gizmo = gizmo.instantiate()
 	where = snap_grid(where)
 	place_object(gizmo, where, parti.node)
 	$Network.register_gizmo(gizmo, layer)

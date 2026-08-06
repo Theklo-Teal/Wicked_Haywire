@@ -202,6 +202,8 @@ class WireMode extends InputMode:
 		me.move_obj_allowed = false
 		me.lasso_allowed = false
 	
+	#FIXME: dragging from Gizmos doesn't place via on release.
+	#FIXME: clicking to gizmos with a wire, doesn't connect.
 	func mouse_gui_release(button:MouseButton, shift:bool, ctrl:bool):
 		if not button == MOUSE_BUTTON_RIGHT: return
 		if grid_mouse() == me.wire_from.get(\"coord\"): return

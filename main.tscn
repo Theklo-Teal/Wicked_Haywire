@@ -60,6 +60,10 @@ func _on_mode_toggled(toggled_on: bool, button:Button) -> void:
 
 func _on_tray_tab_bar_tab_changed(tab: int, tabbar: TabBar) -> void:
 	G.setts.set_value(\"0\", \"ribbonbar\", tab)
+	
+	var grab_gizmo = G.grabbed_buttons.get_pressed_button()
+	if grab_gizmo is Button: grab_gizmo.button_pressed = false
+	
 	if tab < 0:
 		%Ribbon.hide()
 	else:
@@ -197,16 +201,16 @@ func populate_toybox():
 		box.add_child(close_button)
 		box.add_child(innerbox)
 		for dev in DirAccess.get_files_at(dev_path.path_join(dev_category)):
-			if dev.get_extension() == \"uid\": continue
-			var full_path = dev_path.path_join(dev_category).path_join(dev)
-			var gizmo = load(full_path)
-			if not \"toybox_included\" in gizmo: continue
-			if not gizmo.toybox_included(): continue
+			if dev.get_extension() != \"gd\": continue
+			var full_path = dev_path.path_join(dev_category).path_join(dev.get_basename())
+			var gizmo_script = load(full_path + \".gd\")
+			var gizmo = load(full_path + \".tscn\")
+			if not \"toybox_included\" in gizmo_script: continue
+			if not gizmo_script.toybox_included(): continue
 			%Flowchart.gizmo_pallet[dev.get_basename()] = gizmo
 			var dev_button := Button.new()
 			dev_button.text = dev.get_basename().to_upper()
-			dev_button.set_meta(\"path\", full_path)
-			#dev_button.set_meta(\"refer\", gizmo)
+			dev_button.set_meta(\"name\", dev.get_basename())
 			dev_button.flat = true
 			dev_button.toggle_mode = true
 			dev_button.button_group = G.grabbed_buttons
