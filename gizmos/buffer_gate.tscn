@@ -1,0 +1,100 @@
+[gd_scene format=3 uid="uid://ddbqln6sbtevv"]
+
+[ext_resource type="Script" uid="uid://dxbdnxmvfy5cw" path="res://modules/Flowchart/Gizmos/electronics.gd" id="1_i2y0s"]
+[ext_resource type="Script" uid="uid://ddaiqnfpchm0j" path="res://modules/Flowchart/Joints/flowchart_socket.gd" id="2_louv7"]
+[ext_resource type="Script" uid="uid://dixllb5r68rvk" path="res://modules/Flowchart/Gizmos/gizmo_cluster.gd" id="3_lbmk2"]
+
+[sub_resource type="Resource" id="Resource_louv7"]
+resource_local_to_scene = true
+script = ExtResource("2_louv7")
+mode = 1
+port_class = &"Port"
+accepted_port = Array[StringName]([&"Port"])
+refuse_port = Array[StringName]([])
+layer = 0
+coord = Vector2i(0, 0)
+position = Vector2(12, 36)
+metadata/_custom_type_script = "uid://ddaiqnfpchm0j"
+
+[sub_resource type="Resource" id="Resource_lbmk2"]
+script = ExtResource("3_lbmk2")
+coords = Array[Vector2i]([Vector2i(0, 1)])
+limit = Vector2i(0, 0)
+metadata/_custom_type_script = "uid://dixllb5r68rvk"
+
+[sub_resource type="Resource" id="Resource_rgxy1"]
+resource_local_to_scene = true
+script = ExtResource("2_louv7")
+mode = 2
+port_class = &"Port"
+accepted_port = Array[StringName]([&"Port"])
+refuse_port = Array[StringName]([])
+layer = 0
+coord = Vector2i(0, 0)
+position = Vector2(84, 36)
+metadata/_custom_type_script = "uid://ddaiqnfpchm0j"
+
+[sub_resource type="Resource" id="Resource_iedwl"]
+script = ExtResource("3_lbmk2")
+coords = Array[Vector2i]([Vector2i(-1, 1)])
+facing = null
+spread = null
+metadata/_custom_type_script = "uid://dixllb5r68rvk"
+
+[sub_resource type="Resource" id="Resource_cskvj"]
+resource_local_to_scene = true
+script = ExtResource("2_louv7")
+mode = 1
+port_class = &"Port"
+accepted_port = Array[StringName]([&"Port"])
+refuse_port = Array[StringName]([])
+layer = 0
+coord = Vector2i(0, 0)
+position = Vector2(36, 60)
+metadata/_custom_type_script = "uid://ddaiqnfpchm0j"
+
+[sub_resource type="Resource" id="Resource_0bvt3"]
+script = ExtResource("3_lbmk2")
+coords = Array[Vector2i]([Vector2i(1, 2)])
+facing = null
+spread = null
+metadata/_custom_type_script = "uid://dixllb5r68rvk"
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_i2y0s"]
+skew = Vector2(-0.5, 0)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_kg6hg"]
+skew = Vector2(0.5, 0)
+
+[node name="BufferGate" type="Control" unique_id=1805711433]
+custom_minimum_size = Vector2(24, 24)
+layout_mode = 3
+anchors_preset = 0
+offset_right = 96.0
+offset_bottom = 72.0
+script = ExtResource("1_i2y0s")
+sockets = Dictionary[ExtResource("2_louv7"), ExtResource("3_lbmk2")]({
+SubResource("Resource_louv7"): SubResource("Resource_lbmk2"),
+SubResource("Resource_rgxy1"): SubResource("Resource_iedwl"),
+SubResource("Resource_cskvj"): SubResource("Resource_0bvt3")
+})
+panelstyle = Array[StyleBox]([SubResource("StyleBoxFlat_i2y0s"), SubResource("StyleBoxFlat_kg6hg")])
+panelrect = Array[Rect2]([Rect2(0.5, 0.5, -2, 1), Rect2(0.5, 1.5, -2, -1.5)])
+panels = Array[int]([0, 1])
+metadata/_custom_type_script = "uid://dxbdnxmvfy5cw"
+
+[node name="Button" type="Button" parent="." unique_id=442425637]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -24.5
+offset_top = -15.5
+offset_right = 20.5
+offset_bottom = 15.5
+grow_horizontal = 2
+grow_vertical = 2
+text = "Gate"
+metadata/edit_control = true

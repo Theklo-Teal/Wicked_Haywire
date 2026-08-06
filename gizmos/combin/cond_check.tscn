@@ -1,0 +1,173 @@
+[gd_scene format=3 uid="uid://cfxml23hgiusa"]
+
+[ext_resource type="Script" uid="uid://cqfybd6luhjw" path="res://gizmos/combin/cond_check.gd" id="1_tu3ol"]
+[ext_resource type="Script" uid="uid://ddaiqnfpchm0j" path="res://modules/Flowchart/Joints/flowchart_socket.gd" id="2_tu3ol"]
+[ext_resource type="Script" uid="uid://dixllb5r68rvk" path="res://modules/Flowchart/Gizmos/gizmo_cluster.gd" id="3_52thn"]
+
+[sub_resource type="Resource" id="Resource_jpdw3"]
+resource_local_to_scene = true
+script = ExtResource("2_tu3ol")
+mode = 0
+port_class = &"Port"
+accepted_port = Array[StringName]([&"Port"])
+refuse_port = Array[StringName]([])
+layer = 0
+coord = Vector2i(0, 0)
+position = Vector2(108, 108)
+metadata/_custom_type_script = "uid://ddaiqnfpchm0j"
+
+[sub_resource type="Resource" id="Resource_77rw7"]
+script = ExtResource("3_52thn")
+coord = Vector2i(-1, -3)
+limit = Vector2i(2, 6)
+metadata/_custom_type_script = "uid://dixllb5r68rvk"
+
+[sub_resource type="Resource" id="Resource_bv002"]
+resource_local_to_scene = true
+script = ExtResource("2_tu3ol")
+mode = 2
+port_class = &"Port"
+accepted_port = Array[StringName]([&"Port"])
+refuse_port = Array[StringName]([])
+layer = 0
+coord = Vector2i(0, 2)
+position = Vector2(108, 156)
+metadata/_custom_type_script = "uid://ddaiqnfpchm0j"
+
+[sub_resource type="Resource" id="Resource_4nbmf"]
+resource_local_to_scene = true
+script = ExtResource("2_tu3ol")
+mode = 1
+port_class = &"Port"
+accepted_port = Array[StringName]([&"Port"])
+refuse_port = Array[StringName]([])
+layer = 0
+coord = Vector2i(0, 0)
+position = Vector2(12, 12)
+metadata/_custom_type_script = "uid://ddaiqnfpchm0j"
+
+[sub_resource type="Resource" id="Resource_tw8p5"]
+script = ExtResource("3_52thn")
+metadata/_custom_type_script = "uid://dixllb5r68rvk"
+
+[sub_resource type="Resource" id="Resource_afif4"]
+resource_local_to_scene = true
+script = ExtResource("2_tu3ol")
+mode = 1
+port_class = &"Port"
+accepted_port = Array[StringName]([&"Port"])
+refuse_port = Array[StringName]([])
+layer = 0
+coord = Vector2i(0, 1)
+position = Vector2(12, 36)
+metadata/_custom_type_script = "uid://ddaiqnfpchm0j"
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_tu3ol"]
+border_width_left = 20
+border_width_top = 20
+border_width_right = 4
+border_width_bottom = 4
+border_blend = true
+corner_radius_top_left = 18
+corner_radius_bottom_right = 18
+corner_detail = 1
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_52thn"]
+border_width_left = 20
+border_width_top = 20
+border_width_right = 4
+border_width_bottom = 4
+border_blend = true
+corner_radius_top_right = 18
+corner_radius_bottom_left = 18
+corner_detail = 1
+
+[node name="CondCheck" type="Control" unique_id=689840977]
+custom_minimum_size = Vector2(32, 32)
+layout_mode = 3
+anchors_preset = 0
+offset_right = 120.0
+offset_bottom = 168.0
+script = ExtResource("1_tu3ol")
+mirror = true
+sockets = Dictionary[ExtResource("2_tu3ol"), ExtResource("3_52thn")]({
+SubResource("Resource_jpdw3"): SubResource("Resource_77rw7"),
+SubResource("Resource_bv002"): SubResource("Resource_77rw7"),
+SubResource("Resource_4nbmf"): SubResource("Resource_tw8p5"),
+SubResource("Resource_afif4"): SubResource("Resource_tw8p5")
+})
+panelstyle = Array[StyleBox]([SubResource("StyleBoxFlat_tu3ol"), SubResource("StyleBoxFlat_52thn")])
+panelrect = Array[Rect2]([Rect2(0.5, 0, -1.5, -1), Rect2(0, 0.5, -1, -1.5)])
+panels = Dictionary[int, int]({
+0: 1
+})
+metadata/_custom_type_script = "uid://dxbdnxmvfy5cw"
+
+[node name="rule_option" type="OptionButton" parent="." unique_id=263482967]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -24.0
+offset_top = -48.0
+offset_right = 45.0
+offset_bottom = -17.0
+grow_horizontal = 2
+grow_vertical = 2
+flat = true
+alignment = 2
+selected = 0
+item_count = 3
+popup/item_0/text = "ALL"
+popup/item_0/id = 0
+popup/item_1/text = "ANY"
+popup/item_1/id = 1
+popup/item_2/text = "ODD"
+popup/item_2/id = 2
+metadata/grid_bound = Vector2(1, 1)
+
+[node name="rule_invert" type="Label" parent="." unique_id=1787863043]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -24.0
+offset_top = -24.0
+offset_right = 45.0
+offset_bottom = -1.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "SOME"
+horizontal_alignment = 1
+vertical_alignment = 1
+metadata/grid_bound = Vector2(1, 2)
+
+[node name="buttons" type="HBoxContainer" parent="." unique_id=2086253710]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -24.0
+offset_top = 120.0
+offset_right = 12.0
+offset_bottom = 151.0
+grow_horizontal = 2
+metadata/grid_bound = Vector2(1, -3.5)
+metadata/hide_on_disable = true
+
+[node name="Rem" type="Button" parent="buttons" unique_id=59083439]
+layout_mode = 2
+text = "-"
+
+[node name="Add" type="Button" parent="buttons" unique_id=1483292271]
+layout_mode = 2
+text = "+
+"
+
+[connection signal="item_selected" from="rule_option" to="." method="_on_rule_option_item_selected"]

@@ -8,34 +8,45 @@ var pressed : bool
 var hover : bool
 var bitwidth : int
 
-@export var show_check : bool
+@export var show_check : bool : 
+	set(val):
+		show_check = val
+		emit_changed()
 var checked : bool
 
-func draw(_chart:Flowchart, canvas:Control, where:Vector2):
+func draw(chart:Flowchart, canvas:Control, where:Vector2):
 	var color = G.appearance.trace_primary if hover else G.appearance.trace_secondary
+	var hover_offset = Flowchart.VIA_HOLE if hover else 0
+	var radius = Flowchart.JOINT_RAD
+	if chart is Flowchart:
+		radius *= chart.zoom
 	match mode:
 		HIZ:
-			color = G.appearance.color.inverted()
-			canvas.draw_circle(where, Flowchart.JOINT_RAD, color)
+			var polyline := [
+				where + Vector2(0, -radius + hover_offset),
+				where + Vector2(radius + hover_offset, 0),
+				where + Vector2(0, radius + hover_offset),
+				where + Vector2(-radius + hover_offset, 0),
+			]
+			if checked and show_check:
+				polyline = Geometry2D.offset_polyline(polyline, radius - Flowchart.VIA_HOLE,Geometry2D.JOIN_SQUARE)
+				canvas.draw_polyline(polyline, color, Flowchart.VIA_HOLE)
+			else:
+				canvas.draw_colored_polygon(polyline, color)
 		SINK:
-			var wid = Flowchart.JOINT_RAD * 1.4142  # (Square-root of 2)
+			var wid = radius * 1.4142 + hover_offset  # (Square-root of 2)
+			color = Color.BLUE
 			canvas.draw_rect(Rect2(-Vector2(0.5, 0.5) * wid + where, Vector2.ONE * wid), color)
 		SOURCE:
-			var polyline := [
-				where + Vector2(0, -Flowchart.JOINT_RAD),
-				where + Vector2(Flowchart.JOINT_RAD, 0),
-				where + Vector2(0, Flowchart.JOINT_RAD),
-				where + Vector2(-Flowchart.JOINT_RAD, 0),
-			]
-			canvas.draw_colored_polygon(polyline, color)
+			var wid = radius * 1.4142  + hover_offset  # (Square-root of 2)
+			color = Color.ORANGE
+			if checked and show_check:
+				wid -= Flowchart.VIA_HOLE
+				canvas.draw_rect(Rect2(-Vector2(0.5, 0.5) * wid + where, Vector2.ONE * wid), color, false, Flowchart.VIA_HOLE)
+			else:
+				canvas.draw_rect(Rect2(-Vector2(0.5, 0.5) * wid + where, Vector2.ONE * wid), color)
 		BIDIR:
-			canvas.draw_circle(where, Flowchart.JOINT_RAD, color)
-	
-	#if show_check and checked:
-		#canvas.draw_circle(where, G.grid_size * 0.3, color)
-	#if pressed:
-		#canvas.draw_circle(where, G.grid_size * 0.3 , color, false, 3)
-	#elif hover:
-		#canvas.draw_circle(where, G.grid_size * 0.5, color, false, 3)
-	#else:
-		#canvas.draw_circle(where, G.grid_size * 0.33 , color, false, 3)
+			if checked and show_check:
+				canvas.draw_circle(where, radius - Flowchart.VIA_HOLE + hover_offset, color, false, Flowchart.VIA_HOLE)
+			else:
+				canvas.draw_circle(where, radius + hover_offset, color)

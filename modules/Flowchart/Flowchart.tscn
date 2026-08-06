@@ -18,6 +18,11 @@ script = ExtResource("2_3gi3x")
 resource_name = "FlowchartInputFSM"
 script/source = "extends Node
 
+## A Rudimentary Finite State Machine which makes interpreting user input for the
+## Flowchart simpler.
+
+#FIXME Drag Wiring from and to a Gizmo is borked.
+
 var mode : StringName = \"idle\"
 @onready var modes := {
 	\"idle\":IdleMode.new(get_parent(), get_parent().get_node(\"Network\"), set_mode),
@@ -54,6 +59,8 @@ class InputMode:
 		return me.to_canvas_coord(me.get_local_mouse_position())
 	func screen_mouse() -> Vector2:
 		return me.get_local_mouse_position()
+	func global_screen_mouse() -> Vector2:
+		return me.get_global_mouse_position()
 	
 	func joint_canvas_coord(joint:NetBase.Joint) -> Vector2i:
 		var coord = joint.coord
@@ -61,7 +68,7 @@ class InputMode:
 		if gizmo == null:
 			return coord
 		else:
-			return gizmo.get_socket_true_coord(coord) + Flowchart.to_grid(gizmo.position)
+			return gizmo.canvas_socket_coord(joint)
 	
 	func joint_canvas_position(joint:NetBase.Joint) -> Vector2:
 		return Flowchart.from_grid(joint_canvas_coord(joint))
@@ -76,6 +83,7 @@ class InputMode:
 		for via in me.parti.joint.find_objects_simple(me._view_rect):
 			conns.append_array(net.netlist.get_links(via, true, false))
 		for gizmo in me.parti.node.find_objects(me._view_rect):
+			if gizmo.get(\"sockets\") == null: continue
 			for sock in gizmo.sockets:
 				conns.append_array(net.netlist.get_links(sock, true, false))
 		for link in conns:
@@ -161,10 +169,9 @@ class IdleMode extends InputMode:
 			MOUSE_BUTTON_RIGHT:
 				if me.sel_vert == null and me.sel_wire.is_empty():
 					# Show Cnavas Popup
-					me.add_gizmo(\"bogus\", canvas_mouse())
-					#me.get_node(\"Canvas_Menu\").popup(Rect2(screen_mouse(), Vector2.ZERO))
+					me.get_node(\"Canvas_Menu\").popup(Rect2(global_screen_mouse(), Vector2.ZERO))
 				elif ctrl:
-					# Alternate thing
+					# Alternate thing, maybe a popup menu.
 					pass
 				elif me.wiring_allowed:
 					# Wire things
@@ -176,7 +183,7 @@ class IdleMode extends InputMode:
 					elif not me.sel_vert == null:
 						switch.call(\"wire_create\")
 		
-		
+	func mouse_gui_release(button:MouseButton, _shift:bool, _ctrl:bool):
 		# Lasso Selection
 		if button == MOUSE_BUTTON_LEFT:
 			if me.lasso_allowed and me.lasso_canvas_rect.size > Flowchart.MINIMUM_LASSO:
@@ -320,7 +327,7 @@ chirality = 1
 [node name="Input" type="Node" parent="." unique_id=514495943]
 script = SubResource("GDScript_x8yhq")
 
-[node name="Network" type="Node" parent="." unique_id=1505388720]
+[node name="Network" type="Node" parent="." unique_id=910098981]
 script = ExtResource("3_3gi3x")
 metadata/_custom_type_script = "uid://ctv2i7rdaj44r"
 
@@ -361,19 +368,13 @@ text = "Go To Center"
 [node name="Canvas_Menu" type="PopupMenu" parent="." unique_id=897390472]
 oversampling_override = 1.0
 size = Vector2i(159, 251)
-item_count = 6
+item_count = 3
 item_0/text = "Info Panel"
 item_0/id = 0
-item_1/text = "Ammeter"
-item_1/id = 1
-item_2/text = "Voltmeter"
-item_2/id = 2
-item_3/text = "Cabling"
-item_3/id = 3
-item_4/text = "Diode"
-item_4/id = 4
-item_5/text = "Tri-State Buffer"
-item_5/id = 5
+item_1/text = "Bundle"
+item_1/id = 3
+item_2/text = "Gate"
+item_2/id = 4
 
 [node name="Via_Menu" type="PopupMenu" parent="." unique_id=466468682]
 oversampling_override = 1.0

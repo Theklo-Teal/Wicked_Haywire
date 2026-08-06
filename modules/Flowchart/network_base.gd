@@ -33,42 +33,90 @@ func _cycle_finish():
 @warning_ignore_restore("unused_parameter")
 #endregion
 
+#region Index Port and Link Classes.
+var port_classes : Dictionary[StringName, Script]
+var link_classes : Dictionary[StringName, Script]
+
+func _init() -> void:
+	@warning_ignore("static_called_on_instance")
+	for each in G.list_classes(true, true):
+		if each.base == "Port":
+			port_classes[each.name] = each.value
+		elif each.base == "Link":
+			link_classes[each.name] = each.value
+
+func port_new(port_name:StringName) -> Port:
+	var port = port_classes[port_name].new()
+	if get_parent() is Flowchart:
+		get_parent().sim_update_finish.connect(port.integrate, CONNECT_PERSIST)
+	return port
+func link_new(link_name:StringName) -> Port:
+	return link_classes[link_name].new()
+#endregion
+
 class Port:
 	## Target for signals being conveyed during simulation using an Observer Pattern.
 	
-	#var joints : Array[Joint]  ## Subscribed joints that will read and write this port.
-	var value
-	var aggregate : Array
+	var value  ## Current value in the link for reading by sockets.
+	var aggregate : Array  ## Append written values during simulation update to then integrate to final decision.
 	
 	static func get_base_class() -> StringName:
 		return &"Port"
 	
-	## If the port has no values feeding in, what should it be read as?
-	static func default():
+	## If the port has no values feeding in, what should it be read as?[br]
+	## Override [code]_init()[/code] do define an initial value.
+	static func default_value() -> Variant:
 		return 0
+	static func default_link() -> StringName:
+		return &"Link"
+	
 	func integrate():
+		_integrate()
+		aggregate.clear()
+	func _integrate():
+		if aggregate.size() == 0: return
 		value = roundi(aggregate.reduce(func(sum, a):return sum + a, 0) / aggregate.size())
-	func read():
+	
+	func write_none(data):
+		return data
+	func read_none():
 		return value
-	func write(val):
+	
+	## Input data for the next state of the link. It returns an error code, if data isn't accepted.[br]
+	## Optionally, a write [code]filter[/code] of a Port class can be chosen, which transforms the format of the data before storing. An error is return if the requested filter doesn't exist.
+	func write(val, filter:String="none") -> Error:
+		if not has_method("write_" + filter):
+			return Error.ERR_DOES_NOT_EXIST
+		val = call("write_"+filter, val)
 		aggregate.append(val)
-
-class BogusPort extends Port:
-	func _init():
-		value = 123
+		return Error.OK
+	
+	## Get current data of the link. Optionally, a read [code]filter[/code] in the Port class may be chosen, which transforms the data that is stored. If the filter doesn't exist, this returns [code]null[/code].
+	func read(filter:String="none"):
+		if not has_method("read_" + filter):
+			return null
+		return call("read_" + filter)
 
 
 @abstract class NetVert extends Resource:
 	## Anything that can be connected in a network, like joints
 	## and wires.
 	
+	@export_group("Porting")
 	var port : Port  ## Network Port this Vert is subscribed
+	@export var port_class : StringName = "Port"  ## What kind of link is preferred if there's none when connecting this socket? It defines what format, protocol, and variable type the read and write values are.
+	@export var accepted_port : Array[StringName] = ["Port"]  ## When connecting to another socket, we assume we can connect to it, but something in our [code]refuse_link[/code] is its [code]link_class[/code] we refuse to connect. Adding it to this array, allows an exception to accept connection.
+	@export var refuse_port : Array[StringName]  ## When connecting to another socket, we assume we can connect to it, except if something in our [code]refuse_link[/code] is its [code]link_class[/code], so we refuse to connect. Unless, its [code]link_class[/code] is also in [code]accept_link[/code], so we excpetionally allow connection.
+	@export_group("")
 	@export_storage var layer : int
-	@export_storage var coord : Vector2i : 
+	@export var coord : Vector2i : 
 		set(val):
 			coord = val
 			position = Flowchart.from_grid(val)
-	@export_storage var position : Vector2  ## This allows the socket to be found by spatial partitioning.
+			emit_changed()
+	@export_storage var position : Vector2 :  ## This allows the socket to be found by spatial partitioning.
+		set(val):
+			position = val
 	
 	## Returns both grid coordinate and layer as the same data type.
 	func get_cell() -> Vector3i:
@@ -116,28 +164,41 @@ class Joint extends NetVert:
 	func draw(chart:Flowchart, canvas:Control, where:Vector2):
 		var color = G.appearance.color.inverted()
 		color.a = 0.4
-		canvas.draw_circle(where, Flowchart.JOINT_RAD, color)
+		canvas.draw_circle(where, Flowchart.JOINT_RAD * chart.zoom, color)
 
 class Socket extends Joint:
+	signal has_read(val)  ## This socket was used to read a Port. The value is after any Port filtering.
+	signal has_written(val)  ## This socket was used to write a Port. The value is after any Port filtering.
+	
 	enum {
 	HIZ,  ## Electrically isolated socket
 	SINK,  ## This socket reads a value
 	SOURCE,  ## This socket writes a value
 	BIDIR  ## This socket can relay a value
 	}
-	@export_enum("Hi-Z", "Sink", "Source", "Bidir") var mode : int
-	@export_group("Porting")
-	@export var port_class : StringName = "Port"  ## What kind of link is preferred if there's none when connecting this socket? It defines what format, protocol, and variable type the read and write values are.
-	@export var accepted_port : Array[StringName] = ["Port"]  ## When connecting to another socket, we assume we can connect to it, but something in our [code]refuse_link[/code] is its [code]link_class[/code] we refuse to connect. Adding it to this array, allows an exception to accept connection.
-	@export var refuse_port : Array[StringName]  ## When connecting to another socket, we assume we can connect to it, except if something in our [code]refuse_link[/code] is its [code]link_class[/code], so we refuse to connect. Unless, its [code]link_class[/code] is also in [code]accept_link[/code], so we excpetionally allow connection.
-
-	## This socket was used to read a Port.
+	@export_enum("Hi-Z", "Sink", "Source", "Bidir") var mode : int : 
+		set(val):
+			mode = val
+			emit_changed()
+	
+	func read(filter:="none") -> Variant:
+		var val = port.call("read_"+filter, port.val)
+		_read(val)
+		has_read.emit(val)
+		return val
+	func write(val, filter:="none") -> Error:
+		val = port.call("write_"+filter, val)
+		_write(val)
+		has_written.emit(val)
+		return port.write(val)
+	
+	## This socket was used to read a Port. The value is after any Port filtering.
 	@warning_ignore("unused_parameter")
-	func has_read(val):
+	func _read(val):
 		pass
-	## This socket was used to write a Port.
+	## This socket was used to write a Port. The value is after any Port filtering.
 	@warning_ignore("unused_parameter")
-	func has_written(val):
+	func _write(val):
 		pass
 
 
@@ -147,6 +208,9 @@ class Link extends Resource:
 	@export_storage var pair_hash : int
 	@export_storage var chirality : bool  ## "true" means the wire runs clockwise around the corners of an imaginary rectangle.
 	@export_storage var bend : float  ## Defines the distance of the diagonal cutting the corner.
+	
+	static func get_base_class() -> StringName:
+		return &"Link"
 	
 	#region Constructors
 	static func from_chi(clockwise:bool) -> Link:
@@ -161,19 +225,24 @@ class Link extends Resource:
 	#endregion
 	
 	#region Drawing
+	func wire_thick(chart:Flowchart) -> int:
+		return clamp(_wire_thick(), 1, Flowchart.MAX_WIRE) * chart.zoom
+	static func _wire_thick() -> int:
+		return 12
+	
 	func draw(chart:Flowchart, canvas:Control, start:Vector2, stop:Vector2):
 		var color = chart.trace_color_secondary
 		if chart.sel_wire.get("wire", null) == self: 
 			color = chart.trace_color_primary
-		canvas.draw_polyline(get_verts(start, stop), color, Flowchart.MAX_WIRE)
+		canvas.draw_polyline(get_verts(start, stop), color, wire_thick(chart))
 	
-	static func draw_chiral(canvas:Control, start:Vector2, stop:Vector2, clockwise:bool, bending:float, color:=Color.WHITE):
+	static func draw_chiral(canvas:Control, start:Vector2, stop:Vector2, clockwise:bool, wire_thickness:int, bending:float, color:=Color.WHITE):
 		var middle = find_bend_chi(start, stop, clockwise)
-		canvas.draw_polyline(get_verts_from(start, middle, stop, bending), color, Flowchart.MAX_WIRE)
+		canvas.draw_polyline(get_verts_from(start, middle, stop, bending), color, wire_thickness)
 	
-	static func draw_length(canvas:Control, start:Vector2, stop:Vector2, longest:bool, bending:float, color:=Color.WHITE):
+	static func draw_length(canvas:Control, start:Vector2, stop:Vector2, longest:bool, wire_thickness:int, bending:float, color:=Color.WHITE):
 		var middle = find_bend_len(start, stop, longest)
-		canvas.draw_polyline(get_verts_from(start, middle, stop, bending), color, Flowchart.MAX_WIRE)
+		canvas.draw_polyline(get_verts_from(start, middle, stop, bending), color, wire_thickness)
 	#endregion
 	
 	## Set handiness of the wire, given whether we want the first segment to be the longest.

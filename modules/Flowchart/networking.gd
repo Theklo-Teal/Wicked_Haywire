@@ -14,71 +14,52 @@ class_name FlowchartNetwork
 		netlist = val
 		rebuild_network()
 
-var port_classes : Dictionary[StringName, Script]
-var ports : Array[Port]  ## Known Ports
 #var changed : Array[NetVert]  ## Joints that have connections changed.
 
 func _init() -> void:
+	super()
 	if netlist == null:
 		netlist = NetData.new()
-	
-	@warning_ignore("static_called_on_instance")
-	for each in G.list_classes(true, true):
-		if each.base == "Port":
-			port_classes[each.name] = each.value
 
-func port_new(port_name:StringName) -> Port:
-	return port_classes[port_name].new()
+## Propagate a new port from the given verts throughout their whole graphs. Optionally use
+## A given common port instead.
+func update_ports(port:Port=null, ...vertices):
+	var verts : Array[NetVert]
+	verts.assign(vertices)
+	for each in verts:
+		each.port = port if port != null else port_new(each.port_class)
+	var crawl = Crawler.new(netlist, verts)
+	while not crawl.breadth_traverse().is_empty():
+		for each : NetVert in crawl.iter_finds:
+			each.port = port if port != null else crawl.root[each].port
 
 ## Search the whole [code]netlist[/code] to figure out [code]ports[/code].
 func rebuild_network():
 	print("Rebuilding Network")
-	
-	var crawl = Crawler.new(netlist, netlist.sockets.keys())
-	while not crawl.breadth_traverse(Callable(), func(_curr, next): return next is FlowchartGizmo).is_empty():
-		continue
-	var accounted : Dictionary
-	for each : NetVert in crawl.finds:
-		if each is GizmoSocket:
-			if not crawl.root[each] in accounted:
-				var port = port_classes[each.port_class]
-				accounted[crawl.root[each]] = port.new()
-				ports.append(port)
-		#accounted[crawl.root[each]].joints.append(each)
-		each.port = accounted[crawl.root[each]]
+	update_ports.callv([null] + netlist.sockets.keys())
 
 
 #region Simulation Stuff
+signal sim_update_done
 
-var regenerate : bool
-func cycle_begin():
-	if regenerate:
-		# Clean up the Ports list.
-		regenerate = false
-		var new_ports : Array[Port]
-		for port : Port in ports:
-			if port.get_reference_count() > 1:
-				# There are more things referencing this port than just in the
-				# ports array, so they are still in use.
-				new_ports.append(port)
-		ports = new_ports
-
-func cycle_update():
+func sim_cycle_begin():
+	pass
+func sim_cycle_update():
 	for layer in netlist.gizmos:
-		for g in netlist.gizmos[layer]:
-			g.update_cycle()
-
-func cycle_finish():
-	for port in ports:
-		port.integrate()
+		for gizmo : FlowchartPanel in netlist.gizmos[layer]:
+			gizmo.sim_update(self)
+			await gizmo.sim_update_done
+	sim_update_done.emit()
+func sim_cycle_finish():
+	pass
 #endregion
-
 
 #region Graph Editing Stuff
 
-func register_gizmo(gizmo:FlowchartGizmo, layer:int):
+func register_gizmo(gizmo:FlowchartPanel, layer:int):
 	netlist.gizmos.get_or_add(layer, []).append(gizmo)
 	gizmo.layer = layer
+	if gizmo.get("sockets") == null: return
 	for coord in gizmo._sockdex:
 		var socket = gizmo._sockdex[coord]
 		socket.port = port_new(socket.port_class)
@@ -86,7 +67,7 @@ func register_gizmo(gizmo:FlowchartGizmo, layer:int):
 		netlist.sockets[socket as NetVert] = gizmo
 
 #TODO Remove Gizmo, unregistering its sockets
-func unregister_gizmo(gizmo:FlowchartGizmo, layer:int):
+func unregister_gizmo(gizmo:FlowchartPanel, layer:int):
 	netlist.gizmos[layer].erase(gizmo)
 	if netlist.gizmos[layer].is_empty(): netlist.gizmos.erase(layer)
 	for socket in gizmo.sockets:
@@ -104,20 +85,6 @@ func get_or_add_vert(where:Vector2, layer:int, added_vert:NetVert) -> NetVert:
 	#NOTE: Via are only connected by tunnel when they are wired to something. 
 	# So we don't get their tunnel name at registering.
 
-func rem_vert(vert:NetVert):
-	var vert_id = hash(vert)
-	netlist.verts.erase(vert_id)
-	
-	for link in netlist.get_links(vert):
-		netlist.pairs.erase(link)
-		netlist.links.erase(link)
-	
-	if vert is GizmoSocket:
-		netlist.sockets.erase(vert)
-	else:
-		netlist.vias.erase(Vector3i(vert.coord.x, vert.coord.y, vert.layer))
-		
-
 func move_vert(vert:NetVert, where:Vector2) -> Error:
 	if vert is GizmoSocket: return ERR_INVALID_PARAMETER
 	var cell_from = Vector3i(vert.coord.x, vert.coord.y, vert.layer)
@@ -130,21 +97,26 @@ func move_vert(vert:NetVert, where:Vector2) -> Error:
 	netlist.vias[cell_to] = vert
 	return OK
 
+func rem_vert(vert:NetVert):
+	var vert_id = hash(vert)
+	
+	for link in netlist.get_links(vert):
+		var other = netlist.verts[link ^ vert_id]
+		other.disconnected(vert)
+		netlist.pairs.erase(link)
+		netlist.links.erase(link)
+	
+	netlist.verts.erase(vert_id)
+	if vert is GizmoSocket:
+		netlist.sockets.erase(vert)
+	else:
+		netlist.vias.erase(Vector3i(vert.coord.x, vert.coord.y, vert.layer))
+
 func linking(v1: NetVert, v2: NetVert) -> Link:
-	if v1.port == null: 
-		v1.port = v2.port
-		# Propagate port of v2 to all Verts connected to v1
-		var crawl = Crawler.new(netlist, [v1])
-		while not crawl.breadth_traverse().is_empty():
-			for each : NetVert in crawl.iter_finds:
-				each.port = v2.port
+	if v1.port == null:
+		update_ports(v2.port, v1)
 	elif v2.port != v1.port:
-		v2.port = v1.port
-		# Propagate port of v1 to all Verts connected to v2
-		var crawl = Crawler.new(netlist, [v2])
-		while not crawl.breadth_traverse().is_empty():
-			for each : NetVert in crawl.iter_finds:
-				each.port = v1.port
+		update_ports(v1.port, v2)
 	
 	var pair = make_pair_hash(v1, v2)
 	netlist.pairs[pair] = [v1, v2]
@@ -163,5 +135,6 @@ func unlink_hash(pair_hash:int):
 	netlist.pairs.erase(pair_hash)
 	conns[0].disconnected(conns[1])
 	conns[1].disconnected(conns[0])
+	update_ports(null, conns[1])
 
 #endregion

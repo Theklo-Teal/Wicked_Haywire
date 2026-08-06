@@ -23,9 +23,9 @@ class_name Flowchart
 ## The ChartSockets can extended to use different Link types, thus deciding
 ## What kind of wire they produce and which other sockets they are allowed to
 ## connect to.[br]
-## Finally, graph nodes, or class FlowchartGizmo derivations contain Sockets as
+## Finally, graph nodes, or class FlowchartPanel derivations contain Sockets as
 ## child nodes that automatically position to respect a snapping grid. Just don't
-## forget to register them in the [code]FlowchartGizmo.sockets[/code] dictionary.[br]
+## forget to register them in the [code]FlowchartPanel.sockets[/code] dictionary.[br]
 ## You are meant to be at the root of a scene and extended to define the behavior
 ## of their sockets. The can read or write to Links during the update part of the
 ## simulation cycle. The typical idea is to read from ChartSocketSink nodes, transform the
@@ -67,18 +67,19 @@ func _on_appearance_changed():
 
 #region Grid Snapping
 
-const SNAP = 12  ## Size of grid SNAPping cells. The snap grid is based on a rhombus. Refer to [code]Flowchart.to_grid()[/code] for more information.
-const VIA_HOLE = 4  ## Radius of the holes in joints.
-const MAX_WIRE = 8  ## Maximum thickness of a wire.
+const SNAP = 24  ## Size of grid SNAPping cells. The snap grid is based on a rhombus. Refer to [code]Flowchart.to_grid()[/code] for more information.
+const VIA_HOLE = 5  ## Radius of the holes in joints.
+const MAX_WIRE = 20  ## Maximum thickness of a wire.
 const CLEARANCE = 2  ## Minimum distance between conductors.
-const JOINT_RAD = 6
-static func snap_grid(pos:Vector2) -> Vector2:
-	return pos.snappedf(SNAP)
+const JOINT_RAD = 12
+static func snap_grid(pos:Vector2, centered:=false) -> Vector2:
+	return pos.snappedf(SNAP) + (Vector2(0.5, 0.5) * SNAP if centered else Vector2.ZERO)
 ## Returns the actual space position snapped to the grid from a grid coordinate.
-static func from_grid(coord:Vector2i) -> Vector2:
-	return Vector2(coord) * SNAP
+static func from_grid(coord:Vector2i, centered:=false) -> Vector2:
+	return Vector2(coord) * SNAP + (Vector2(0.5, 0.5) * SNAP if centered else Vector2.ZERO)
 ## Returns [code]coord[/code] on the grid.
-static func to_grid(pos:Vector2) -> Vector2i:
+static func to_grid(pos:Vector2, centered:=false) -> Vector2i:
+	pos -= Vector2(0.5, 0.5) * SNAP if centered else Vector2.ZERO
 	var coord := Vector2i(  ## Find cell coordinate in the grid
 		roundi(inverse_lerp(0, SNAP, pos.x)),
 		roundi(inverse_lerp(0, SNAP, pos.y))
@@ -108,7 +109,7 @@ enum Mode{
 var mode : Mode : 
 	set(val):
 		mode = val
-		for gizmo : FlowchartGizmo in $Network.netlist.gizmos.get(layer, []):
+		for gizmo : FlowchartPanel in $Network.netlist.gizmos.get(layer, []):
 			gizmo._on_flowchart_mode_changed(mode)
 
 func _ready() -> void:
@@ -116,9 +117,10 @@ func _ready() -> void:
 	if OS.has_feature("editor_hint"): return
 	
 	G.chart = self
-	for gizmo_file in DirAccess.get_files_at("res://gizmos/"):
-		if not gizmo_file.get_extension() in ["gd", "tscn"]: continue
-		gizmo_pallet[gizmo_file.get_basename()] = load("res://gizmos/" + gizmo_file)
+	
+	# Special devices that don't appear in the Toybox.
+	gizmo_pallet["_info_panel"] = load("uid://biwbp7mhl3co")
+	gizmo_pallet["_buffer_gate"] = load("uid://ddbqln6sbtevv")
 	
 	%zoom.pressed.connect(_on_zoom_pressed)
 	%origin.pressed.connect(_on_origin_pressed)
@@ -127,6 +129,12 @@ func _ready() -> void:
 	$Canvas_Menu.index_pressed.connect(_on_popup_pressed)
 	
 	$Input.now().enter()
+
+func get_netlist() -> FlowchartNetwork.NetData:
+	return $Network.netlist
+
+func set_netlist(netdata:FlowchartNetwork.NetData):
+	$Network.netlist = netdata
 #endregion
 
 #region Drawing
@@ -150,10 +158,11 @@ func draw_fore_geometry(canvas:Control, viewed_canvas_rect:Rect2):
 	if OS.has_feature("editor_hint"): return
 	
 	# Drawing Gizmo sockets
-	for gizmo : FlowchartGizmo in parti.node.find_objects_simple(viewed_canvas_rect):
+	for gizmo : FlowchartPanel in parti.node.find_objects_simple(viewed_canvas_rect):
+		if gizmo.get("sockets") == null: continue
 		for coord in gizmo._sockdex:
 			var socket = gizmo._sockdex[coord]
-			var where = gizmo.get_socket_canvas_position(socket)
+			var where = gizmo.canvas_socket_position(socket)
 			socket.draw(self, canvas, to_screen_coord(where))
 			for link in $Network.netlist.get_links(socket, true, false):
 				_visible_links.append(link)
@@ -163,8 +172,8 @@ func draw_fore_geometry(canvas:Control, viewed_canvas_rect:Rect2):
 		var wire : NetBase.Link = $Network.netlist.links[link]
 		var pair : Array[NetBase.NetVert]
 		pair.assign($Network.netlist.pairs[link])
-		var pos1 = $Network.netlist.sockets.get(pair[0]).get_socket_canvas_position(pair[0]) if pair[0] in $Network.netlist.sockets else from_grid(pair[0].coord)
-		var pos2 = $Network.netlist.sockets.get(pair[1]).get_socket_canvas_position(pair[1]) if pair[1] in $Network.netlist.sockets else from_grid(pair[1].coord)
+		var pos1 = $Network.netlist.sockets.get(pair[0]).canvas_socket_position(pair[0]) if pair[0] in $Network.netlist.sockets else from_grid(pair[0].coord)
+		var pos2 = $Network.netlist.sockets.get(pair[1]).canvas_socket_position(pair[1]) if pair[1] in $Network.netlist.sockets else from_grid(pair[1].coord)
 		wire.draw(self, canvas, to_screen_coord(pos1), to_screen_coord(pos2))
 	
 	
@@ -176,13 +185,17 @@ func draw_overlay(canvas:Control, _viewed_canvas_rect:Rect2):
 	
 	# Draw wire being pulled.
 	if $Input.at("wire_create") or $Input.at("wire_split") and not wire_from.is_empty():
-		NetBase.Link.draw_length(canvas, to_screen_coord(wire_from.canvas_position), get_local_mouse_position(), Input.is_key_pressed(KEY_SHIFT), SNAP, trace_color_highlight)
+		var wire_type = $Network.link_classes[wire_from.netvert.port.default_link()]
+		var thickness = wire_type._wire_thick()
+		thickness = clamp(thickness, 1, MAX_WIRE) * zoom
+		NetBase.Link.draw_length(canvas, to_screen_coord(wire_from.canvas_position), get_local_mouse_position(), Input.is_key_pressed(KEY_SHIFT), thickness, SNAP, trace_color_highlight)
 	
 	# Highlight grid cell under mouse.
-	var where = to_screen_coord(snap_grid(to_canvas_coord(get_local_mouse_position())) + Vector2(0.5, 0.5) * SNAP)
+	var where = to_canvas_coord(get_local_mouse_position(), -Vector2(0.5, 0.5) * SNAP)
+	where = to_screen_coord( snap_grid(where, true ))
 	var clr = G.appearance.color.inverted()
 	clr.a = 0.4
-	canvas.draw_circle(where, JOINT_RAD, clr)
+	canvas.draw_circle(where, JOINT_RAD * zoom, clr)
 
 #endregion
 
@@ -218,7 +231,7 @@ func _input(event: InputEvent) -> void:
 				sel_wire.clear()
 			else:
 				for each in _selected:
-					if each is FlowchartGizmo:
+					if each is FlowchartPanel:
 						rem_gizmo(each)
 					if each is FlowchartVia:
 						rem_via(each)
@@ -270,7 +283,7 @@ func selected_obj_movement_stop():
 	# Ensure the Dictionary doesn't just keep growing.
 	past_via_coord.clear()
 func obj_movement_modulate(object, new_position:Vector2) -> Vector2:
-	if object is FlowchartGizmo:
+	if object is FlowchartPanel:
 		return snap_grid(new_position)
 	return snap_grid(new_position)
 
@@ -303,22 +316,17 @@ func _on_origin_pressed():
 #region Add or Remove objects
 
 func _on_popup_pressed(idx:int):
-	match $PopupMenu.get_item_text(idx):
+	match $Canvas_Menu.get_item_text(idx):
 		"Info Panel":
-			var node = load("res://modules/Flowchart/Gizmos/info_panel.tscn").instantiate()
-			add_gizmo(node, to_canvas_coord(fin_mouse))
-		"Ammeter":
-			pass
-		"Voltmeter":
-			pass
+			add_gizmo("_info_panel", to_canvas_coord(fin_mouse))
 		"Bundle":
-			pass
+			add_gizmo("_bundle", to_canvas_coord(fin_mouse))
 		"Gate":
-			pass
+			add_gizmo("_buffer_gate", to_canvas_coord(fin_mouse))
 
 
 #region Gizmos
-func add_gizmo(res:String, where:=Vector2.ZERO) -> FlowchartGizmo:
+func add_gizmo(res:String, where:=Vector2.ZERO) -> FlowchartPanel:
 	var gizmo = gizmo_pallet.get(res)
 	if gizmo is Script:
 		gizmo = gizmo.new()
@@ -330,7 +338,7 @@ func add_gizmo(res:String, where:=Vector2.ZERO) -> FlowchartGizmo:
 	gizmo._on_flowchart_mode_changed(mode)
 	return gizmo
 
-func rem_gizmo(gizmo:FlowchartGizmo):
+func rem_gizmo(gizmo:FlowchartPanel):
 	queue_redraw()
 	$Network.unregister_gizmo(gizmo, layer)
 	remove_object(gizmo)
@@ -382,7 +390,7 @@ signal sim_update_finish
 signal sim_cycle_finish
 
 var in_a_cycle : bool = false
-var skip_cycle : bool = false
+var skip_cycle : bool = true
 var sim_paused : bool = false
 var tick_elapse : float = 0
 var process_elapse : float = 0
@@ -396,36 +404,23 @@ func reset_sim():
 	for link in $Network.the_links:
 		$Network.the_links[link] = link.default
 
-var gizmos : Array[FlowchartGizmo]
 func _on_sim_update():
 	var begin_time := Time.get_ticks_usec()
-	in_a_cycle = true
-	sim_cycle_started.emit()
-	
-	gizmos.clear()
-	for lay in $Network.netlist.gizmos:
-		gizmos.append_array($Network.netlist.gizmos[lay])
-	
-	$Network.cycle_begin()
-	
-	if not (skip_cycle or sim_paused):
-		for port in $Network.ports:
-			for vert in port.verts:
-				vert.cycle_begin(port)
+	if not skip_cycle:
+		in_a_cycle = true
+		sim_cycle_started.emit()
 		
-		sim_update_started.emit()
-		for port in $Network.ports:
-			for vert in port.verts:
-				vert.cycle_update(port)
-		sim_update_finish.emit()
-	
-		for port in $Network.ports:
-			for vert in port.verts:
-				vert.cycle_finish(port)
-	
-	$Network.cycle_finish()
-	
-	sim_cycle_finish.emit()
+		$Network.sim_cycle_begin()
+		
+		if not sim_paused:
+			sim_update_started.emit()
+			$Network.sim_cycle_update()
+			await $Network.sim_update_done
+			sim_update_finish.emit()
+		
+		$Network.sim_cycle_finish()
+		
+		sim_cycle_finish.emit()
 	in_a_cycle = false
 	skip_cycle = false
 	tick_elapse = (Time.get_ticks_usec() - begin_time) / 1_000_000.0  # microseconds it took for all nodes to be done.

@@ -12,7 +12,7 @@ func draw(chart:Flowchart, canvas:Control, where:Vector2):
 	var color = G.appearance.trace_secondary
 	if chart.sel_vert == self or self in chart._selected:
 		color = G.appearance.trace_primary
-	canvas.draw_circle(where, Flowchart.JOINT_RAD, color, false, 4)
+	canvas.draw_circle(where, Flowchart.JOINT_RAD * 0.5 * chart.zoom, color, false, Flowchart.JOINT_RAD * 0.3)
 
 func _canvas_repositioning(data:Dictionary):
 	coord = Flowchart.to_grid(data.position)

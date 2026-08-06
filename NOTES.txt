@@ -4,13 +4,42 @@ Device panel design:
 https://en.wikipedia.org/wiki/Neumorphism
 
 Gizmo ideas:
-	Info Panel/Note - point to a joint and show text
-	Ammeter - Count Gizmos between two joints.
-	Diode - Acts as HiZ in one direction, but allow signals in the other
-	Hi-Z Switch - Disable pin sets connections to Hi-Z
-	Gate - Combines Diode, Hi-Z Switch and can also be a buffer
-	Monostable - A pulse flips output, which then returns after a set time.
-	Bus Match - Compares input with given value, outputting high if they are equal.
+	Misc:
+		_Info Panel/Note - point to a joint and show text
+		_Ammeter - Count Gizmos between two joints.
+		_Bundle - Taps bits from a bus into separate lines.
+		Constant - A binary number that doesn't change. Can also be set to produce pull-up/pull-down effect.
+		Gate - Combines Diode, Hi-Z Buffer and can also be a NOT gate
+		Relay - Switches between two network ports depending on a control signal.
+		Monostable - A pulse flips output, which then returns after a set time.
+		Heartbeat - A synchronization clock.
+	Combinational:
+		Bus Match - Compares input with given value, outputting high if they are equal.
+		Bit Counter - Counts how many bits in a value are High or LowBit Counter - Counts how many bits in a value are High or Low
+		Condition Check - A logic gate; All/Some, Any/None, Odd/Even
+		Multiplexer - Selects one from many inputs to the output.
+		Demultiplexer - Selects one of many outputs to relay the input.
+		Bit Selector - A multiplexer that outputs a bit from a bus value, selected by another value.
+		Codec - Converts one value into another according to some rule, like binary number into 7 segment pattern or a rotation shift.
+	Sequential:
+		Register/Bistable - Stores data; Latch (transparent input), Toggle (Flip-Flop), Implier (J-K Flip-Flop)
+		Shifter - Moves bits along a chain of registers. Can be a FIFO memory if bitwidth is larger than 1.
+		Counter - A Register which can change its state internal with an update signal.
+	Automata:
+		ROM - The user can write data in that persist, or take it from a file. Can only be read.
+		RAM - The user can write data in to start as a default, but can be written along with writing.
+		Turing - As in "Turing Machine", a microcontroller or central processor; can have a script written to it to manage inputs and outputs.
+		Teletype - A text line that can be written to, producing output signals and displays text according to inputs.
+	Input:
+		Push Button - Can also be toggled. Can be stacked to act like a DIP Switch.
+		Slider - Outputs a binary number according to position on a scale.
+		Key - Select a Keyboard key to respond to, producing a signal.
+		Joystick - A circle that can be dragged to produce an X value and a Y value on different outputs.
+	Output:
+		LED - a single bulb that lights up if input is high. Can be stacked to make a bargraph. A bitwidth can make them addressable.
+		Segmented Display - LEDs arranged in a particular way that light up in a certain pattern according to the code in a bus.
+		Matrix Display - LEDs arranged in 2D plane.
+		Speaker - Plays a sound.
 
 Cabling/Bundle/Combiner/Splitter Is implemented as a Via connected to a bus and relays to other wires
 certain bits specified in options. Effectively wire taps.
