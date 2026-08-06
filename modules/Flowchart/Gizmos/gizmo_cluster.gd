@@ -14,7 +14,7 @@ class_name Cluster
 	set(val):
 		spread = val
 		emit_changed()
-@export var perpendicular : bool : 
+@export var perpendicular : bool :  ## Rotate coordinates 90 degrees?
 	set(val):
 		perpendicular = val
 		emit_changed()

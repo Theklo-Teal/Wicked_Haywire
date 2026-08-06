@@ -13,13 +13,13 @@ accepted_port = Array[StringName]([&"Port"])
 refuse_port = Array[StringName]([])
 layer = 0
 coord = Vector2i(0, 0)
-position = Vector2(108, 108)
+position = Vector2(108, 12)
 metadata/_custom_type_script = "uid://ddaiqnfpchm0j"
 
 [sub_resource type="Resource" id="Resource_77rw7"]
 script = ExtResource("3_52thn")
-coord = Vector2i(-1, -3)
-limit = Vector2i(2, 6)
+coord = Vector2i(-1, 0)
+limit = Vector2i(2, 4)
 metadata/_custom_type_script = "uid://dixllb5r68rvk"
 
 [sub_resource type="Resource" id="Resource_bv002"]
@@ -31,23 +31,25 @@ accepted_port = Array[StringName]([&"Port"])
 refuse_port = Array[StringName]([])
 layer = 0
 coord = Vector2i(0, 2)
-position = Vector2(108, 156)
+position = Vector2(108, 60)
 metadata/_custom_type_script = "uid://ddaiqnfpchm0j"
 
 [sub_resource type="Resource" id="Resource_4nbmf"]
 resource_local_to_scene = true
 script = ExtResource("2_tu3ol")
-mode = 1
+mode = 0
 port_class = &"Port"
 accepted_port = Array[StringName]([&"Port"])
 refuse_port = Array[StringName]([])
 layer = 0
 coord = Vector2i(0, 0)
-position = Vector2(12, 12)
+position = Vector2(12, 108)
 metadata/_custom_type_script = "uid://ddaiqnfpchm0j"
 
 [sub_resource type="Resource" id="Resource_tw8p5"]
 script = ExtResource("3_52thn")
+coord = Vector2i(0, -1)
+mirror_y = true
 metadata/_custom_type_script = "uid://dixllb5r68rvk"
 
 [sub_resource type="Resource" id="Resource_afif4"]
@@ -59,7 +61,7 @@ accepted_port = Array[StringName]([&"Port"])
 refuse_port = Array[StringName]([])
 layer = 0
 coord = Vector2i(0, 1)
-position = Vector2(12, 36)
+position = Vector2(12, 84)
 metadata/_custom_type_script = "uid://ddaiqnfpchm0j"
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_tu3ol"]
@@ -87,9 +89,9 @@ custom_minimum_size = Vector2(32, 32)
 layout_mode = 3
 anchors_preset = 0
 offset_right = 120.0
-offset_bottom = 168.0
+offset_bottom = 120.0
 script = ExtResource("1_tu3ol")
-mirror = true
+rule = 2
 sockets = Dictionary[ExtResource("2_tu3ol"), ExtResource("3_52thn")]({
 SubResource("Resource_jpdw3"): SubResource("Resource_77rw7"),
 SubResource("Resource_bv002"): SubResource("Resource_77rw7"),
@@ -97,29 +99,20 @@ SubResource("Resource_4nbmf"): SubResource("Resource_tw8p5"),
 SubResource("Resource_afif4"): SubResource("Resource_tw8p5")
 })
 panelstyle = Array[StyleBox]([SubResource("StyleBoxFlat_tu3ol"), SubResource("StyleBoxFlat_52thn")])
-panelrect = Array[Rect2]([Rect2(0.5, 0, -1.5, -1), Rect2(0, 0.5, -1, -1.5)])
-panels = Dictionary[int, int]({
-0: 1
+panels = Dictionary[Rect2, int]({
+Rect2(0.5, 0, -1.5, -1): 0
 })
 metadata/_custom_type_script = "uid://dxbdnxmvfy5cw"
 
 [node name="rule_option" type="OptionButton" parent="." unique_id=263482967]
 unique_name_in_owner = true
 layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -24.0
-offset_top = -48.0
-offset_right = 45.0
-offset_bottom = -17.0
-grow_horizontal = 2
-grow_vertical = 2
+offset_left = 24.0
+offset_right = 93.0
+offset_bottom = 31.0
 flat = true
 alignment = 2
-selected = 0
+selected = 2
 item_count = 3
 popup/item_0/text = "ALL"
 popup/item_0/id = 0
@@ -127,38 +120,28 @@ popup/item_1/text = "ANY"
 popup/item_1/id = 1
 popup/item_2/text = "ODD"
 popup/item_2/id = 2
-metadata/grid_bound = Vector2(1, 1)
+metadata/grid_bound = Vector2(1, 0)
 
 [node name="rule_invert" type="Label" parent="." unique_id=1787863043]
 unique_name_in_owner = true
 layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -24.0
-offset_top = -24.0
-offset_right = 45.0
-offset_bottom = -1.0
-grow_horizontal = 2
-grow_vertical = 2
-text = "SOME"
+offset_left = 48.0
+offset_top = 48.0
+offset_right = 89.0
+offset_bottom = 71.0
+text = "EVEN"
 horizontal_alignment = 1
 vertical_alignment = 1
-metadata/grid_bound = Vector2(1, 2)
+metadata/grid_bound = Vector2(2, 2)
 
 [node name="buttons" type="HBoxContainer" parent="." unique_id=2086253710]
+unique_name_in_owner = true
 layout_mode = 1
-anchors_preset = 5
-anchor_left = 0.5
-anchor_right = 0.5
-offset_left = -24.0
-offset_top = 120.0
-offset_right = 12.0
-offset_bottom = 151.0
-grow_horizontal = 2
-metadata/grid_bound = Vector2(1, -3.5)
+offset_left = 36.0
+offset_top = 91.2
+offset_right = 72.0
+offset_bottom = 122.2
+metadata/grid_bound = Vector2(1.5, 3.8)
 metadata/hide_on_disable = true
 
 [node name="Rem" type="Button" parent="buttons" unique_id=59083439]
@@ -171,3 +154,5 @@ text = "+
 "
 
 [connection signal="item_selected" from="rule_option" to="." method="_on_rule_option_item_selected"]
+[connection signal="pressed" from="buttons/Rem" to="." method="_on_rem_pressed"]
+[connection signal="pressed" from="buttons/Add" to="." method="_on_add_pressed"]

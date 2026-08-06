@@ -2,10 +2,11 @@
 extends FlowchartPanel
 class_name FlowchartGizmo
 
-## A FlowchartPanel that carries and handles GizmoSockets, allowing them to partake
-## in the simulation system.[br]
-## Sockets are grouped into "clusters" which then are associated with a "surface".
-## Changing layout means changing the surface associations. Socket positioning will
+## A FlowchartPanel that carries and handles GizmoSockets, allowing them emit and 
+## receive signals in the simulation system.[br]
+## Sockets are grouped by sharing [code]GizmoCluster[/code] which have their own
+## coordinate.[br]
+## Changing layout means changing the coordinate of . Socket positioning will
 ## be relative to that surface's coordinate on the grid.
 
 @export var sockets : Dictionary[GizmoSocket, Cluster] :  ## GizmoSockets and the cluster they belong to.

@@ -7,9 +7,10 @@ class_name FlowchartPanel
 ## with the Flowchart.[br]
 ## You may override [code]_cycle_update()[/code] to do something during a simulation frame.[br]
 ## The size of a Panel is always a multiple of the Flowchart grid snapping.[br]
-## In editor it can also display a grid of socket positions that "surfaces" snap to.
-## Objects can be positioned relative to these surfaces. The layout system changes
-## the surface assoicated with objects to move them around.[br]
+## In editor it can also display a grid of socket positions things may snap to.
+## The layout system works by implementing [code]_update_layout()[/code], change
+## the position of objects to move them around, and the [code]panels[/code] property
+## to decide which panels to display.[br]
 ## The background is a procedurally generated set of StyleBox defined in
 ## [code]panelstyle[/code], and positioned with [code]panelrect[/code], according to
 ## [code]panels[/code] indexes. The same StyleBox can be reused for different Rect2.[br]
@@ -22,7 +23,8 @@ class_name FlowchartPanel
 ## You may have controls hide when disabled with the metadata "hide_on_disable".[br]
 ## You may also make child controls' anchors bound to the grid with the metadata
 ## "grid_bound" associated to a Vector2 and it will respect the same rules as panel Rect2.
-## The position will then be relative to these anchors.
+## The position will then be relative to these anchors. In the [code]_update_layout()[/code]
+## this coordinate may be modified to make controls snap to the grid.
 
 #TODO Disable Gizmo repositioning if clicking on controls in editing mode.
 
@@ -38,17 +40,13 @@ func _set_show_grid(val:bool):
 		panelstyle = val
 		for each in val:
 			each.changed.connect(queue_redraw)
-@export var panelrect : Array[Rect2] :  ## The placement of panels. The units are in snap units, but values in between grid cells are allowed. For example, w = 3.0, makes a panel (snap * 3) of width, but w = 3.5 makes it between grid cells, (snap * 3 + snap * 0.5). If size is negative or zero, the value will be relative to size of the node.
+@export var panels : Dictionary[Rect2, int] :  ## [Rect2] -> panelstyle_idx; Provides a rectangle to position a stylebox. This works as control interface to define which styleboxes to display depending on layout. If you don't want to show something, don't mention it!
 	set(val):
-		panelrect = val
-		queue_redraw()
-@export var panels : Dictionary[int, int] :  ## [panelrect_idx] -> panelstyle_idx; Association between panelrect to their intended styleboxes. This works as control interface to define which styleboxes to display depending on layout. If you don't want to show something, don't mention it!
-	set(val):
-		var _val : Dictionary[int, int]
-		for rect_i in val:
-			var style_i = val[rect_i]
-			if rect_i < panelrect.size() and style_i < panelstyle.size():
-				_val[rect_i] = style_i
+		var _val : Dictionary[Rect2, int]
+		for rect in val:
+			var style_i = val[rect]
+			if style_i < panelstyle.size():
+				_val[rect] = style_i
 		panels = _val
 		queue_redraw()
 
@@ -121,12 +119,12 @@ func get_bound_coord(coord:Vector2i) -> Vector2i:
 ## The integer part of a vector element is taken as grid cell, with decimal
 ## part allowing for an offset from that. Negative values wrap around the size
 ## of the panel grid.
-func get_bound_position(pos:Vector2) -> Vector2:
+func get_bound_position(pos:Vector2, centered:=false) -> Vector2:
 	var pos_int = pos.floor()  # integer part of the values
 	var pos_dec = pos - pos_int  # decimal part of the values
 	
 	# Scale with grid cell size.
-	pos = Flowchart.from_grid(pos_int, true) + pos_dec * Flowchart.SNAP
+	pos = Flowchart.from_grid(pos_int, centered) + pos_dec * Flowchart.SNAP
 	
 	# Limit magnitude to node size, both in negative
 	# and positive direction.
@@ -163,7 +161,10 @@ func _sim_update(graph:FlowchartNetwork):
 
 
 var _layout_outdated : bool
+## Override this function to define the layout.
 func _update_layout(): pass
+## Call this function if something changed that affects layout. If Sockets were
+## Altered, call [code]_update_sockdex()[/code] first.
 func update_layout():
 	queue_redraw()
 	_layout_outdated = true
@@ -183,10 +184,8 @@ func _draw() -> void:
 			var where = get_bound_position(coord)
 			each.position = where
 	
-	for rect_i : int in panels:
-		var style_i = panels[rect_i]
-		var rect = panelrect[rect_i]
-		var style = panelstyle[style_i]
+	for rect : Rect2 in panels:
+		var style = panelstyle[panels[rect]]
 		var pos_floor = rect.position.floor()
 		var siz_floor = rect.size.abs().floor()
 		var pos_deci = rect.position - pos_floor
