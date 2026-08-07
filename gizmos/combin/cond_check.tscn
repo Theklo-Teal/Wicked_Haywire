@@ -3,18 +3,19 @@
 [ext_resource type="Script" uid="uid://cqfybd6luhjw" path="res://gizmos/combin/cond_check.gd" id="1_tu3ol"]
 [ext_resource type="Script" uid="uid://ddaiqnfpchm0j" path="res://modules/Flowchart/Joints/flowchart_socket.gd" id="2_tu3ol"]
 [ext_resource type="Script" uid="uid://dixllb5r68rvk" path="res://modules/Flowchart/Gizmos/gizmo_cluster.gd" id="3_52thn"]
+[ext_resource type="Script" uid="uid://0nsdyckus4cq" path="res://gizmos/bit_output.gd" id="4_jpdw3"]
+[ext_resource type="Script" uid="uid://cvcm4bskckdtj" path="res://gizmos/bit_input.gd" id="5_77rw7"]
 
-[sub_resource type="Resource" id="Resource_jpdw3"]
-resource_local_to_scene = true
-script = ExtResource("2_tu3ol")
+[sub_resource type="Resource" id="Resource_bv002"]
+script = ExtResource("4_jpdw3")
 mode = 2
-port_class = &"Port"
+port_class = &"BitPort"
 accepted_port = Array[StringName]([&"Port"])
 refuse_port = Array[StringName]([])
 layer = 0
 coord = Vector2i(0, 0)
 position = Vector2(108, 12)
-metadata/_custom_type_script = "uid://ddaiqnfpchm0j"
+metadata/_custom_type_script = "uid://0nsdyckus4cq"
 
 [sub_resource type="Resource" id="Resource_77rw7"]
 script = ExtResource("3_52thn")
@@ -22,29 +23,27 @@ coord = Vector2i(-1, 0)
 limit = Vector2i(2, 4)
 metadata/_custom_type_script = "uid://dixllb5r68rvk"
 
-[sub_resource type="Resource" id="Resource_bv002"]
-resource_local_to_scene = true
-script = ExtResource("2_tu3ol")
+[sub_resource type="Resource" id="Resource_4nbmf"]
+script = ExtResource("4_jpdw3")
 mode = 2
-port_class = &"Port"
+port_class = &"BitPort"
 accepted_port = Array[StringName]([&"Port"])
 refuse_port = Array[StringName]([])
 layer = 0
 coord = Vector2i(0, 2)
 position = Vector2(108, 60)
-metadata/_custom_type_script = "uid://ddaiqnfpchm0j"
+metadata/_custom_type_script = "uid://0nsdyckus4cq"
 
-[sub_resource type="Resource" id="Resource_4nbmf"]
-resource_local_to_scene = true
-script = ExtResource("2_tu3ol")
+[sub_resource type="Resource" id="Resource_afif4"]
+script = ExtResource("5_77rw7")
 mode = 1
-port_class = &"Port"
+port_class = &"BitPort"
 accepted_port = Array[StringName]([&"Port"])
 refuse_port = Array[StringName]([])
 layer = 0
 coord = Vector2i(0, 0)
 position = Vector2(12, 108)
-metadata/_custom_type_script = "uid://ddaiqnfpchm0j"
+metadata/_custom_type_script = "uid://cvcm4bskckdtj"
 
 [sub_resource type="Resource" id="Resource_tw8p5"]
 script = ExtResource("3_52thn")
@@ -52,17 +51,16 @@ coord = Vector2i(0, -1)
 mirror_y = true
 metadata/_custom_type_script = "uid://dixllb5r68rvk"
 
-[sub_resource type="Resource" id="Resource_afif4"]
-resource_local_to_scene = true
-script = ExtResource("2_tu3ol")
+[sub_resource type="Resource" id="Resource_0fewg"]
+script = ExtResource("5_77rw7")
 mode = 1
-port_class = &"Port"
+port_class = &"BitPort"
 accepted_port = Array[StringName]([&"Port"])
 refuse_port = Array[StringName]([])
 layer = 0
 coord = Vector2i(0, 1)
 position = Vector2(12, 84)
-metadata/_custom_type_script = "uid://ddaiqnfpchm0j"
+metadata/_custom_type_script = "uid://cvcm4bskckdtj"
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_tu3ol"]
 border_width_left = 20
@@ -175,7 +173,7 @@ func west():
 		me.in_cluster.coord = Vector2i(-1, 0)
 
 func widget_west():
-	me.get_node(\"%rule_option\").set_meta(\"grid_bound\", pos_coord + Vector2(1, 0 if me.mirrored else -0.2))
+	me.get_node(\"%rule_option\").set_meta(\"grid_bound\", pos_coord + Vector2(1, 0.0 if me.mirrored else -0.2))
 	me.get_node(\"%rule_invert\").set_meta(\"grid_bound\", neg_coord + Vector2(1, 0))
 	var padding = 0.4 if me.mirrored else -0.2
 	me.get_node(\"%buttons\").set_meta(\"grid_bound\", butts_coord - Vector2(butts_wid.x, padding))
@@ -210,16 +208,23 @@ offset_right = 120.0
 offset_bottom = 120.0
 script = ExtResource("1_tu3ol")
 rule = 1
+description = "The basic logical element for binary values. You may select one of the boolean operations, with the second output being the inverted result."
+options = Dictionary[String, StringName]({
+"bitwidth": &"bitwidth"
+})
 sockets = Dictionary[ExtResource("2_tu3ol"), ExtResource("3_52thn")]({
-SubResource("Resource_jpdw3"): SubResource("Resource_77rw7"),
 SubResource("Resource_bv002"): SubResource("Resource_77rw7"),
-SubResource("Resource_4nbmf"): SubResource("Resource_tw8p5"),
-SubResource("Resource_afif4"): SubResource("Resource_tw8p5")
+SubResource("Resource_4nbmf"): SubResource("Resource_77rw7"),
+SubResource("Resource_afif4"): SubResource("Resource_tw8p5"),
+SubResource("Resource_0fewg"): SubResource("Resource_tw8p5")
 })
 panelstyle = Array[StyleBox]([SubResource("StyleBoxFlat_tu3ol"), SubResource("StyleBoxFlat_52thn")])
+panels = Dictionary[Vector4, int]({
+Vector4(0.5, 0, -1.5, -1): 0
+})
 metadata/_custom_type_script = "uid://dxbdnxmvfy5cw"
 
-[node name="layout_fsm" type="Node" parent="." unique_id=2043962721]
+[node name="Layout" type="Node" parent="." unique_id=2043962721]
 script = SubResource("GDScript_ax31v")
 
 [node name="rule_option" type="OptionButton" parent="." unique_id=263482967]

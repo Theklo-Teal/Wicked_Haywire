@@ -38,12 +38,14 @@ func rebuild_network():
 	print("Rebuilding Network")
 	update_ports.callv([null] + netlist.sockets.keys())
 
-
 #region Simulation Stuff
 signal sim_update_done
+signal sim_cycle_begun
+signal sim_cycle_finished
 
 func sim_cycle_begin():
-	pass
+	_sim_cycle_begin()
+	sim_cycle_begun.emit()
 func sim_cycle_update():
 	for layer in netlist.gizmos:
 		for gizmo : FlowchartPanel in netlist.gizmos[layer]:
@@ -51,8 +53,22 @@ func sim_cycle_update():
 			await gizmo.sim_update_done
 	sim_update_done.emit()
 func sim_cycle_finish():
+	_sim_cycle_finish()
+	sim_cycle_finished.emit()
+
+func _sim_cycle_begin():
 	pass
+func _sim_cycle_finish():
+	pass
+
+func port_new(port_name:StringName) -> Port:
+	var port = port_classes[port_name].new()
+	sim_cycle_finished.connect(port.integrate, CONNECT_PERSIST)
+	return port
+func link_new(link_name:StringName) -> Port:
+	return link_classes[link_name].new()
 #endregion
+
 
 #region Graph Editing Stuff
 

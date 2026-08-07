@@ -1,0 +1,64 @@
+[gd_scene format=3 uid="uid://doq2jajpcxdef"]
+
+[ext_resource type="Script" uid="uid://cscd6xj5ga5gy" path="res://gizmos/input/push_button.gd" id="1_enejn"]
+[ext_resource type="Script" uid="uid://ddaiqnfpchm0j" path="res://modules/Flowchart/Joints/flowchart_socket.gd" id="1_gebwe"]
+[ext_resource type="Script" uid="uid://dixllb5r68rvk" path="res://modules/Flowchart/Gizmos/gizmo_cluster.gd" id="2_enejn"]
+[ext_resource type="Script" uid="uid://0nsdyckus4cq" path="res://gizmos/bit_output.gd" id="3_2mldl"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_patoc"]
+border_width_left = 4
+border_width_top = 4
+border_color = Color(0.35, 0.35, 0.35, 1)
+border_blend = true
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_7y7cw"]
+bg_color = Color(0.73828125, 0.73828125, 0.73828125, 1)
+border_width_right = 6
+border_width_bottom = 6
+border_color = Color(0.34765625, 0.34765625, 0.34765625, 1)
+border_blend = true
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[sub_resource type="Resource" id="Resource_61dp3"]
+resource_local_to_scene = true
+script = ExtResource("3_2mldl")
+mode = 2
+port_class = &"BitPort"
+accepted_port = Array[StringName]([&"BitPort"])
+refuse_port = Array[StringName]([])
+layer = 0
+coord = Vector2i(0, 0)
+position = Vector2(84, 36)
+metadata/_custom_type_script = "uid://0nsdyckus4cq"
+
+[sub_resource type="Resource" id="Resource_3605k"]
+script = ExtResource("2_enejn")
+coord = Vector2i(-1, 1)
+metadata/_custom_type_script = "uid://dixllb5r68rvk"
+
+[node name="PushButton" type="Control" unique_id=2136718918]
+custom_minimum_size = Vector2(24, 24)
+layout_mode = 3
+anchors_preset = 0
+offset_right = 96.0
+offset_bottom = 72.0
+script = ExtResource("1_enejn")
+slider_panel = SubResource("StyleBoxFlat_patoc")
+button_panel = SubResource("StyleBoxFlat_7y7cw")
+dwell = null
+sockets = Dictionary[ExtResource("1_gebwe"), ExtResource("2_enejn")]({
+SubResource("Resource_61dp3"): SubResource("Resource_3605k")
+})
+panelstyle = Array[StyleBox]([SubResource("StyleBoxFlat_patoc")])
+panels = Dictionary[Vector4, int]({
+Vector4(0, 1, -2, -2): 0
+})
+show_grid = true
+metadata/_custom_type_script = "uid://dxbdnxmvfy5cw"

@@ -4,34 +4,6 @@ class_name NetBase
 
 ## Definition of classes necessary to build a network.
 
-#region Simulation Override Functions
-signal update_done
-signal begin_done
-signal finish_done
-
-@warning_ignore_start("unused_parameter")
-func update(graph:FlowchartNetwork):
-	_update(graph)
-	update_done.emit()
-
-func cycle_begin():
-	_cycle_begin()
-	begin_done.emit()
-
-func cycle_finish():
-	_cycle_finish()
-	finish_done.emit()
-
-func _update(graph:FlowchartNetwork):
-	pass
-
-func _cycle_begin():
-	pass
-
-func _cycle_finish():
-	pass
-@warning_ignore_restore("unused_parameter")
-#endregion
 
 #region Index Port and Link Classes.
 var port_classes : Dictionary[StringName, Script]
@@ -39,19 +11,13 @@ var link_classes : Dictionary[StringName, Script]
 
 func _init() -> void:
 	@warning_ignore("static_called_on_instance")
-	for each in G.list_classes(true, true):
-		if each.base == "Port":
-			port_classes[each.name] = each.value
-		elif each.base == "Link":
-			link_classes[each.name] = each.value
-
-func port_new(port_name:StringName) -> Port:
-	var port = port_classes[port_name].new()
-	if get_parent() is Flowchart:
-		get_parent().sim_update_finish.connect(port.integrate, CONNECT_PERSIST)
-	return port
-func link_new(link_name:StringName) -> Port:
-	return link_classes[link_name].new()
+	var all_classes = G.list_classes()
+	for klaso in all_classes:
+		var info = all_classes[klaso]
+		if info.added == &"Port":
+			port_classes[klaso] = info.script
+		elif info.added == &"Link":
+			link_classes[klaso] = info.script
 #endregion
 
 class Port:
@@ -60,8 +26,16 @@ class Port:
 	var value  ## Current value in the link for reading by sockets.
 	var aggregate : Array  ## Append written values during simulation update to then integrate to final decision.
 	
-	static func get_base_class() -> StringName:
+	static func added_class_info() -> StringName:
 		return &"Port"
+	
+	## Return the name of the class defining the data protocol expected by this Port.
+	static func get_protocol_name() -> Variant:
+		return &"Variant"
+	
+	## Return the class of the protocol expected by this port so it can be instantiated.
+	static func get_protocol() -> Variant:
+		return null
 	
 	## If the port has no values feeding in, what should it be read as?[br]
 	## Override [code]_init()[/code] do define an initial value.
@@ -77,25 +51,26 @@ class Port:
 		if aggregate.size() == 0: return
 		value = roundi(aggregate.reduce(func(sum, a):return sum + a, 0) / aggregate.size())
 	
-	func write_none(data):
+	func write_none(data, ..._other):
 		return data
-	func read_none(data):
+	func read_none(data, ..._other):
 		return data
 	
 	## Input data for the next state of the link. It returns an error code, if data isn't accepted.[br]
 	## Optionally, a write [code]filter[/code] of a Port class can be chosen, which transforms the format of the data before storing. An error is return if the requested filter doesn't exist.
-	func write(val, filter:String="none") -> Error:
+	func write(val, filter:String="none", filter_args:Array=[]) -> Error:
 		if not has_method("write_" + filter):
 			return Error.ERR_DOES_NOT_EXIST
-		val = call("write_"+filter, val)
+		val = callv("write_" + filter, [val] + filter_args)
 		aggregate.append(val)
 		return Error.OK
 	
 	## Get current data of the link. Optionally, a read [code]filter[/code] in the Port class may be chosen, which transforms the data that is stored. If the filter doesn't exist, this returns [code]null[/code].
-	func read(filter:String="none"):
+	func read(filter:String="none", filter_args:Array=[]):
+		print(value)
 		if not has_method("read_" + filter):
 			return null
-		return call("read_" + filter)
+		return callv("read_" + filter, filter_args)
 
 
 @abstract class NetVert extends Resource:
@@ -181,24 +156,24 @@ class Socket extends Joint:
 			mode = val
 			emit_changed()
 	
-	func read(filter:="none") -> Variant:
-		var val = port.call("read_"+filter, port.value)
-		_read(val)
+	func read(filter:="none", ...filter_args) -> Variant:
+		var val = port.callv("read_" + filter, [port.value] + filter_args)
+		_has_read(val)
 		has_read.emit(val)
 		return val
-	func write(val, filter:="none") -> Error:
-		val = port.call("write_"+filter, val)
-		_write(val)
+	func write(val, filter:="none", ...filter_args) -> Error:
+		val = port.callv("write_" + filter, [val] + filter_args)
+		_has_written(val)
 		has_written.emit(val)
 		return port.write(val)
 	
 	## This socket was used to read a Port. The value is after any Port filtering.
 	@warning_ignore("unused_parameter")
-	func _read(val):
+	func _has_read(val):
 		pass
 	## This socket was used to write a Port. The value is after any Port filtering.
 	@warning_ignore("unused_parameter")
-	func _write(val):
+	func _has_written(val):
 		pass
 
 
@@ -209,7 +184,7 @@ class Link extends Resource:
 	@export_storage var chirality : bool  ## "true" means the wire runs clockwise around the corners of an imaginary rectangle.
 	@export_storage var bend : float  ## Defines the distance of the diagonal cutting the corner.
 	
-	static func get_base_class() -> StringName:
+	static func added_class_info() -> StringName:
 		return &"Link"
 	
 	#region Constructors

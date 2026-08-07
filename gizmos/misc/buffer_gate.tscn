@@ -1,20 +1,21 @@
 [gd_scene format=3 uid="uid://ddbqln6sbtevv"]
 
-[ext_resource type="Script" uid="uid://dxbdnxmvfy5cw" path="res://modules/Flowchart/Gizmos/electronics.gd" id="1_tp44y"]
+[ext_resource type="Script" uid="uid://dxbdnxmvfy5cw" path="res://gizmos/electronics.gd" id="1_tp44y"]
 [ext_resource type="Script" uid="uid://ddaiqnfpchm0j" path="res://modules/Flowchart/Joints/flowchart_socket.gd" id="2_r70w6"]
 [ext_resource type="Script" uid="uid://dixllb5r68rvk" path="res://modules/Flowchart/Gizmos/gizmo_cluster.gd" id="3_1d307"]
+[ext_resource type="Script" uid="uid://cvcm4bskckdtj" path="res://gizmos/bit_input.gd" id="4_1d307"]
+[ext_resource type="Script" uid="uid://0nsdyckus4cq" path="res://gizmos/bit_output.gd" id="5_1ndly"]
 
-[sub_resource type="Resource" id="Resource_louv7"]
-resource_local_to_scene = true
-script = ExtResource("2_r70w6")
+[sub_resource type="Resource" id="Resource_ugu8b"]
+script = ExtResource("4_1d307")
 mode = 1
-port_class = &"Port"
+port_class = &"BitPort"
 accepted_port = Array[StringName]([&"Port"])
 refuse_port = Array[StringName]([])
 layer = 0
 coord = Vector2i(0, 0)
 position = Vector2(12, 36)
-metadata/_custom_type_script = "uid://ddaiqnfpchm0j"
+metadata/_custom_type_script = "uid://cvcm4bskckdtj"
 
 [sub_resource type="Resource" id="Resource_lbmk2"]
 script = ExtResource("3_1d307")
@@ -22,34 +23,32 @@ coord = Vector2i(0, 1)
 limit = Vector2i(0, 0)
 metadata/_custom_type_script = "uid://dixllb5r68rvk"
 
-[sub_resource type="Resource" id="Resource_rgxy1"]
-resource_local_to_scene = true
-script = ExtResource("2_r70w6")
+[sub_resource type="Resource" id="Resource_qlnho"]
+script = ExtResource("5_1ndly")
 mode = 2
-port_class = &"Port"
+port_class = &"BitPort"
 accepted_port = Array[StringName]([&"Port"])
 refuse_port = Array[StringName]([])
 layer = 0
 coord = Vector2i(0, 0)
 position = Vector2(84, 36)
-metadata/_custom_type_script = "uid://ddaiqnfpchm0j"
+metadata/_custom_type_script = "uid://0nsdyckus4cq"
 
 [sub_resource type="Resource" id="Resource_iedwl"]
 script = ExtResource("3_1d307")
 coord = Vector2i(-1, 1)
 metadata/_custom_type_script = "uid://dixllb5r68rvk"
 
-[sub_resource type="Resource" id="Resource_cskvj"]
-resource_local_to_scene = true
-script = ExtResource("2_r70w6")
+[sub_resource type="Resource" id="Resource_0c2ae"]
+script = ExtResource("4_1d307")
 mode = 1
-port_class = &"Port"
+port_class = &"BitPort"
 accepted_port = Array[StringName]([&"Port"])
 refuse_port = Array[StringName]([])
 layer = 0
 coord = Vector2i(0, 0)
 position = Vector2(36, 60)
-metadata/_custom_type_script = "uid://ddaiqnfpchm0j"
+metadata/_custom_type_script = "uid://cvcm4bskckdtj"
 
 [sub_resource type="Resource" id="Resource_0bvt3"]
 script = ExtResource("3_1d307")
@@ -70,9 +69,9 @@ offset_right = 96.0
 offset_bottom = 72.0
 script = ExtResource("1_tp44y")
 sockets = Dictionary[ExtResource("2_r70w6"), ExtResource("3_1d307")]({
-SubResource("Resource_louv7"): SubResource("Resource_lbmk2"),
-SubResource("Resource_rgxy1"): SubResource("Resource_iedwl"),
-SubResource("Resource_cskvj"): SubResource("Resource_0bvt3")
+SubResource("Resource_ugu8b"): SubResource("Resource_lbmk2"),
+SubResource("Resource_qlnho"): SubResource("Resource_iedwl"),
+SubResource("Resource_0c2ae"): SubResource("Resource_0bvt3")
 })
 panelstyle = Array[StyleBox]([SubResource("StyleBoxFlat_i2y0s"), SubResource("StyleBoxFlat_kg6hg")])
 panels = Dictionary[Vector4, int]({

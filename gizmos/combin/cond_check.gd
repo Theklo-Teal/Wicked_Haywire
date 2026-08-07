@@ -5,6 +5,9 @@ static func toybox_included() -> bool:
 	return true
 
 func _ready() -> void:
+	options = {
+		"bitwidth": "bitwidth",
+		}
 	update_layout()
 
 var inps : Array[GizmoSocket]
@@ -133,6 +136,6 @@ func _update_layout():
 	%rule_invert.reset_size()
 	out_cluster.limit.y = _grid.size.y - 1
 	size = Vector2(5, 5) * Flowchart.SNAP
-	$layout_fsm.set_layout(facing)
+	$Layout.set_layout(facing)
 
 #endregion

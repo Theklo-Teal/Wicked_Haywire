@@ -57,7 +57,6 @@ func _on_mode_toggled(toggled_on: bool, button:Button) -> void:
 		\"[u]Mouse Left[/u]: Interact with Gizmos.\"]\\
 		[int(toggled_on)]
 
-
 func _on_tray_tab_bar_tab_changed(tab: int, tabbar: TabBar) -> void:
 	G.setts.set_value(\"0\", \"ribbonbar\", tab)
 	

@@ -1,0 +1,62 @@
+[gd_scene format=3 uid="uid://cc2se5e4tt77s"]
+
+[ext_resource type="Script" uid="uid://b3jgpsu7uixf1" path="res://gizmos/output/indicator.gd" id="1_b5ldk"]
+[ext_resource type="Script" uid="uid://ddaiqnfpchm0j" path="res://modules/Flowchart/Joints/flowchart_socket.gd" id="2_q77ae"]
+[ext_resource type="Script" uid="uid://dixllb5r68rvk" path="res://modules/Flowchart/Gizmos/gizmo_cluster.gd" id="3_1t6a0"]
+[ext_resource type="Script" uid="uid://cvcm4bskckdtj" path="res://gizmos/bit_input.gd" id="4_ldp1b"]
+
+[sub_resource type="Resource" id="Resource_5djvh"]
+resource_local_to_scene = true
+script = ExtResource("4_ldp1b")
+mode = 1
+port_class = &"BitPort"
+accepted_port = Array[StringName]([&"BitPort"])
+refuse_port = Array[StringName]([])
+layer = 0
+coord = Vector2i(0, 0)
+position = Vector2(12, 60)
+metadata/_custom_type_script = "uid://cvcm4bskckdtj"
+
+[sub_resource type="Resource" id="Resource_w4fs7"]
+script = ExtResource("3_1t6a0")
+coord = Vector2i(0, 2)
+metadata/_custom_type_script = "uid://dixllb5r68rvk"
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_3bapb"]
+bg_color = Color(0.3046875, 0.1725769, 0.1725769, 1)
+border_width_right = 4
+border_width_bottom = 4
+border_color = Color(0.3046875, 0.3046875, 0.3046875, 1)
+border_blend = true
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_8x6cc"]
+bg_color = Color(0.24307251, 0.4609375, 0.2720077, 1)
+border_width_left = 4
+border_width_top = 4
+border_color = Color(0.32030296, 0.734375, 0.3069458, 1)
+border_blend = true
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[node name="Indicator" type="Control" unique_id=347359990]
+custom_minimum_size = Vector2(24, 24)
+layout_mode = 3
+anchors_preset = 0
+offset_right = 24.0
+offset_bottom = 72.0
+script = ExtResource("1_b5ldk")
+sockets = Dictionary[ExtResource("2_q77ae"), ExtResource("3_1t6a0")]({
+SubResource("Resource_5djvh"): SubResource("Resource_w4fs7")
+})
+panelstyle = Array[StyleBox]([SubResource("StyleBoxFlat_3bapb"), SubResource("StyleBoxFlat_8x6cc")])
+panels = Dictionary[Vector4, int]({
+Vector4(0, 0, -1, -2): 0
+})
+show_grid = true
+metadata/_custom_type_script = "uid://dxbdnxmvfy5cw"
