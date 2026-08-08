@@ -149,7 +149,7 @@ func draw_back_geometry(viewed_canvas_rect:Rect2):
 		#TODO don't track GizmoSockets. We use Gizmo search to tell if to draw these.
 		if not joint is GizmoSocket:
 			if joint.layer == layer:
-				var where = from_grid(joint.coord)
+				var where = from_grid(joint.coord, true)
 				joint.draw(self, self, to_screen_coord(where))
 				for link in $Network.netlist.get_links(joint, true, false):
 					_visible_links.append(link)
@@ -170,11 +170,11 @@ func draw_fore_geometry(canvas:Control, viewed_canvas_rect:Rect2):
 		var wire : NetBase.Link = $Network.netlist.links[link]
 		var pair : Array[NetBase.NetVert]
 		pair.assign($Network.netlist.pairs[link])
-		var pos1 = $Network.netlist.sockets.get(pair[0]).canvas_socket_position(pair[0]) if pair[0] in $Network.netlist.sockets else from_grid(pair[0].coord)
-		var pos2 = $Network.netlist.sockets.get(pair[1]).canvas_socket_position(pair[1]) if pair[1] in $Network.netlist.sockets else from_grid(pair[1].coord)
+		var pos1 = $Network.netlist.sockets.get(pair[0]).canvas_socket_position(pair[0]) if pair[0] in $Network.netlist.sockets else from_grid(pair[0].coord, true)
+		var pos2 = $Network.netlist.sockets.get(pair[1]).canvas_socket_position(pair[1]) if pair[1] in $Network.netlist.sockets else from_grid(pair[1].coord, true)
 		wire.draw(self, canvas, to_screen_coord(pos1), to_screen_coord(pos2))
-	
-	
+
+
 func draw_overlay(canvas:Control, _viewed_canvas_rect:Rect2):
 	if OS.has_feature("editor_hint"): return
 	

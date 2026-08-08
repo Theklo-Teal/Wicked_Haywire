@@ -9,11 +9,14 @@ class_name InfiCanvas
 ## Other UI details like the background pattern and the compass arrow can also be changed by overriding their functions.[br]
 ## Remember to use coordinates translated into canvas coordinates with [code]to_canvas_coord()[/code], or things will looks fixed on the screen. Then convert back with [code]to_screen_coord()[/code], for them to display in the correct place on screen.[br]
 ## There are equivalent functions for Rect2, [code]to_canvas_rect()[/code], [code]to_screen_rect()[/code], which will resize a rect according to zoom.[br]
-## If you are seeing background patterns being drawn outside the visible area, set "Layout/Clip Contents" in the inspector.
+## If you are seeing background patterns being drawn outside the visible area, set "Layout/Clip Contents" in the inspector.[br]
+## Objects can be grouped and ungrouped by defining an InputEventAction in Project Settings' Input Map for [code]inficanvas_group[/code] and [code]inficanvas_ungroup[/code].
+## Grouped objects will move together when one or more of them is repositioned.
 
 # MODIFICATIONS
 # Modulation of object positioning can now vary according to what object is it.
 # Added override functions for when starting or stopping to move an object.
+# Added object grouping feature. Objects in the same group move together.
 
 #TODO Make zoom into the center
 #FIXME go_to(Vector2.ZERO) doesn't seem to work if InfiCanvas isn't root node.
@@ -160,6 +163,27 @@ func _gui_input(event: InputEvent) -> void:
 func _input(event: InputEvent) -> void:
 	if overlay_mode == "Input Event": overlay.queue_redraw()
 	
+	if Input.is_action_just_pressed_by_event("inficanvas_group", event):
+		var default_group_name = str(Time.get_ticks_usec())
+		move_groups[default_group_name] = []
+		for each in _selected:
+			var data = get_obj_data(each)
+			data["move_group"] = default_group_name
+			move_groups[default_group_name].append(each)
+		_selected.clear()
+	
+	if Input.is_action_just_pressed_by_event("inficanvas_ungroup", event):
+		#FIXME
+		for each in _selected:
+			var data = get_obj_data(each)
+			if "move_group" in data and data["move_group"] in move_groups:
+				move_groups[data["move_group"]].erase(each)
+				if move_groups[data["move_group"]].size() == 0:
+					move_groups.erase(data["move_group"])
+			data["move_group"] = ""
+			
+			
+	
 	if event is InputEventKey and event.is_released():
 		if event.keycode == KEY_ESCAPE:
 			escape_key_action()
@@ -216,12 +240,22 @@ func _input(event: InputEvent) -> void:
 func obj_movement_modulate(object, new_position:Vector2) -> Vector2:
 	return new_position
 
+var move_groups : Dictionary[StringName, Array]
 ## Call this function if selected objects are about to be moved.
 func selected_obj_movement_start():
 	if move_obj_allowed:
 		lasso_allowed = false
 		is_moving_obj = true
 		_selected_positions.clear()
+		
+		for each in _selected.duplicate():
+			var data = get_obj_data(each)
+			var group = data.get("move_group", "")
+			if not group.is_empty():
+				for other in move_groups.get(group, []):
+					if other in _selected: continue
+					_selected.append(other)
+			
 		for each in _selected:
 			if get_obj_data(each).centered:
 				_selected_positions.append(get_obj_rect(each).get_center())

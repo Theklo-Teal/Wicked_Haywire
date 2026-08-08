@@ -14,8 +14,6 @@ class_name FlowchartNetwork
 		netlist = val
 		rebuild_network()
 
-#var changed : Array[NetVert]  ## Joints that have connections changed.
-
 func _init() -> void:
 	super()
 	if netlist == null:
@@ -43,10 +41,13 @@ signal sim_update_done
 signal sim_cycle_begun
 signal sim_cycle_finished
 
+var sim_ticks : int = 0  ## How many sim update cycles since the start of the application. It will rollover if the value goes past 64 bits.
+
 func sim_cycle_begin():
 	_sim_cycle_begin()
 	sim_cycle_begun.emit()
 func sim_cycle_update():
+	sim_ticks += 1
 	for layer in netlist.gizmos:
 		for gizmo : FlowchartPanel in netlist.gizmos[layer]:
 			gizmo.sim_update(self)
@@ -82,7 +83,6 @@ func register_gizmo(gizmo:FlowchartPanel, layer:int):
 		netlist.verts[hash(socket)] = socket
 		netlist.sockets[socket as NetVert] = gizmo
 
-#TODO Remove Gizmo, unregistering its sockets
 func unregister_gizmo(gizmo:FlowchartPanel, layer:int):
 	netlist.gizmos[layer].erase(gizmo)
 	if netlist.gizmos[layer].is_empty(): netlist.gizmos.erase(layer)

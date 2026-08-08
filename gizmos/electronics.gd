@@ -5,6 +5,11 @@ class_name Electronics
 @export var bitwidth : int = 1 : 
 	set(val):
 		bitwidth = max(1, val)
+		_set_bitwidth()
+
+## Override this function if something changes when the bitwidth changes
+func _set_bitwidth():
+	pass
 
 @export var dwell : int :  ## How many simulation ticks it takes to sample inputs or emit outputs.
 	set(val):
@@ -21,19 +26,13 @@ class_name Electronics
 static func toybox_included() -> bool:
 	return false
 
-var _sim_period : int = 0
-var _sample_period : int = 0
 ## Instantaneous response to a simulation update tick. Use [code]_sim_update_sampling[/code]
 ## to account [code]dwell[/code] and [code]_sim_update_response[/code] to account [code]delay[/code].
 func _sim_update(graph:FlowchartNetwork):
-	_sim_period += 1
-	_sample_period += 1
-	if _sim_period > dwell:
-		_sim_period = 0
+	if dwell == 0 or posmod(graph.sim_ticks, dwell) == 0:
 		_sim_update_sampling(graph)
 	
-	if _sample_period > delay:
-		_sample_period = 0
+	if delay == 0 or posmod(graph.sim_ticks, delay) == 0:
 		_sim_update_respond(graph)
 
 @warning_ignore("unused_parameter")
@@ -80,7 +79,7 @@ class BitSignal extends RefCounted:
 		#valid |= down & agreed
 		#var value = valid & noised
 		#return value
-		return G.rng.randi() & maxval
+		return (G.rng.randi() & hiz) | (bits & (maxval ^ hiz))
 
 
 #region Utilities

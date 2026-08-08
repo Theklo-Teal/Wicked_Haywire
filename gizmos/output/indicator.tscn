@@ -56,7 +56,37 @@ SubResource("Resource_5djvh"): SubResource("Resource_w4fs7")
 })
 panelstyle = Array[StyleBox]([SubResource("StyleBoxFlat_3bapb"), SubResource("StyleBoxFlat_8x6cc")])
 panels = Dictionary[Vector4, int]({
-Vector4(0, 0, -1, -2): 0
+Vector4(0, 0, 1, -1.5): 0
 })
 show_grid = true
 metadata/_custom_type_script = "uid://dxbdnxmvfy5cw"
+
+[node name="VBoxContainer" type="VBoxContainer" parent="." unique_id=51724173]
+layout_mode = 1
+anchors_preset = 4
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_left = 24.0
+offset_top = -36.0
+offset_right = 42.0
+offset_bottom = 30.0
+grow_vertical = 2
+metadata/edit_control = true
+metadata/edit_only_control = true
+metadata/hide_on_disabled = true
+metadata/grid_bound = Vector2(-1, 0)
+
+[node name="Add" type="Button" parent="VBoxContainer" unique_id=185017022]
+layout_mode = 2
+size_flags_horizontal = 0
+text = "+"
+
+[node name="Rem" type="Button" parent="VBoxContainer" unique_id=1156155874]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 0
+disabled = true
+text = "-"
+
+[connection signal="pressed" from="VBoxContainer/Add" to="." method="_on_add_pressed"]
+[connection signal="pressed" from="VBoxContainer/Rem" to="." method="_on_rem_pressed"]

@@ -1,7 +1,6 @@
 @tool
 extends Electronics
 
-@export var slider_panel : StyleBox
 @export var button_panel : StyleBox
 var sock : BitOutput
 var state : bool
@@ -21,11 +20,10 @@ func _gui_input(event: InputEvent) -> void:
 
 func _draw():
 	super()
-	var wid = size.y / 2.0 - Flowchart.JOINT_RAD
 	
 	draw_style_box(button_panel, Rect2(
-		Vector2(size.x - Flowchart.SNAP * 2 if state else 0, wid - Flowchart.JOINT_RAD),
-		Vector2(Flowchart.SNAP, Flowchart.SNAP * 2)
+		Vector2(size.x - Flowchart.SNAP * 2 if state else 0, Flowchart.SNAP * 0.14),
+		Vector2(Flowchart.SNAP, Flowchart.SNAP * 0.8)
 		))
 
 func _sim_update(_graph:FlowchartNetwork):

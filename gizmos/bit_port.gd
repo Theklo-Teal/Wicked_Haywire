@@ -19,14 +19,23 @@ func _integrate():
 	value.width = 1
 	for entry : Electronics.BitSignal in aggregate:
 		value.width = max(value.width, entry.width)
+		value.hiz = entry.hiz
 		value.bits = entry.bits
 
 ## Return the boolean state of the bit at the given digit. 0 is the least significant.
-func read_bool(data, digit:=0) -> bool:
+func read_bool(data:Electronics.BitSignal, digit:=0) -> bool:
 	return data.to_int() & (1 << digit) == 1
 
+## Return an array of bools for all bits.
+func read_array(data:Electronics.BitSignal) -> Array[bool]:
+	var result : Array[bool]
+	var val = data.to_int()
+	for i in range(data.width):
+		result.append(val & (1 << i) == 1)
+	return result
+
 ## Return all the bits after accounting Hi-Z and pull states.
-func read_int(data) -> int:
+func read_int(data:Electronics.BitSignal) -> int:
 	return data.to_int()
 
 ## Write a value where all bits are valid, with a given bitwidth. If some bits

@@ -22,6 +22,7 @@ Gizmo ideas:
 		Bit Selector - A multiplexer that outputs a bit from a bus value, selected by another value.
 		Codec - Converts one value into another according to some rule, like binary number into 7 segment pattern or a rotation shift.
 	Sequential:
+		Bistable - A funny latch. Usually latches give priority to Reset or Set if both inputs are high. In this variant it produces an oscillation instead. Optionally make output "random" as if indeterminate; except it actually is a song encoded in binary.
 		Register/Bistable - Stores data; Latch (transparent input), Toggle (Flip-Flop), Implier (J-K Flip-Flop)
 		Shifter - Moves bits along a chain of registers. Can be a FIFO memory if bitwidth is larger than 1.
 		Counter - A Register which can change its state internal with an update signal.
