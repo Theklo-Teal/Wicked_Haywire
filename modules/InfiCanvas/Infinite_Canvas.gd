@@ -17,10 +17,13 @@ class_name InfiCanvas
 # Modulation of object positioning can now vary according to what object is it.
 # Added override functions for when starting or stopping to move an object.
 # Added object grouping feature. Objects in the same group move together.
+# Added `objects_selected` signal.
 
 #TODO Make zoom into the center
+#TODO Implement more signals
 #FIXME go_to(Vector2.ZERO) doesn't seem to work if InfiCanvas isn't root node.
 
+signal objects_selected(objects:Array)
 
 const DEBUGGING = false
 const MINIMUM_LASSO = Vector2(16,16)  # A lasso operation is only performed if its rect size is larger than this. Otherwise, a click was probably intended.
@@ -292,6 +295,12 @@ func _selected_obj_movement_stop(obj):
 ## Override this function if something is to happen when selecting objects.
 func set_selected(val:Array):
 		_selected = val
+		objects_selected.emit(val)
+		_set_selected(val)
+
+@warning_ignore("unused_parameter")
+func _set_selected(val:Array):
+	pass
 #endregion
 
 #region Canvas Handling

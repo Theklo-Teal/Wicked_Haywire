@@ -1,6 +1,6 @@
 @abstract
 extends NetBase
-class_name NetAnalysis
+class_name NetUtilities
 
 ## Functions necessary to store, traverse, search and analyze a network.
 

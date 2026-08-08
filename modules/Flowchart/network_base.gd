@@ -44,6 +44,9 @@ class Port:
 	static func default_link() -> StringName:
 		return &"Link"
 	
+	func reset():
+		value = default_value()
+	
 	func integrate():
 		_integrate()
 		aggregate.clear()
@@ -67,10 +70,11 @@ class Port:
 	
 	## Get current data of the link. Optionally, a read [code]filter[/code] in the Port class may be chosen, which transforms the data that is stored. If the filter doesn't exist, this returns [code]null[/code].
 	func read(filter:String="none", filter_args:Array=[]):
-		print(value)
 		if not has_method("read_" + filter):
 			return null
-		return callv("read_" + filter, filter_args)
+		var val = value
+		if value is Object and value.has_method("duplicate"): val = val.duplicate()
+		return callv("read_" + filter, [value] + filter_args)
 
 
 @abstract class NetVert extends Resource:
@@ -157,15 +161,15 @@ class Socket extends Joint:
 			emit_changed()
 	
 	func read(filter:="none", ...filter_args) -> Variant:
-		var val = port.callv("read_" + filter, [port.value] + filter_args)
+		var val = port.read(filter, filter_args)
 		_has_read(val)
 		has_read.emit(val)
 		return val
 	func write(val, filter:="none", ...filter_args) -> Error:
-		val = port.callv("write_" + filter, [val] + filter_args)
+		val = port.write(val, filter, filter_args)
 		_has_written(val)
 		has_written.emit(val)
-		return port.write(val)
+		return val
 	
 	## This socket was used to read a Port. The value is after any Port filtering.
 	@warning_ignore("unused_parameter")

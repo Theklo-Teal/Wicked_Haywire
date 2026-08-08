@@ -1,4 +1,4 @@
-extends NetAnalysis
+extends NetUtilities
 class_name FlowchartNetwork
 
 ## A network is composed of netlists which are isolated graphs. sockets are
@@ -40,8 +40,13 @@ func rebuild_network():
 signal sim_update_done
 signal sim_cycle_begun
 signal sim_cycle_finished
+signal sim_reset
 
 var sim_ticks : int = 0  ## How many sim update cycles since the start of the application. It will rollover if the value goes past 64 bits.
+
+func reset_simulation():
+	rebuild_network()
+	sim_reset.emit()
 
 func sim_cycle_begin():
 	_sim_cycle_begin()
@@ -65,6 +70,8 @@ func _sim_cycle_finish():
 func port_new(port_name:StringName) -> Port:
 	var port = port_classes[port_name].new()
 	sim_cycle_finished.connect(port.integrate, CONNECT_PERSIST)
+	sim_cycle_begun.connect(port.sim_cycle_begin, CONNECT_PERSIST)
+	sim_reset.connect(port.reset, CONNECT_PERSIST)
 	return port
 func link_new(link_name:StringName) -> Port:
 	return link_classes[link_name].new()

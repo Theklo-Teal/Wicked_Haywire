@@ -47,13 +47,15 @@ func _sim_update_respond(graph:FlowchartNetwork):
 class BitSignal extends RefCounted:
 	## The protocol for Ports managing binary digital signals.
 	
-	var maxval : int = 1  ## Used as a mask to limit the amount of bits stored.
 	var width : int = 1 :  ## Bit amount of values
 		set(val):
 			width = clampi(val, 1, 32)
 			var mask = (1 << width) - 1  # Find maximum value for this bitwidth
-			hiz = (maxval ^ mask) | hiz  # set new bits to hiz, if the width increases.
+			var new_hiz = (maxval ^ mask) | hiz  # set new bits to hiz, if the width increases.
 			maxval = mask
+			hiz = new_hiz
+			
+	var maxval : int = 1  ## Used as a mask to limit the amount of bits stored.
 	
 	var bits : int = 0 : 
 		set(val):
@@ -67,24 +69,21 @@ class BitSignal extends RefCounted:
 	var down : int = 0 :  ## Pulled down, for an HIZ bit, it makes it 0 as default.
 		set(val):
 			down = val & maxval
-	 
-	func to_int() -> int:
-		#var conflict = up & down
-		#var agreed = maxval & conflict & hiz
-		#var noisy = hiz | conflict
-		#var noised = G.rng.randi() & noisy + 1
-		#var deter = maxval ^ noisy
-		#var valid = bits & deter
-		#valid |= up & agreed
-		#valid |= down & agreed
-		#var value = valid & noised
-		#return value
-		return (G.rng.randi() & hiz) | (bits & (maxval ^ hiz))
+	
+	func _init(bitwidth:int):
+		width = bitwidth
+	
+	func duplicate():
+		var dupl = BitSignal.new(width)
+		dupl.bits = bits
+		dupl.up = bits
+		dupl.down = bits
+		return dupl
 
 
 #region Utilities
 ## Produce an integer which is the concatenation of input bits.
-func parallel_to_int(nums:Array[bool]) -> int:
+static func parallel_to_int(nums:Array[bool]) -> int:
 	var serial : int = 0
 	var digit : int = -1
 	for n : bool in nums:
@@ -93,7 +92,7 @@ func parallel_to_int(nums:Array[bool]) -> int:
 	return serial
 
 ## Return an array which counts the bits at the same binary digit of multiple integers.
-func parallel_bit_count(nums:PackedInt32Array, bit_width:int) -> PackedInt32Array:
+static func parallel_bit_count(nums:PackedInt32Array, bit_width:int) -> PackedInt32Array:
 	var counts : Array[int] = []
 	counts.resize(bit_width)
 	counts.fill(0)
@@ -103,7 +102,7 @@ func parallel_bit_count(nums:PackedInt32Array, bit_width:int) -> PackedInt32Arra
 	return counts
 
 ## Return how many bits are high or low in an integer.
-func count_bits(n:int, high:bool) -> int:
+static func count_bits(n:int, high:bool) -> int:
 	var amount = n
 	var count : int = 0
 	while n != 0:

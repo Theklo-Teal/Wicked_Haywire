@@ -48,8 +48,6 @@ class_name Flowchart
 @export var update_rate : float = 0.01 :  # Time for the simulation to update state.
 	set(val):
 		update_rate = max(0, val)
-		if is_node_ready():
-			$Update_Timer.wait_time = update_rate
 @export var trace_color_primary := Color.GOLDENROD
 @export var trace_color_secondary := Color.GOLD
 @export var trace_color_highlight := Color.YELLOW
@@ -93,10 +91,9 @@ func _process(delta: float) -> void:
 	if process_elapse > update_rate:
 		process_elapse = 0.0
 		if in_a_cycle:
+			skip_cycle = true
 			printerr("Flowchart: Simulation Rate not keeping up with cycle duration!")
-	_on_sim_update()
-	skip_cycle = false
-
+		_on_sim_update()
 
 #region Boilerplate
 var gizmo_pallet : Dictionary[String, PackedScene]
@@ -227,8 +224,7 @@ func _input(event: InputEvent) -> void:
 		if event.keycode == KEY_DELETE and $Input.at("idle"):
 			queue_redraw()
 			if not sel_wire.is_empty():
-				$Network.netlist.pairs.erase(sel_wire.pair_hash)
-				$Network.netlist.links.erase(sel_wire.pair_hash)
+				$Network.unlink_hash(sel_wire.pair_hash)
 				sel_wire.clear()
 			else:
 				for each in _selected:
@@ -387,24 +383,31 @@ signal sim_cycle_started
 signal sim_update_started
 signal sim_update_finish
 signal sim_cycle_finish
+signal auto_paused
+#signal auto_resume
 
 var in_a_cycle : bool = false
 var skip_cycle : bool = true
 var sim_paused : bool = false
 var tick_elapse : float = 0
 var process_elapse : float = 0
+var tick_countdown : int = -1
 
 func pause_sim():
 	#NOTE: we can't stop the timer because the Network relies on it for removing or adding Network Nodes.
 	sim_paused = true
-func resume_sim():
+## Run simulation cycles. If duration is a positive value, it will pause itself
+## after that amount of cycles, after which the signal [code]auto_pause[/code]
+## is emitted.
+func resume_sim(duration:int = -1):
 	sim_paused = false
+	tick_countdown = duration - 1
 func reset_sim():
-	for link in $Network.the_links:
-		$Network.the_links[link] = link.default
+	$Network.reset_simulation()
 
 func _on_sim_update():
 	var begin_time := Time.get_ticks_usec()
+	
 	if not skip_cycle:
 		in_a_cycle = true
 		sim_cycle_started.emit()
@@ -412,6 +415,11 @@ func _on_sim_update():
 		$Network.sim_cycle_begin()
 		
 		if not sim_paused:
+			if tick_countdown == 0:
+				pause_sim()
+				auto_paused.emit()
+			elif tick_countdown > 0: tick_countdown -= 1
+			
 			sim_update_started.emit()
 			$Network.sim_cycle_update()
 			await $Network.sim_update_done

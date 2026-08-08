@@ -1,8 +1,6 @@
 @tool
 extends Electronics
 
-#TODO Have variable bitwidth, making a bargraph from a single input.
-
 var sock : BitInput
 var states : Array[bool] = [false] :
 	set(val):
@@ -27,9 +25,9 @@ func _set_bitwidth():
 
 func _sim_update_sampling(_graph:FlowchartNetwork):
 	var old_state = state_int
-	states.assign(sock.read("array"))
+	states.assign(sock.read("array", bitwidth))
 	states.resize(bitwidth)
-	state_int = sock.read("int")
+	state_int = sock.read("int", bitwidth)
 	if state_int != old_state:
 		queue_redraw()
 

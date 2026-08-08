@@ -27,4 +27,4 @@ func _draw():
 		))
 
 func _sim_update(_graph:FlowchartNetwork):
-	sock.write(int(state), "value")
+	sock.write(int(state), "value", bitwidth)
