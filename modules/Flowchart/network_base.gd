@@ -47,9 +47,24 @@ class Port:
 	func reset():
 		value = default_value()
 	
-	func integrate():
+	func sim_cycle_begin(graph:FlowchartNetwork):
+		_sim_cycle_begin(graph)
+	func sim_update(graph:FlowchartNetwork):
+		_sim_update(graph)
+	func sim_cycle_finish(graph:FlowchartNetwork):
 		_integrate()
 		aggregate.clear()
+		_sim_cycle_finish(graph)
+	
+	@warning_ignore_start("unused_parameter")
+	func _sim_cycle_begin(graph:FlowchartNetwork): pass
+	func _sim_update(graph:FlowchartNetwork): pass
+	## Called after aggregate is cleared.
+	func _sim_cycle_finish(graph:FlowchartNetwork): pass
+	@warning_ignore_restore("unused_parameter")
+	
+	## Called before the aggregate is cleared. Override this function to decide
+	## what to write to the port value.
 	func _integrate():
 		if aggregate.size() == 0: return
 		value = roundi(aggregate.reduce(func(sum, a):return sum + a, 0) / aggregate.size())

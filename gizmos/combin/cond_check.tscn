@@ -7,6 +7,7 @@
 [ext_resource type="Script" uid="uid://cvcm4bskckdtj" path="res://gizmos/bit_input.gd" id="5_77rw7"]
 
 [sub_resource type="Resource" id="Resource_bv002"]
+resource_local_to_scene = true
 script = ExtResource("4_jpdw3")
 mode = 2
 port_class = &"BitPort"
@@ -24,6 +25,7 @@ limit = Vector2i(2, 4)
 metadata/_custom_type_script = "uid://dixllb5r68rvk"
 
 [sub_resource type="Resource" id="Resource_4nbmf"]
+resource_local_to_scene = true
 script = ExtResource("4_jpdw3")
 mode = 2
 port_class = &"BitPort"
@@ -35,6 +37,7 @@ position = Vector2(108, 60)
 metadata/_custom_type_script = "uid://0nsdyckus4cq"
 
 [sub_resource type="Resource" id="Resource_afif4"]
+resource_local_to_scene = true
 script = ExtResource("5_77rw7")
 mode = 1
 port_class = &"BitPort"
@@ -52,6 +55,7 @@ mirror_y = true
 metadata/_custom_type_script = "uid://dixllb5r68rvk"
 
 [sub_resource type="Resource" id="Resource_0fewg"]
+resource_local_to_scene = true
 script = ExtResource("5_77rw7")
 mode = 1
 port_class = &"BitPort"
@@ -207,7 +211,6 @@ anchors_preset = 0
 offset_right = 120.0
 offset_bottom = 120.0
 script = ExtResource("1_tu3ol")
-rule = 1
 description = "The basic logical element for binary values. You may select one of the boolean operations, with the second output being the inverted result."
 options = Dictionary[String, StringName]({
 "bitwidth": &"bitwidth"
@@ -234,7 +237,7 @@ offset_left = 24.0
 offset_right = 97.0
 offset_bottom = 31.0
 flat = true
-selected = 1
+selected = 0
 item_count = 4
 popup/item_0/text = "ALL"
 popup/item_0/id = 0
@@ -253,9 +256,9 @@ unique_name_in_owner = true
 layout_mode = 1
 offset_left = 48.0
 offset_top = 48.0
-offset_right = 95.0
+offset_right = 94.0
 offset_bottom = 71.0
-text = "NONE"
+text = "SOME"
 horizontal_alignment = 1
 vertical_alignment = 1
 metadata/grid_bound = Vector2(2, 2)

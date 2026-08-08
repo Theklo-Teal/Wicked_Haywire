@@ -69,8 +69,9 @@ func _sim_cycle_finish():
 
 func port_new(port_name:StringName) -> Port:
 	var port = port_classes[port_name].new()
-	sim_cycle_finished.connect(port.integrate, CONNECT_PERSIST)
-	sim_cycle_begun.connect(port.sim_cycle_begin, CONNECT_PERSIST)
+	sim_cycle_begun.connect(port.sim_cycle_begin.bind(self), CONNECT_PERSIST)
+	sim_update_done.connect(port.sim_update.bind(self), CONNECT_PERSIST)
+	sim_cycle_finished.connect(port.sim_cycle_finish.bind(self), CONNECT_PERSIST)
 	sim_reset.connect(port.reset, CONNECT_PERSIST)
 	return port
 func link_new(link_name:StringName) -> Port:
@@ -99,7 +100,7 @@ func unregister_gizmo(gizmo:FlowchartPanel, layer:int):
 ## Tries to returns an existing vertex at [code]where[/code], otherwise registers
 ## the given vertex. Whatever vertex is used, is returned.
 func get_or_add_vert(where:Vector2, layer:int, added_vert:NetVert) -> NetVert:
-	var cell = Flowchart.to_grid(where)
+	var cell = Flowchart.to_grid(where, true)
 	var vert = netlist.vias.get_or_add(Vector3i(cell.x, cell.y, layer), added_vert)
 	vert.coord = cell
 	vert.layer = layer
@@ -126,8 +127,7 @@ func rem_vert(vert:NetVert):
 	for link in netlist.get_links(vert):
 		var other = netlist.verts[link ^ vert_id]
 		other.disconnected(vert)
-		netlist.pairs.erase(link)
-		netlist.links.erase(link)
+		unlink_verts(vert, other)
 	
 	netlist.verts.erase(vert_id)
 	if vert is GizmoSocket:
@@ -159,5 +159,7 @@ func unlink_hash(pair_hash:int):
 	conns[0].disconnected(conns[1])
 	conns[1].disconnected(conns[0])
 	update_ports(null, conns[1])
+	if conns[0] is FlowchartVia and conns[0].conns() == 0 and conns[0].text.is_empty: rem_vert(conns[0])
+	if conns[1] is FlowchartVia and conns[1].conns() == 0 and conns[1].text.is_empty: rem_vert(conns[1])
 
 #endregion

@@ -125,7 +125,7 @@ func _ready() -> void:
 	%LineEdit.text_submitted.connect(_on_line_edit_submit)
 	$Canvas_Menu.index_pressed.connect(_on_popup_pressed)
 	
-	$Input.now().enter()
+	$Act.now().enter()
 
 func get_netlist() -> FlowchartNetwork.NetData:
 	return $Network.netlist
@@ -179,7 +179,7 @@ func draw_overlay(canvas:Control, _viewed_canvas_rect:Rect2):
 	$coord.position = get_local_mouse_position() + Vector2(0, -24)
 	
 	# Draw wire being pulled.
-	if $Input.at("wire_create") or $Input.at("wire_split") and not wire_from.is_empty():
+	if $Act.at("wire_create") or $Act.at("wire_split") and not wire_from.is_empty():
 		var wire_type = $Network.link_classes[wire_from.netvert.port.default_link()]
 		var thickness = wire_type._wire_thick()
 		thickness = clamp(thickness, 1, MAX_WIRE) * zoom
@@ -200,18 +200,21 @@ func _gui_input(event: InputEvent) -> void:
 	
 	if event is InputEventMouseButton:
 		if event.is_pressed():
-			if event.button_index == MOUSE_BUTTON_LEFT and not is_moving_obj:
-				_selected.clear()
-				var grab_gizmo = G.grabbed_buttons.get_pressed_button()
-				if grab_gizmo != null:
-					add_gizmo(grab_gizmo.get_meta("name"), to_canvas_coord(event.position))
-			$Input.now().mouse_gui_press(
-				event.button_index,
-				Input.is_key_pressed(KEY_SHIFT),
-				Input.is_key_pressed(KEY_CTRL),
-				)
+			var grab_gizmo = G.grabbed_buttons.get_pressed_button()
+			if not is_moving_obj:
+				if event.button_index == MOUSE_BUTTON_LEFT:
+					_selected.clear()
+					if grab_gizmo != null:
+						add_gizmo(grab_gizmo.get_meta("name"), to_canvas_coord(event.position))
+				
+				if grab_gizmo == null:
+					$Act.now().mouse_gui_press(
+						event.button_index,
+						Input.is_key_pressed(KEY_SHIFT),
+						Input.is_key_pressed(KEY_CTRL),
+						)
 		elif event.is_released():
-			$Input.now().mouse_gui_release(
+			$Act.now().mouse_gui_release(
 				event.button_index,
 				Input.is_key_pressed(KEY_SHIFT),
 				Input.is_key_pressed(KEY_CTRL),
@@ -221,7 +224,7 @@ func _input(event: InputEvent) -> void:
 	super(event)
 	
 	if event is InputEventKey and not event.is_echo():
-		if event.keycode == KEY_DELETE and $Input.at("idle"):
+		if event.keycode == KEY_DELETE and $Act.at("idle"):
 			queue_redraw()
 			if not sel_wire.is_empty():
 				$Network.unlink_hash(sel_wire.pair_hash)
@@ -235,19 +238,19 @@ func _input(event: InputEvent) -> void:
 			_selected.clear()
 			
 		if event.keycode == KEY_SHIFT:
-			$Input.now().shifted(event.is_pressed())
+			$Act.now().shifted(event.is_pressed())
 		if event.keycode == KEY_CTRL:
-			$Input.now().ctrled(event.is_pressed())
+			$Act.now().ctrled(event.is_pressed())
 	
 	if event is InputEventMouseButton:
 		if event.is_pressed():
-			$Input.now().mouse_press(
+			$Act.now().mouse_press(
 				event.button_index,
 				Input.is_key_pressed(KEY_SHIFT),
 				Input.is_key_pressed(KEY_CTRL),
 				)
 		elif event.is_released():
-			$Input.now().mouse_release(
+			$Act.now().mouse_release(
 				event.button_index,
 				Input.is_key_pressed(KEY_SHIFT),
 				Input.is_key_pressed(KEY_CTRL),
@@ -261,7 +264,7 @@ func _input(event: InputEvent) -> void:
 		if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) and not is_moving_obj and not _selected.is_empty():
 			selected_obj_movement_start()
 		elif not is_moving_obj:
-			$Input.now().mouse_move(Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT), 
+			$Act.now().mouse_move(Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT), 
 				Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT),
 				Input.is_key_pressed(KEY_SHIFT),
 				Input.is_key_pressed(KEY_CTRL),
@@ -286,7 +289,7 @@ func obj_movement_modulate(object, new_position:Vector2) -> Vector2:
 	return snap_grid(new_position)
 
 func escape_key_action():
-	$Input.now().cancel()
+	$Act.now().cancel()
 	super()
 
 func _on_line_edit_submit(_txt:String):
@@ -365,15 +368,15 @@ var sel_vert : NetBase.NetVert
 func start_socket_wiring(sock_data:Dictionary):
 	wire_from = sock_data
 	sel_vert = sock_data.netvert
-	$Input.set_mode("wire_create")
+	$Act.set_mode("wire_create")
 
 ## Wire stopped at a Gizmo socket.
 func stop_socket_wiring(sock_data:Dictionary):
-	if not ($Input.at("wire_create") or $Input.at("wire_split")): return
+	if not ($Act.at("wire_create") or $Act.at("wire_split")): return
 	if wire_from.is_empty(): return
 	if sock_data.netvert == wire_from.netvert: return
 	sel_vert = sock_data.netvert
-	$Input.now().finish_wiring(wire_from.netvert, sel_vert,
+	$Act.now().finish_wiring(wire_from.netvert, sel_vert,
 		Input.is_key_pressed(KEY_SHIFT), Input.is_key_pressed(KEY_CTRL))
 
 #endregion

@@ -18,6 +18,7 @@ class_name InfiCanvas
 # Added override functions for when starting or stopping to move an object.
 # Added object grouping feature. Objects in the same group move together.
 # Added `objects_selected` signal.
+# Enabled option to not draw highlight on objects, if their Rect2 doesn't have area.
 
 #TODO Make zoom into the center
 #TODO Implement more signals
@@ -469,10 +470,11 @@ func draw_compass():
 func draw_lasso():
 	draw_rect(lasso_screen_rect, [lasso_main_color, lasso_alter_color][int(lasso_mode)], false, lasso_thick)
 
-## Draw highlight effect on selected objects.
+## Draw highlight effect on selected objects. Objects where the Rect2 doesn't have area are ignored.
 func highlight_selection(selected_objs:Array):
 	for obj in selected_objs:
 		var rect = get_obj_rect(obj)
+		if rect.size == Vector2.ZERO: continue
 		rect.position = to_screen_coord(rect.position)
 		rect.size *= zoom
 		draw_rect(rect, Saliko.negate_color(color), false, lasso_thick)

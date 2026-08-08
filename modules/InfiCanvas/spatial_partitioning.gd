@@ -164,7 +164,7 @@ func get_obj_rect(obj) -> Rect2:
 		elif "rect" in obj:
 			return obj.rect
 		else:
-			return Rect2(get_obj_position(obj), Vector2.ONE)
+			return Rect2(get_obj_position(obj), Vector2.ZERO)
 
 func get_obj_position(obj) -> Vector2:
 	if typeof(obj) == TYPE_OBJECT and obj.has_method("get_position"):

@@ -18,7 +18,7 @@ func _init() -> void:
 # This keeps electronic noise when reading consistent regardless of how many
 # times functions that use RNG are called in the same sim cycle.
 var rng_cycle_state : int
-func sim_cycle_begin():
+func sim_cycle_begin(_graph:FlowchartNetwork):
 	G.rng.randi()  # Advances the RNG State for this port, so different ports will have different RNG outcomes.
 	rng_cycle_state = G.rng.state
 
