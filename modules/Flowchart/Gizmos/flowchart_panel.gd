@@ -68,6 +68,9 @@ var _mouse_hover : bool : set=_set_mouse_hover
 
 func _set_mouse_hover(val:bool):
 	_mouse_hover = val
+	if owner is Flowchart:
+		if val: owner._hover_gizmo = self
+		else: owner._hover_gizmo = null
 
 func _canvas_repositioned(_data:Dictionary):
 	_grid.position = Flowchart.to_grid(position)
@@ -159,6 +162,7 @@ func get_bound_distance(dist:float, axis_y:bool, centered:=false) -> float:
 #endregion
 
 func _gui_input(event: InputEvent) -> void:
+	if not owner is Flowchart: return
 	if event is InputEventMouseButton:
 		if event.is_pressed():
 			if event.button_index == MOUSE_BUTTON_LEFT:

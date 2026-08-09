@@ -109,9 +109,13 @@ var mode : Mode :
 		for gizmo : FlowchartPanel in $Network.netlist.gizmos.get(layer, []):
 			gizmo._on_flowchart_mode_changed(mode)
 
-
+var _hover_gizmo : FlowchartPanel :  ## Set by owned gizmos. This is an workaround to prioritize input events on gizmos over the canvas.
+	set(val):
+		_hover_gizmo = val
+		%gizmo.text = str(val != null)
+	
 func _ready() -> void:
-	if not OS.has_feature("debug"): $coord.hide()
+	if not OS.has_feature("debug"): %coord.hide()
 	if OS.has_feature("editor_hint"): return
 	
 	G.chart = self
@@ -136,7 +140,7 @@ func set_netlist(netdata:FlowchartNetwork.NetData):
 #endregion
 
 #region Drawing
-var _visible_links : PackedInt64Array
+var _visible_links : Dictionary
 
 func draw_back_geometry(viewed_canvas_rect:Rect2):
 	if OS.has_feature("editor_hint"): return
@@ -150,7 +154,7 @@ func draw_back_geometry(viewed_canvas_rect:Rect2):
 				var where = from_grid(joint.coord)
 				joint.draw(self, self, to_screen_coord(where))
 				for link in $Network.netlist.get_links(joint, true, false):
-					_visible_links.append(link)
+					_visible_links[link] = null
 
 func draw_fore_geometry(canvas:Control, viewed_canvas_rect:Rect2):
 	if OS.has_feature("editor_hint"): return
@@ -160,8 +164,8 @@ func draw_fore_geometry(canvas:Control, viewed_canvas_rect:Rect2):
 		if gizmo.get("sockets") == null: continue
 		for coord in gizmo._sockdex:
 			var socket = gizmo._sockdex[coord]
-			for link in $Network.netlist.get_links(socket, true, false):
-				_visible_links.append(link)
+			for link in $Network.netlist.get_links(socket):
+				_visible_links[link] = null
 	
 	# Drawing Wires
 	for link in _visible_links:
@@ -176,8 +180,8 @@ func draw_fore_geometry(canvas:Control, viewed_canvas_rect:Rect2):
 func draw_overlay(canvas:Control, _viewed_canvas_rect:Rect2):
 	if OS.has_feature("editor_hint"): return
 	
-	$coord.text = str(to_canvas_coord(get_local_mouse_position()))
-	$coord.position = get_local_mouse_position() + Vector2(0, -24)
+	%coord.text = str(to_canvas_coord(get_local_mouse_position()))
+	%coord.position = get_local_mouse_position() + Vector2(0, -24)
 	
 	# Draw wire being pulled.
 	if $Act.at("wire_create") or $Act.at("wire_split") and not wire_from.is_empty():
@@ -290,6 +294,8 @@ func obj_movement_modulate(object, new_position:Vector2) -> Vector2:
 	if object is FlowchartPanel:
 		queue_redraw()  # Makes wires follow gizmo sockets.
 		return snap_grid(new_position) - Vector2(0.5, 0.5) * SNAP
+	if object is NetBase.Joint:
+		return snap_grid(new_position - Vector2(0.5, 0.5) * SNAP)
 	return snap_grid(new_position)
 
 func escape_key_action():

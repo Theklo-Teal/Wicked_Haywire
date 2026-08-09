@@ -35,7 +35,6 @@ func _set_show_grid(val:bool):
 	super(val)
 	_update_sockdex()
 
-var socket_menu : PopupMenu
 var socket_tooltip : Control
 
 func _init() -> void:
@@ -44,7 +43,11 @@ func _init() -> void:
 	mouse_exited.connect(_on_mouse_exit)
 	
 	await ready
-	socket_tooltip = preload("uid://cxgvler3bpjqk").instantiate()
+	set_socket_toolip(preload("uid://cxgvler3bpjqk").instantiate())
+
+func set_socket_toolip(tooltip:Control):
+	if socket_tooltip != null: socket_tooltip.queue_free()
+	socket_tooltip = tooltip
 	socket_tooltip.hide()
 	socket_tooltip.mouse_exited.connect(func(): socket_tooltip.hide())
 	add_child(socket_tooltip, false, Node.INTERNAL_MODE_FRONT)
@@ -61,7 +64,6 @@ func _on_mouse_exit():
 	_mouse_hover = false
 	if not Input.is_key_pressed(KEY_CTRL): socket_tooltip.hide()
 	if hover_socket != null:
-		hover_socket.pressed=false
 		hover_socket.hover=false
 		hover_socket = null
 		queue_redraw()
@@ -95,11 +97,12 @@ func _input(event: InputEvent) -> void:
 						if event.is_pressed(): owner.start_socket_wiring(sock_data)
 						elif event.is_released(): owner.stop_socket_wiring(sock_data)
 			elif event.button_index == MOUSE_BUTTON_LEFT:
+				queue_redraw()
 				if event.is_pressed():
-					hover_socket.pressed = true
+					hover_socket.mouse_press()
 					_on_socket_pressed(hover_socket)
 				else:
-					hover_socket.pressed = false
+					hover_socket.mouse_release()
 					_on_socket_released(hover_socket)
 
 
@@ -196,4 +199,5 @@ func show_socket_tooltip(sock:GizmoSocket):
 		socket_tooltip.show()
 		socket_tooltip.position = sock.position + Vector2.ONE * Flowchart.SNAP
 		socket_tooltip.get_node("%Body").text = str(sock.port)
+		socket_tooltip.get_node("%Show_State").button_pressed = sock.pressed
 #endregion

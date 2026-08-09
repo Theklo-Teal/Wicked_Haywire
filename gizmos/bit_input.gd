@@ -5,12 +5,16 @@ class_name BitInput
 func _init() -> void:
 	super()
 	mode = SINK
+	toggle = true
 	port_class = &"BitPort"
 	accepted_port = [&"BitPort"]
 
-
-## This calls [code]write()[/code] and returns its outcome if the port value has
-## changed, otherwise returns [code]null[/code].
-func edge_trigger(filter:="none", ...filter_args) -> Variant:
-	if port.changed: return read.callv([filter] + filter_args)
-	return null
+#func read(filter:="none", ...filter_args) -> Variant:
+	#var bitsignal = port.read()
+	#var conflict = bitsignal.hiz | (bitsignal.up & bitsignal.down)
+	#var agreed = bitsignal.maxval ^ conflict
+	#var val = port.read(filter, filter_args)
+	#val = val & agreed | conflict
+	#_has_read(val)
+	#has_read.emit(val)
+	#return val

@@ -72,7 +72,7 @@ func read_int(data:Electronics.BitSignal, bitwidth:int=1) -> int:
 
 ## Write a value where all bits are valid, with a given bitwidth. If some bits
 ## aren't to be set, include a Hi-Z integer.
-func write_value(val:int, bitwidth:int=1, hiz:int=0) -> Electronics.BitSignal:
+func write_int(val:int, bitwidth:int=1, hiz:int=0) -> Electronics.BitSignal:
 	var data = Electronics.BitSignal.new(bitwidth)
 	data.bits = val
 	data.hiz = hiz

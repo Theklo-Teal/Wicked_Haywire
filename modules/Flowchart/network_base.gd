@@ -75,23 +75,25 @@ class Port:
 	func read_none(data, ..._other):
 		return data
 	
-	## Input data for the next state of the link. It returns an error code, if data isn't accepted.[br]
-	## Optionally, a write [code]filter[/code] of a Port class can be chosen, which transforms the format of the data before storing. An error is return if the requested filter doesn't exist.
-	func write(val, filter:String="none", filter_args:Array=[]) -> Error:
-		if not has_method("write_" + filter):
-			return Error.ERR_DOES_NOT_EXIST
-		val = callv("write_" + filter, [val] + filter_args)
-		aggregate.append(val)
-		return Error.OK
+	## Input data for the next state of the link. It returns an error code,
+	## if data isn't accepted.[br]
+	## Optionally, a write [code]filter[/code] of a Port class can be chosen,
+	## which transforms the format of the data before storing. An
+	##[code]null[/code] is return if the requested filter doesn't exist.
+	func write(val, filter:String="none", filter_args:Array=[]) -> Variant:
+		if has_method("write_" + filter):
+			val = callv("write_" + filter, [val] + filter_args)
+			aggregate.append(val)
+			return val
+		return null
 	
 	## Get current data of the link. Optionally, a read [code]filter[/code] in the Port class may be chosen, which transforms the data that is stored. If the filter doesn't exist, this returns [code]null[/code].
 	func read(filter:String="none", filter_args:Array=[]):
-		if not has_method("read_" + filter):
-			return null
-		var val = value
-		if value is Object and value.has_method("duplicate"): val = val.duplicate()
-		return callv("read_" + filter, [value] + filter_args)
-
+		if has_method("read_" + filter):
+			var val = value
+			if value is Object and value.has_method("duplicate"): val = val.duplicate()
+			return callv("read_" + filter, [value] + filter_args)
+		return null
 
 @abstract class NetVert extends Resource:
 	## Anything that can be connected in a network, like joints
@@ -181,7 +183,7 @@ class Socket extends Joint:
 		_has_read(val)
 		has_read.emit(val)
 		return val
-	func write(val, filter:="none", ...filter_args) -> Error:
+	func write(val, filter:="none", ...filter_args) -> Variant:
 		val = port.write(val, filter, filter_args)
 		_has_written(val)
 		has_written.emit(val)

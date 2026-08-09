@@ -12,6 +12,14 @@ corner_radius_bottom_right = 3
 corner_radius_bottom_left = 3
 corner_detail = 5
 
+[sub_resource type="GDScript" id="GDScript_3cmrc"]
+script/source = "extends PanelContainer
+
+
+func _ready() -> void:
+	set_meta(\"edit_control\", true)
+"
+
 [sub_resource type="LabelSettings" id="LabelSettings_jnm3w"]
 outline_size = 1
 
@@ -22,6 +30,7 @@ font_size = 12
 offset_right = 110.0
 offset_bottom = 50.0
 theme_override_styles/panel = SubResource("StyleBoxFlat_oo18t")
+script = SubResource("GDScript_3cmrc")
 
 [node name="VBoxContainer" type="VBoxContainer" parent="." unique_id=963209252]
 layout_mode = 2

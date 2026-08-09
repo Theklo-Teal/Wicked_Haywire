@@ -8,11 +8,11 @@ Gizmo ideas:
 		_Info Panel/Note - point to a joint and show text
 		_Ammeter - Count Gizmos between two joints.
 		_Bundle - Taps bits from a bus into separate lines.
-		Constant - A binary number that doesn't change. Can also be set to produce pull-up/pull-down effect.
-		Gate - Combines Diode, Hi-Z Buffer and can also be a NOT gate
+		_Constant - A binary number that doesn't change. Can also be set to produce pull-up/pull-down effect.
+		_Gate - Combines Diode, Hi-Z Buffer and can also be a NOT gate
+		_Maestro - A synchronization clock.
 		Relay - Switches between two network ports depending on a control signal.
 		Monostable - A pulse flips output, which then returns after a set time.
-		Heartbeat - A synchronization clock.
 	Combinational:
 		Bus Match - Compares input with given value, outputting high if they are equal.
 		Bit Counter - Counts how many bits in a value are High or LowBit Counter - Counts how many bits in a value are High or Low

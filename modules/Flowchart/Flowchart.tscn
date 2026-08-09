@@ -101,7 +101,7 @@ class InputMode:
 	## InfiCanvas action escape called.
 	func cancel():pass
 	## Mode entered
-	func enter(): me.get_node(\"state\").text = \"Abstract\"
+	func enter(): me.get_node(\"%state\").text = \"Abstract\"
 	## Mode exited
 	func exit(): pass
 	
@@ -130,7 +130,7 @@ class IdleMode extends InputMode:
 		me.queue_redraw()
 	
 	func enter():
-		me.get_node(\"state\").text = \"Idle\"
+		me.get_node(\"%state\").text = \"Idle\"
 		me.queue_redraw()
 		me.move_obj_allowed = true
 		me.lasso_allowed = true
@@ -157,9 +157,9 @@ class IdleMode extends InputMode:
 		else:
 			me._selected = moved_joint
 		return true
-	
-	 
-	func mouse_gui_press(button:MouseButton, shift:bool, ctrl:bool):
+
+	func mouse_press(button:MouseButton, shift:bool, ctrl:bool):
+		if me._hover_gizmo != null: return
 		me.sel_wire.clear() 
 		mouse_over_vert()
 		if me.sel_vert == null: mouse_over_wire()
@@ -180,7 +180,8 @@ class IdleMode extends InputMode:
 					elif not me.sel_vert == null:
 						switch.call(\"wire_create\")
 		
-	func mouse_gui_release(button:MouseButton, _shift:bool, _ctrl:bool):
+	func mouse_release(button:MouseButton, _shift:bool, _ctrl:bool):
+		if me._hover_gizmo != null: return
 		# Lasso Selection
 		if button == MOUSE_BUTTON_LEFT:
 			if me.lasso_allowed and me.lasso_canvas_rect.size > Flowchart.MINIMUM_LASSO:
@@ -200,30 +201,28 @@ class WireMode extends InputMode:
 		switch.call(\"idle\")
 		
 	func enter():
-		me.get_node(\"state\").text = \"WireMode\"
+		me.get_node(\"%state\").text = \"WireMode\"
 		me.move_obj_allowed = false
 		me.lasso_allowed = false
 	
 	#FIXME: dragging from Gizmos doesn't place via on release.
 	#FIXME: clicking to gizmos with a wire, doesn't connect.
-	func mouse_gui_release(button:MouseButton, shift:bool, ctrl:bool):
-		if not button == MOUSE_BUTTON_RIGHT: switch.call(\"idle\"); return
-		if grid_mouse() == me.wire_from.get(\"coord\"): switch.call(\"idle\"); return
-		
-		var destin = find_joint()  # Finding the destination joint of a wire
-		finish_wiring(me.wire_from.netvert, destin, shift, ctrl)
+	func mouse_release(button:MouseButton, shift:bool, ctrl:bool):
+		if me._hover_gizmo == null:
+			if not button == MOUSE_BUTTON_RIGHT: switch.call(\"idle\"); return
+			if grid_mouse() == me.wire_from.get(\"coord\"): switch.call(\"idle\"); return
+			
+			find_joint()  # Finding the destination joint of a wire
+		finish_wiring(me.wire_from.netvert, me.sel_vert, shift, ctrl)
 	
 	func find_joint() -> NetBase.Joint:
-		var via : NetBase.Joint
 		mouse_over_vert()
 		if me.sel_vert == null:
 			mouse_over_wire()
-			if me.sel_wire.is_empty(): via = me.add_via(canvas_mouse())
-			else: via = split_wire().netvert
-		else:
-			via = me.sel_vert
-		if via == me.wire_from.netvert: return null
-		return via
+			if me.sel_wire.is_empty(): me.sel_vert = me.add_via(canvas_mouse())
+			else: me.sel_vert = split_wire().netvert
+		if me.sel_vert == me.wire_from.netvert: return null
+		return me.sel_vert
 		
 	func finish_wiring(origin:NetBase.Joint, destin:NetBase.Joint, shift:bool, _ctrl:bool):
 		me.wire_from.clear()
@@ -257,7 +256,7 @@ class WireMode extends InputMode:
 class WireCreate extends WireMode:
 	func enter():
 		super()
-		me.get_node(\"state\").text = \"Wire Create\"
+		me.get_node(\"%state\").text = \"Wire Create\"
 		if not me.sel_vert is GizmoSocket:
 			me.wire_from = {
 				\"netvert\": me.sel_vert,
@@ -271,7 +270,7 @@ class WireCreate extends WireMode:
 class WireSplit extends WireMode:
 	func enter():
 		super()
-		me.get_node(\"state\").text = \"Wire Split\"
+		me.get_node(\"%state\").text = \"Wire Split\"
 		me.wire_from = split_wire()
 	
 	func shifted(_pressed:bool):
@@ -338,15 +337,33 @@ script = SubResource("GDScript_x8yhq")
 script = ExtResource("3_3gi3x")
 metadata/_custom_type_script = "uid://ctv2i7rdaj44r"
 
-[node name="state" type="Label" parent="." unique_id=627417524]
+[node name="VBoxContainer2" type="VBoxContainer" parent="." unique_id=147196501]
 layout_mode = 1
 anchors_preset = 5
 anchor_left = 0.5
 anchor_right = 0.5
 offset_left = -20.0
 offset_right = 20.0
-offset_bottom = 23.0
+offset_bottom = 50.0
 grow_horizontal = 2
+
+[node name="state" type="Label" parent="VBoxContainer2" unique_id=627417524]
+unique_name_in_owner = true
+layout_mode = 2
+text = "???"
+horizontal_alignment = 1
+
+[node name="gizmo" type="Label" parent="VBoxContainer2" unique_id=1417366262]
+unique_name_in_owner = true
+layout_mode = 2
+text = "false"
+horizontal_alignment = 1
+
+[node name="coord" type="Label" parent="." unique_id=900146494]
+unique_name_in_owner = true
+layout_mode = 0
+offset_right = 40.0
+offset_bottom = 23.0
 text = "???"
 
 [node name="VBoxContainer" type="VBoxContainer" parent="." unique_id=2124179095]
@@ -400,9 +417,3 @@ size = Vector2i(181, 251)
 item_count = 1
 item_0/text = "A Via"
 item_0/id = 0
-
-[node name="coord" type="Label" parent="." unique_id=900146494]
-layout_mode = 0
-offset_right = 40.0
-offset_bottom = 23.0
-text = "???"

@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="FlowchartStyle" format=3 uid="uid://cau8aque1on3r"]
+
+[ext_resource type="Script" uid="uid://ckwx0a4u6y2ce" path="res://styles/flowchart/flowchart_style.gd" id="1_yuws8"]
+
+[resource]
+script = ExtResource("1_yuws8")
+cell_size = 24
+grid_thick = -1
+grid_color = Color(0.631907, 0.8203125, 0.59280396, 1)
+orig_color = Color(0.23451465, 0.41015625, 0.19866943, 1)
+color = Color(0.30455732, 0.62109375, 0.21592712, 1)
+trace_primary = Color(0.7421875, 0.67940235, 0.16815186, 1)
+trace_secondary = Color(0.8007246, 0.86328125, 0, 1)
+trace_highlight = Color(0.98083496, 1, 0.38671875, 1)
+metadata/_custom_type_script = "uid://ckwx0a4u6y2ce"

@@ -1,6 +1,8 @@
 @tool
 extends Electronics
 
+@export var key_mode : Dictionary[Key, bool] = {KEY_1: false}  ## Keyboard keys that control this switch and whether they behave as toggles, rather than momentary switches.
+@export var key_bit : Dictionary[Key, int] = {KEY_1: 0}  ## Which bit the
 @export var button_panel : StyleBox
 var sock : BitOutput
 var state : bool
@@ -17,6 +19,15 @@ func _gui_input(event: InputEvent) -> void:
 		if event.is_pressed() and event.button_index == MOUSE_BUTTON_LEFT:
 			state = not state
 			queue_redraw()
+	
+	if event is InputEventKey:
+		var bit = key_bit.get(event.keycode, -1)
+		var toggle = key_mode.get(event.keycode, false)
+		if bit >= 0:
+			if event.is_pressed() and not event.is_echo():
+				state = not state if toggle else true
+			elif event.is_released():
+				if not toggle: state = false
 
 func _draw():
 	super()
