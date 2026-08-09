@@ -14,9 +14,11 @@ func _set_bitwidth():
 @export var dwell : int :  ## How many simulation ticks it takes to sample inputs or emit outputs.
 	set(val):
 		dwell = max(0, val)
-@export var delay : int :  ## How many simulation ticks for the output to respond to the input, after sampling due [code]dwell[/code].
+@export var delay : int :  ## How many simulation ticks for the output to respond to the input, after sampling with [code]dwell[/code].
 	set(val):
 		delay = max(0, val)
+
+var _edgy_sockets : Dictionary[BitInput, int]  ## A list of sockets being observed for the contigence of their ports changing value.
 
 @export_multiline() var description : String = ""
 
@@ -26,23 +28,56 @@ func _set_bitwidth():
 static func toybox_included() -> bool:
 	return false
 
-## Instantaneous response to a simulation update tick. Use [code]_sim_update_sampling[/code]
-## to account [code]dwell[/code] and [code]_sim_update_response[/code] to account [code]delay[/code].
-func _sim_update(graph:FlowchartNetwork):
+## Registers sockets to be observed in the contigence of changing values.
+## Use [code]_edge_triggered()[/code] and [code]_edge_triggered_sampling()[/code]
+## to respond to these changed values.[br]
+## Can only watch BitInput sockets.
+func watch_sockets(...bit_input_socks):
+	for sock in bit_input_socks:
+		if sock is BitInput:
+			_edgy_sockets[sock] = sock.read("int")
+
+func sim_update(graph:FlowchartNetwork):
+	var changed : Dictionary[BitInput, Vector2i]
+	for sock in _edgy_sockets:
+		var curr_val = sock.read("int")
+		var diff = curr_val ^ _edgy_sockets[sock]
+		if diff > 0:
+			var highs = diff & curr_val
+			var lows = diff ^ highs
+			_edgy_sockets[sock] =  curr_val
+			_edge_triggered(graph, sock, highs, lows)
+			changed[sock] = Vector2i(highs, lows)
+	
 	if dwell == 0 or posmod(graph.sim_ticks, dwell) == 0:
 		_sim_update_sampling(graph)
+		for sock in changed:
+			_edge_triggered_sampling(graph, sock, changed[sock].x, changed[sock].y)
 	
 	if delay == 0 or posmod(graph.sim_ticks, delay) == 0:
 		_sim_update_respond(graph)
+	
+	super(graph)
 
-@warning_ignore("unused_parameter")
+@warning_ignore_start("unused_parameter")
+## Instantaneous response to a simulation update tick. Use [code]_sim_update_sampling[/code]
+## to account [code]dwell[/code] and [code]_sim_update_response[/code] to account [code]delay[/code].
+func _sim_update(graph:FlowchartNetwork):
+	pass
 ## Called at the time the Gizmo samples inputs due [code]dwell[/code].
 func _sim_update_sampling(graph:FlowchartNetwork):
 	pass
-@warning_ignore("unused_parameter")
 ## Called at the time the Gizmo emits output due [code]delay[/code].
 func _sim_update_respond(graph:FlowchartNetwork):
 	pass
+## Called at sim cycle update, if value on a socket registered with [code]watch_socket[/code]
+## has changed, providing which bits were set high or low.
+func _edge_triggered(graph:FlowchartNetwork, socket: BitInput, rising:int, falling:int):
+	pass
+## Similar to [code]_edge_triggered()[/code], but called at the [code]dwell[/code] trigger.
+func _edge_triggered_sampling(graph:FlowchartNetwork, socket: BitInput, rising:int, falling:int):
+	pass
+@warning_ignore_restore("unused_parameter")
 
 class BitSignal extends RefCounted:
 	## The protocol for Ports managing binary digital signals.

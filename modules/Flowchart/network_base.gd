@@ -24,6 +24,7 @@ class Port:
 	## Target for signals being conveyed during simulation using an Observer Pattern.
 	
 	var value  ## Current value in the link for reading by sockets.
+	var changed : bool  ## Tells if for a given sim update cycle a significant change in the value happened. Implement what that means with [code]_has_changed()[/code].
 	var aggregate : Array  ## Append written values during simulation update to then integrate to final decision.
 	
 	static func added_class_info() -> StringName:

@@ -1,0 +1,12 @@
+[gd_scene format=3 uid="uid://b424udvex1i2"]
+
+[ext_resource type="Script" uid="uid://dxbdnxmvfy5cw" path="res://gizmos/electronics.gd" id="1_8ra1t"]
+
+[node name="Ram" type="Control" unique_id=559031523]
+custom_minimum_size = Vector2(24, 24)
+layout_mode = 3
+anchors_preset = 0
+offset_right = 24.0
+offset_bottom = 24.0
+script = ExtResource("1_8ra1t")
+metadata/_custom_type_script = "uid://dxbdnxmvfy5cw"

@@ -22,6 +22,7 @@ func sim_cycle_begin(_graph:FlowchartNetwork):
 	G.rng.randi()  # Advances the RNG State for this port, so different ports will have different RNG outcomes.
 	rng_cycle_state = G.rng.state
 
+
 func _integrate():
 	if aggregate.size() == 0: return
 	value.width = 1
@@ -46,15 +47,6 @@ func _integrate():
 func to_int(data:Electronics.BitSignal) -> int:
 	G.rng.state = rng_cycle_state
 	#var conflict = up & down
-	#var agreed = maxval & conflict & hiz
-	#var noisy = hiz | conflict
-	#var noised = G.rng.randi() & noisy + 1
-	#var deter = maxval ^ noisy
-	#var valid = bits & deter
-	#valid |= up & agreed
-	#valid |= down & agreed
-	#var value = valid & noised
-	#return value
 	var noise = G.rng.randi() & data.hiz
 	var valid = data.bits & (data.maxval ^ data.hiz)
 	return noise | valid

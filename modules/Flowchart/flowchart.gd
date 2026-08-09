@@ -70,14 +70,14 @@ const VIA_HOLE = 5  ## Radius of the holes in joints.
 const MAX_WIRE = 20  ## Maximum thickness of a wire.
 const CLEARANCE = 2  ## Minimum distance between conductors.
 const JOINT_RAD = 12
-static func snap_grid(pos:Vector2, centered:=false) -> Vector2:
-	return pos.snappedf(SNAP) + (Vector2(0.5, 0.5) * SNAP if centered else Vector2.ZERO)
+static func snap_grid(pos:Vector2) -> Vector2:
+	return pos.snappedf(SNAP) + (Vector2(0.5, 0.5) * SNAP)
 ## Returns the actual space position snapped to the grid from a grid coordinate.
-static func from_grid(coord:Vector2i, centered:=false) -> Vector2:
-	return Vector2(coord) * SNAP + (Vector2(0.5, 0.5) * SNAP if centered else Vector2.ZERO)
+static func from_grid(coord:Vector2i) -> Vector2:
+	return Vector2(coord) * SNAP + (Vector2(0.5, 0.5) * SNAP)
 ## Returns [code]coord[/code] on the grid.
-static func to_grid(pos:Vector2, centered:=false) -> Vector2i:
-	pos -= Vector2(0.5, 0.5) * SNAP if centered else Vector2.ZERO
+static func to_grid(pos:Vector2) -> Vector2i:
+	pos -= Vector2(0.5, 0.5) * SNAP
 	var coord := Vector2i(  ## Find cell coordinate in the grid
 		roundi(inverse_lerp(0, SNAP, pos.x)),
 		roundi(inverse_lerp(0, SNAP, pos.y))
@@ -108,6 +108,7 @@ var mode : Mode :
 		mode = val
 		for gizmo : FlowchartPanel in $Network.netlist.gizmos.get(layer, []):
 			gizmo._on_flowchart_mode_changed(mode)
+
 
 func _ready() -> void:
 	if not OS.has_feature("debug"): $coord.hide()
@@ -146,7 +147,7 @@ func draw_back_geometry(viewed_canvas_rect:Rect2):
 		#TODO don't track GizmoSockets. We use Gizmo search to tell if to draw these.
 		if not joint is GizmoSocket:
 			if joint.layer == layer:
-				var where = from_grid(joint.coord, true)
+				var where = from_grid(joint.coord)
 				joint.draw(self, self, to_screen_coord(where))
 				for link in $Network.netlist.get_links(joint, true, false):
 					_visible_links.append(link)
@@ -167,8 +168,8 @@ func draw_fore_geometry(canvas:Control, viewed_canvas_rect:Rect2):
 		var wire : NetBase.Link = $Network.netlist.links[link]
 		var pair : Array[NetBase.NetVert]
 		pair.assign($Network.netlist.pairs[link])
-		var pos1 = $Network.netlist.sockets.get(pair[0]).canvas_socket_position(pair[0]) if pair[0] in $Network.netlist.sockets else from_grid(pair[0].coord, true)
-		var pos2 = $Network.netlist.sockets.get(pair[1]).canvas_socket_position(pair[1]) if pair[1] in $Network.netlist.sockets else from_grid(pair[1].coord, true)
+		var pos1 = $Network.netlist.sockets.get(pair[0]).canvas_socket_position(pair[0]) if pair[0] in $Network.netlist.sockets else from_grid(pair[0].coord)
+		var pos2 = $Network.netlist.sockets.get(pair[1]).canvas_socket_position(pair[1]) if pair[1] in $Network.netlist.sockets else from_grid(pair[1].coord)
 		wire.draw(self, canvas, to_screen_coord(pos1), to_screen_coord(pos2))
 
 
@@ -187,7 +188,7 @@ func draw_overlay(canvas:Control, _viewed_canvas_rect:Rect2):
 	
 	# Highlight grid cell under mouse.
 	var where = to_canvas_coord(get_local_mouse_position(), -Vector2(0.5, 0.5) * SNAP)
-	where = to_screen_coord( snap_grid(where, true ))
+	where = to_screen_coord( snap_grid(where) )
 	var clr = G.appearance.color.inverted()
 	clr.a = 0.4
 	canvas.draw_circle(where, JOINT_RAD * zoom, clr)
@@ -227,8 +228,11 @@ func _input(event: InputEvent) -> void:
 		if event.keycode == KEY_DELETE and $Act.at("idle"):
 			queue_redraw()
 			if not sel_wire.is_empty():
+				var joints = $Network.netlist.joints_of_hash(sel_wire.pair_hash)
 				$Network.unlink_hash(sel_wire.pair_hash)
 				sel_wire.clear()
+				if joints[0] is FlowchartVia and joints[0].conns() == 0 and joints[0].text.is_empty(): rem_via(joints[0])
+				if joints[1] is FlowchartVia and joints[1].conns() == 0 and joints[1].text.is_empty(): rem_via(joints[1])
 			else:
 				for each in _selected:
 					if each is FlowchartPanel:
@@ -285,7 +289,7 @@ func selected_obj_movement_stop():
 func obj_movement_modulate(object, new_position:Vector2) -> Vector2:
 	if object is FlowchartPanel:
 		queue_redraw()  # Makes wires follow gizmo sockets.
-		return snap_grid(new_position)
+		return snap_grid(new_position) - Vector2(0.5, 0.5) * SNAP
 	return snap_grid(new_position)
 
 func escape_key_action():
@@ -390,7 +394,7 @@ signal auto_paused
 #signal auto_resume
 
 var in_a_cycle : bool = false
-var skip_cycle : bool = true
+var skip_cycle : bool = false
 var sim_paused : bool = false
 var tick_elapse : float = 0
 var process_elapse : float = 0

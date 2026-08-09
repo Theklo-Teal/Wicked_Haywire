@@ -137,9 +137,9 @@ func east():
 func widget_east():
 	me.get_node(\"%rule_option\").set_meta(\"grid_bound\", pos_coord - opt_wid)
 	me.get_node(\"%rule_invert\").set_meta(\"grid_bound\", neg_coord - inv_wid)
-	var padding = 0.2 if me.mirrored else -0.6
-	me.get_node(\"%buttons\").set_meta(\"grid_bound\", butts_coord + Vector2(1.5, padding))
-
+	me.get_node(\"%buttons\").set_meta(\"grid_bound\", butts_coord)
+	me.get_node(\"%buttons\").offset_transform_position.x = Flowchart.SNAP + 4
+	me.get_node(\"%buttons\").offset_transform_position.y = -10
 
 func south():
 	me.size.x += inp_offset
@@ -179,8 +179,8 @@ func west():
 func widget_west():
 	me.get_node(\"%rule_option\").set_meta(\"grid_bound\", pos_coord + Vector2(1, 0.0 if me.mirrored else -0.2))
 	me.get_node(\"%rule_invert\").set_meta(\"grid_bound\", neg_coord + Vector2(1, 0))
-	var padding = 0.4 if me.mirrored else -0.2
-	me.get_node(\"%buttons\").set_meta(\"grid_bound\", butts_coord - Vector2(butts_wid.x, padding))
+	me.get_node(\"%buttons\").set_meta(\"grid_bound\", butts_coord)
+	me.get_node(\"%buttons\").offset_transform_position_ratio.x = 1
 
 
 func north():
@@ -203,6 +203,8 @@ func widget_north():
 	var padding = 0.2 if me.mirrored else 1.2 - butts_wid.x
 	me.get_node(\"%buttons\").set_meta(\"grid_bound\", butts_coord + Vector2(padding, -1.5))
 "
+
+[sub_resource type="PlaceholderTexture2D" id="PlaceholderTexture2D_jpdw3"]
 
 [node name="CondCheck" type="Control" unique_id=689840977]
 custom_minimum_size = Vector2(32, 32)
@@ -234,9 +236,12 @@ script = SubResource("GDScript_ax31v")
 unique_name_in_owner = true
 layout_mode = 1
 offset_left = 24.0
-offset_right = 97.0
+offset_right = 105.0
 offset_bottom = 31.0
+theme_override_constants/arrow_margin = 1
+theme_override_icons/arrow = SubResource("PlaceholderTexture2D_jpdw3")
 flat = true
+alignment = 2
 selected = 0
 item_count = 4
 popup/item_0/text = "ALL"
@@ -254,23 +259,24 @@ metadata/edit_only_control = true
 [node name="rule_invert" type="Label" parent="." unique_id=1787863043]
 unique_name_in_owner = true
 layout_mode = 1
-offset_left = 48.0
+offset_left = 72.0
 offset_top = 48.0
-offset_right = 94.0
+offset_right = 118.0
 offset_bottom = 71.0
 text = "SOME"
 horizontal_alignment = 1
 vertical_alignment = 1
-metadata/grid_bound = Vector2(2, 2)
+metadata/grid_bound = Vector2(3, 2)
 
 [node name="buttons" type="HBoxContainer" parent="." unique_id=2086253710]
 unique_name_in_owner = true
 layout_mode = 1
-offset_left = 36.0
-offset_top = 81.600006
-offset_right = 72.0
-offset_bottom = 112.600006
-metadata/grid_bound = Vector2(1.5, 3.4)
+offset_top = 96.0
+offset_right = 36.0
+offset_bottom = 127.0
+offset_transform_enabled = true
+offset_transform_position = Vector2(28, -10)
+metadata/grid_bound = Vector2(0, 4)
 metadata/hide_on_disable = true
 metadata/edit_control = true
 

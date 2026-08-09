@@ -12,8 +12,9 @@ class_name FlowchartPanel
 ## the position of objects to move them around, and the [code]panels[/code] property
 ## to decide which panels to display.[br]
 ## The background is a procedurally generated set of StyleBox defined in
-## [code]panelstyle[/code], and positioned with [code]panelrect[/code], according to
-## [code]panels[/code] indexes. The same StyleBox can be reused for different Rect2.[br]
+## [code]panelstyle[/code], where then [code]panels[/code] associates a Vector4 as
+## coordinate of each panel side to an StyleBox index. The same StyleBox can be
+## reused for different Vector4.[br]
 ## Child UI controls are typically disabled if [code]Flowchart.mode[/code] is
 ## [code]Flowchart.Mode.EDITING[/code], allowing to drag and move them, without
 ## changing their state accidentally. If a child Control node is meant to
@@ -21,10 +22,10 @@ class_name FlowchartPanel
 ## called "edit_control" set to [code]true[/code]. If it shouldn't be enabled
 ## during simulation add the metadata "edit_only_control" instead.[br]
 ## You may have controls hide when disabled with the metadata "hide_on_disable".[br]
-## You may also make child controls' anchors bound to the grid with the metadata
-## "grid_bound" associated to a Vector2 and it will respect the same rules as panel Rect2.
-## The position will then be relative to these anchors. In the [code]_update_layout()[/code]
-## this coordinate may be modified to make controls snap to the grid.
+## You may also make child controls' position bound to the grid with the metadata
+## "grid_bound" associated to a Vector2 and it will respect the same rules as panel Vector4.
+## Afterwards use [code]offset_transform_*()[/code] to position the child control
+## relative to that position when defining layout with [code]_update_layout()[/code].
 
 #TODO Disable Gizmo repositioning if clicking on controls in editing mode.
 
@@ -68,9 +69,6 @@ var _mouse_hover : bool : set=_set_mouse_hover
 func _set_mouse_hover(val:bool):
 	_mouse_hover = val
 
-#@onready var socket_menu := PopupMenu.new()
-#@onready var socket_tooltip := PanelContainer.new()
-
 func _canvas_repositioned(_data:Dictionary):
 	_grid.position = Flowchart.to_grid(position)
 
@@ -78,6 +76,13 @@ func _parti_registered(_parti:SpatialPartition, data:Dictionary) -> void:
 	data.registry_acknowledged = true
 
 func _init() -> void:
+	
+	# Enable offset control to grid-bound elements.
+	for each in get_children():
+		if each is Control and each.has_meta("grid_bound"):
+			offset_transform_enabled = true
+			offset_transform_visual_only = false
+	
 	resized.connect(_on_resized)
 	mouse_entered.connect(func():_mouse_hover = true)
 	mouse_exited.connect(func():_mouse_hover = false)
@@ -108,7 +113,7 @@ func _on_resized():
 #region Positioning things to the grid
 
 func get_canvas_position(coord:Vector2i) -> Vector2:
-	return position + Flowchart.from_grid(coord, true)
+	return position + Flowchart.from_grid(coord)
 
 func get_canvas_coord(coord:Vector2i) -> Vector2i:
 	return _grid.position + get_bound_coord(coord)
@@ -234,7 +239,7 @@ func _draw() -> void:
 		if show_grid:
 			for y : int in range(_grid.size.y):
 				for x : int in range(_grid.size.x):
-					var pos = Flowchart.from_grid(Vector2i(x,y), true)
+					var pos = Flowchart.from_grid(Vector2i(x,y))
 					draw_circle(pos, Flowchart.JOINT_RAD, Color.HOT_PINK, false)
 	elif owner is Flowchart:
 		# Allow socket effects to update when it's the Flowchart drawing them.

@@ -1,0 +1,138 @@
+[gd_scene format=3 uid="uid://cv4efcjj2atcp"]
+
+[ext_resource type="Script" uid="uid://c4qn6ssja2lu8" path="res://gizmos/sequen/bistable.gd" id="1_0tklw"]
+[ext_resource type="Script" uid="uid://ddaiqnfpchm0j" path="res://modules/Flowchart/Joints/flowchart_socket.gd" id="2_0tklw"]
+[ext_resource type="Script" uid="uid://dixllb5r68rvk" path="res://modules/Flowchart/Gizmos/gizmo_cluster.gd" id="3_rcejo"]
+[ext_resource type="Script" uid="uid://cvcm4bskckdtj" path="res://gizmos/bit_input.gd" id="4_35xia"]
+[ext_resource type="Script" uid="uid://0nsdyckus4cq" path="res://gizmos/bit_output.gd" id="5_2ie02"]
+
+[sub_resource type="Resource" id="Resource_m7vdf"]
+resource_local_to_scene = true
+script = ExtResource("4_35xia")
+mode = 1
+port_class = &"BitPort"
+accepted_port = Array[StringName]([&"BitPort"])
+refuse_port = Array[StringName]([])
+layer = 0
+coord = Vector2i(0, 0)
+position = Vector2(12, 12)
+metadata/_custom_type_script = "uid://cvcm4bskckdtj"
+
+[sub_resource type="Resource" id="Resource_3tmui"]
+script = ExtResource("3_rcejo")
+metadata/_custom_type_script = "uid://dixllb5r68rvk"
+
+[sub_resource type="Resource" id="Resource_w1atm"]
+resource_local_to_scene = true
+script = ExtResource("4_35xia")
+mode = 1
+port_class = &"BitPort"
+accepted_port = Array[StringName]([&"BitPort"])
+refuse_port = Array[StringName]([])
+layer = 0
+coord = Vector2i(0, 0)
+position = Vector2(12, 60)
+metadata/_custom_type_script = "uid://cvcm4bskckdtj"
+
+[sub_resource type="Resource" id="Resource_f8oky"]
+script = ExtResource("3_rcejo")
+coord = Vector2i(0, 2)
+metadata/_custom_type_script = "uid://dixllb5r68rvk"
+
+[sub_resource type="Resource" id="Resource_c2l2c"]
+resource_local_to_scene = true
+script = ExtResource("5_2ie02")
+mode = 2
+port_class = &"BitPort"
+accepted_port = Array[StringName]([&"BitPort"])
+refuse_port = Array[StringName]([])
+layer = 0
+coord = Vector2i(0, 0)
+position = Vector2(108, 12)
+metadata/_custom_type_script = "uid://0nsdyckus4cq"
+
+[sub_resource type="Resource" id="Resource_rc8y3"]
+script = ExtResource("3_rcejo")
+coord = Vector2i(-1, 0)
+metadata/_custom_type_script = "uid://dixllb5r68rvk"
+
+[sub_resource type="Resource" id="Resource_3qqjw"]
+resource_local_to_scene = true
+script = ExtResource("5_2ie02")
+mode = 2
+port_class = &"BitPort"
+accepted_port = Array[StringName]([&"BitPort"])
+refuse_port = Array[StringName]([])
+layer = 0
+coord = Vector2i(0, 2)
+position = Vector2(108, 60)
+metadata/_custom_type_script = "uid://0nsdyckus4cq"
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_0tklw"]
+bg_color = Color(0.515625, 0.515625, 0.515625, 1)
+corner_radius_bottom_right = 20
+corner_radius_bottom_left = 20
+corner_detail = 1
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_rcejo"]
+bg_color = Color(0.5137255, 0.5137255, 0.5137255, 1)
+corner_radius_top_left = 20
+corner_radius_top_right = 20
+corner_detail = 1
+
+[node name="Bistable" type="Control" unique_id=891508316]
+custom_minimum_size = Vector2(24, 24)
+layout_mode = 3
+anchors_preset = 0
+offset_right = 120.0
+offset_bottom = 72.0
+script = ExtResource("1_0tklw")
+description = "A funny latch. Usually latches prioritize Reset if both inputs are high. But this one oscillates instead, making it into an oscillator that can be enabled or disabled."
+sockets = Dictionary[ExtResource("2_0tklw"), ExtResource("3_rcejo")]({
+SubResource("Resource_m7vdf"): SubResource("Resource_3tmui"),
+SubResource("Resource_w1atm"): SubResource("Resource_f8oky"),
+SubResource("Resource_c2l2c"): SubResource("Resource_rc8y3"),
+SubResource("Resource_3qqjw"): SubResource("Resource_rc8y3")
+})
+panelstyle = Array[StyleBox]([SubResource("StyleBoxFlat_0tklw"), SubResource("StyleBoxFlat_rcejo")])
+panels = Dictionary[Vector4, int]({
+Vector4(0.5, 0, -1.5, 1.5): 0,
+Vector4(0.5, 1.5, -1.5, -1): 1
+})
+metadata/_custom_type_script = "uid://dxbdnxmvfy5cw"
+
+[node name="Set" type="Label" parent="." unique_id=1924815062]
+layout_mode = 0
+offset_left = 24.0
+offset_right = 49.0
+offset_bottom = 23.0
+text = "Set"
+vertical_alignment = 1
+metadata/grid_bound = Vector2(1, 0)
+
+[node name="Rst" type="Label" parent="." unique_id=753197315]
+layout_mode = 0
+offset_left = 24.0
+offset_top = 48.0
+offset_right = 49.0
+offset_bottom = 71.0
+text = "Rst"
+vertical_alignment = 1
+metadata/grid_bound = Vector2(1, 2)
+
+[node name="Pos" type="Label" parent="." unique_id=822399148]
+layout_mode = 0
+offset_left = 72.0
+offset_right = 85.0
+offset_bottom = 23.0
+text = "Q"
+metadata/grid_bound = Vector2(-3, 0)
+
+[node name="Neg" type="Label" parent="." unique_id=696068329]
+layout_mode = 0
+offset_left = 72.0
+offset_top = 48.0
+offset_right = 89.0
+offset_bottom = 71.0
+text = "!Q"
+metadata/grid_bound = Vector2(-3, 2)

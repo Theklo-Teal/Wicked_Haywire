@@ -1,0 +1,171 @@
+[gd_scene format=3 uid="uid://cemnx8omi6i8x"]
+
+[ext_resource type="Script" uid="uid://e61mkffffq3w" path="res://gizmos/misc/monostable.gd" id="1_8fxhc"]
+[ext_resource type="Script" uid="uid://ddaiqnfpchm0j" path="res://modules/Flowchart/Joints/flowchart_socket.gd" id="2_nmtsa"]
+[ext_resource type="Script" uid="uid://dixllb5r68rvk" path="res://modules/Flowchart/Gizmos/gizmo_cluster.gd" id="3_blc2e"]
+[ext_resource type="Script" uid="uid://cvcm4bskckdtj" path="res://gizmos/bit_input.gd" id="4_hk6rx"]
+[ext_resource type="Script" uid="uid://0nsdyckus4cq" path="res://gizmos/bit_output.gd" id="5_wfhgs"]
+
+[sub_resource type="Resource" id="Resource_igo3e"]
+resource_local_to_scene = true
+script = ExtResource("4_hk6rx")
+mode = 1
+port_class = &"BitPort"
+accepted_port = Array[StringName]([&"BitPort"])
+refuse_port = Array[StringName]([])
+layer = 0
+coord = Vector2i(0, 0)
+position = Vector2(12, 12)
+metadata/_custom_type_script = "uid://cvcm4bskckdtj"
+
+[sub_resource type="Resource" id="Resource_re76w"]
+script = ExtResource("3_blc2e")
+metadata/_custom_type_script = "uid://dixllb5r68rvk"
+
+[sub_resource type="Resource" id="Resource_xxr5o"]
+resource_local_to_scene = true
+script = ExtResource("4_hk6rx")
+mode = 1
+port_class = &"BitPort"
+accepted_port = Array[StringName]([&"BitPort"])
+refuse_port = Array[StringName]([])
+layer = 0
+coord = Vector2i(0, 0)
+position = Vector2(12, 60)
+metadata/_custom_type_script = "uid://cvcm4bskckdtj"
+
+[sub_resource type="Resource" id="Resource_5qn1h"]
+script = ExtResource("3_blc2e")
+coord = Vector2i(0, 2)
+metadata/_custom_type_script = "uid://dixllb5r68rvk"
+
+[sub_resource type="Resource" id="Resource_2ci5k"]
+resource_local_to_scene = true
+script = ExtResource("5_wfhgs")
+mode = 2
+port_class = &"BitPort"
+accepted_port = Array[StringName]([&"BitPort"])
+refuse_port = Array[StringName]([])
+layer = 0
+coord = Vector2i(0, 0)
+position = Vector2(108, 12)
+metadata/_custom_type_script = "uid://0nsdyckus4cq"
+
+[sub_resource type="Resource" id="Resource_j3uda"]
+script = ExtResource("3_blc2e")
+coord = Vector2i(-1, 0)
+metadata/_custom_type_script = "uid://dixllb5r68rvk"
+
+[sub_resource type="Resource" id="Resource_yjyiv"]
+resource_local_to_scene = true
+script = ExtResource("5_wfhgs")
+mode = 2
+port_class = &"BitPort"
+accepted_port = Array[StringName]([&"BitPort"])
+refuse_port = Array[StringName]([])
+layer = 0
+coord = Vector2i(0, 2)
+position = Vector2(108, 60)
+metadata/_custom_type_script = "uid://0nsdyckus4cq"
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_0tklw"]
+bg_color = Color(0.515625, 0.515625, 0.515625, 1)
+corner_radius_bottom_right = 20
+corner_radius_bottom_left = 20
+corner_detail = 1
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_rcejo"]
+bg_color = Color(0.5137255, 0.5137255, 0.5137255, 1)
+corner_radius_top_left = 20
+corner_radius_top_right = 20
+corner_detail = 1
+
+[node name="Monostable" type="Control" unique_id=891508316]
+custom_minimum_size = Vector2(24, 24)
+layout_mode = 3
+anchors_preset = 0
+offset_right = 120.0
+offset_bottom = 72.0
+script = ExtResource("1_8fxhc")
+delay = 1
+description = "One input is a rising edge trigger, the other is a falling edge trigger. When triggered, the state switches from its stable value, then after a time it automatically resets to that stable state."
+sockets = Dictionary[ExtResource("2_nmtsa"), ExtResource("3_blc2e")]({
+SubResource("Resource_igo3e"): SubResource("Resource_re76w"),
+SubResource("Resource_xxr5o"): SubResource("Resource_5qn1h"),
+SubResource("Resource_2ci5k"): SubResource("Resource_j3uda"),
+SubResource("Resource_yjyiv"): SubResource("Resource_j3uda")
+})
+panelstyle = Array[StyleBox]([SubResource("StyleBoxFlat_0tklw"), SubResource("StyleBoxFlat_rcejo")])
+panels = Dictionary[Vector4, int]({
+Vector4(0.5, 0, -1.5, 1.5): 0,
+Vector4(0.5, 1.5, -1.5, -1): 1
+})
+metadata/_custom_type_script = "uid://dxbdnxmvfy5cw"
+
+[node name="Rise" type="Label" parent="." unique_id=1924815062]
+layout_mode = 0
+offset_left = 24.0
+offset_right = 56.0
+offset_bottom = 23.0
+text = "Rise"
+vertical_alignment = 1
+metadata/grid_bound = Vector2(1, 0)
+
+[node name="Fall" type="Label" parent="." unique_id=753197315]
+layout_mode = 0
+offset_left = 24.0
+offset_top = 48.0
+offset_right = 51.0
+offset_bottom = 71.0
+text = "Fall"
+vertical_alignment = 1
+metadata/grid_bound = Vector2(1, 2)
+
+[node name="Pos" type="Label" parent="." unique_id=822399148]
+layout_mode = 0
+offset_left = 72.0
+offset_right = 85.0
+offset_bottom = 23.0
+text = "Q"
+metadata/grid_bound = Vector2(-3, 0)
+
+[node name="Neg" type="Label" parent="." unique_id=696068329]
+layout_mode = 0
+offset_left = 72.0
+offset_top = 48.0
+offset_right = 89.0
+offset_bottom = 71.0
+text = "!Q"
+metadata/grid_bound = Vector2(-3, 2)
+
+[node name="Bar" type="ProgressBar" parent="." unique_id=62958162]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -33.0
+offset_top = -13.5
+offset_right = 33.0
+offset_bottom = 13.5
+grow_horizontal = 2
+grow_vertical = 2
+show_percentage = false
+
+[node name="Counter" type="Label" parent="." unique_id=1835582284]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -20.0
+offset_top = -11.5
+offset_right = 20.0
+offset_bottom = 11.5
+grow_horizontal = 2
+grow_vertical = 2
+text = "000"
+horizontal_alignment = 1
+vertical_alignment = 1

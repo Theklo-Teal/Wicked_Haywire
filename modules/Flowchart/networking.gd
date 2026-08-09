@@ -100,7 +100,7 @@ func unregister_gizmo(gizmo:FlowchartPanel, layer:int):
 ## Tries to returns an existing vertex at [code]where[/code], otherwise registers
 ## the given vertex. Whatever vertex is used, is returned.
 func get_or_add_vert(where:Vector2, layer:int, added_vert:NetVert) -> NetVert:
-	var cell = Flowchart.to_grid(where, true)
+	var cell = Flowchart.to_grid(where)
 	var vert = netlist.vias.get_or_add(Vector3i(cell.x, cell.y, layer), added_vert)
 	vert.coord = cell
 	vert.layer = layer
@@ -159,7 +159,5 @@ func unlink_hash(pair_hash:int):
 	conns[0].disconnected(conns[1])
 	conns[1].disconnected(conns[0])
 	update_ports(null, conns[1])
-	if conns[0] is FlowchartVia and conns[0].conns() == 0 and conns[0].text.is_empty: rem_vert(conns[0])
-	if conns[1] is FlowchartVia and conns[1].conns() == 0 and conns[1].text.is_empty: rem_vert(conns[1])
 
 #endregion

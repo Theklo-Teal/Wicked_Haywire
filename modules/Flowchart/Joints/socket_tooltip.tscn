@@ -1,0 +1,45 @@
+[gd_scene format=3 uid="uid://cxgvler3bpjqk"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_oo18t"]
+content_margin_left = 8.0
+content_margin_top = 4.0
+content_margin_right = 8.0
+content_margin_bottom = 4.0
+bg_color = Color(0.1, 0.1, 0.1, 0.6)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+corner_detail = 5
+
+[sub_resource type="LabelSettings" id="LabelSettings_jnm3w"]
+outline_size = 1
+
+[sub_resource type="LabelSettings" id="LabelSettings_kwtlo"]
+font_size = 12
+
+[node name="SocketTooltip" type="PanelContainer" unique_id=1935064638]
+offset_right = 110.0
+offset_bottom = 50.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_oo18t")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="." unique_id=963209252]
+layout_mode = 2
+
+[node name="Header" type="Label" parent="VBoxContainer" unique_id=1624803109]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Socket Tooltip"
+label_settings = SubResource("LabelSettings_jnm3w")
+
+[node name="Body" type="Label" parent="VBoxContainer" unique_id=187769577]
+unique_name_in_owner = true
+layout_mode = 2
+text = "TOOLTIPED"
+label_settings = SubResource("LabelSettings_kwtlo")
+
+[node name="Show_State" type="CheckBox" parent="VBoxContainer" unique_id=1937202971]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Show State"
