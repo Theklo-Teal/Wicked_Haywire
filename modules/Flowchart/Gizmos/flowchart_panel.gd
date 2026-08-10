@@ -250,11 +250,10 @@ func _draw() -> void:
 		owner.queue_redraw()
 
 
-func _on_flowchart_mode_changed(mode:Flowchart.Mode):
+func _on_flowchart_mode_changed(chart:Flowchart, mode:Flowchart.Mode):
 	match mode:
 		Flowchart.Mode.EDITING:
 			# Allow re-positioning and wiring
-			mouse_filter = MOUSE_FILTER_STOP
 			for each in get_children():
 				if not each is Control: continue
 				if each.get_meta("edit_control", false) or each.get_meta("edit_only_control", false):
@@ -267,7 +266,6 @@ func _on_flowchart_mode_changed(mode:Flowchart.Mode):
 					each.mouse_behavior_recursive = MOUSE_BEHAVIOR_DISABLED
 		Flowchart.Mode.SIMULAT:
 			# Allow interacting which children UI
-			mouse_filter = MOUSE_FILTER_IGNORE
 			for each in get_children():
 				if not each is Control: continue
 				if each.get_meta("edit_only_control", false):

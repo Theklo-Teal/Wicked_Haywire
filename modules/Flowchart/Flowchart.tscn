@@ -27,8 +27,7 @@ var mode : StringName = \"idle\"
 @onready var modes := {
 	\"idle\":IdleMode.new(get_parent(), get_parent().get_node(\"Network\"), set_mode),
 	#\"via\":ViaMode.new(get_parent(), get_parent().get_node(\"Network\"), set_mode),
-	\"wire_create\":WireCreate.new(get_parent(), get_parent().get_node(\"Network\"), set_mode),
-	\"wire_split\":WireSplit.new(get_parent(), get_parent().get_node(\"Network\"), set_mode),
+	\"wire_mode\":WireMode.new(get_parent(), get_parent().get_node(\"Network\"), set_mode),
 	\"wire_bend\":WireBend.new(get_parent(), get_parent().get_node(\"Network\"), set_mode),
 	}
 
@@ -56,7 +55,7 @@ class InputMode:
 	func grid_mouse() -> Vector2i:
 		return Flowchart.to_grid(me.to_canvas_coord(me.get_local_mouse_position()))
 	func canvas_mouse() -> Vector2:
-		return me.to_canvas_coord(me.get_local_mouse_position())
+		return Flowchart.snap_grid(me.to_canvas_coord(me.get_local_mouse_position()))
 	func screen_mouse() -> Vector2:
 		return me.get_local_mouse_position()
 	func global_screen_mouse() -> Vector2:
@@ -73,12 +72,12 @@ class InputMode:
 	func joint_canvas_position(joint:NetBase.Joint) -> Vector2:
 		return Flowchart.from_grid(joint_canvas_coord(joint))
 	
-	func mouse_over_vert():
+	func vert_under_mouse() -> NetBase.NetVert:
 		var cell = grid_mouse()
 		cell = Vector3i(cell.x, cell.y, me.layer)
-		me.sel_vert = net.netlist.vias.get(cell)
+		return net.netlist.vias.get(cell)
 	
-	func mouse_over_wire():
+	func wire_under_mouse():
 		var conns : PackedInt64Array
 		for via in me.parti.joint.find_objects_simple(me._view_rect):
 			conns.append_array(net.netlist.get_links(via, true, false))
@@ -87,21 +86,23 @@ class InputMode:
 			for sock in gizmo.sockets:
 				var links = net.netlist.get_links(sock, true, false)
 				conns.append_array(links)
+		var wire_info : Dictionary
 		for link in conns:
 			var wire = net.netlist.links[link]
 			var pair = net.netlist.pairs[link]
 			#FIXME Wrong coordinate on joint_canvas_position(pair[1]) ?
-			me.sel_wire = wire.near(canvas_mouse(), joint_canvas_position(pair[0]), joint_canvas_position(pair[1]))
-			if not me.sel_wire.is_empty():
-				me.sel_wire[\"wire\"] = wire
-				me.sel_wire[\"pair_hash\"] = link
-				me.sel_wire[\"ini_bend\"] = wire.bend
+			wire_info = wire.near(canvas_mouse(), joint_canvas_position(pair[0]), joint_canvas_position(pair[1]))
+			if not wire_info.is_empty():
+				wire_info[\"wire\"] = wire
+				wire_info[\"pair_hash\"] = link
+				wire_info[\"ini_bend\"] = wire.bend
 				break
+		return wire_info
 	
 	## InfiCanvas action escape called.
 	func cancel():pass
 	## Mode entered
-	func enter(): me.get_node(\"%state\").text = \"Abstract\"
+	func enter(): me.get_node(\"%state\").text = \"Abstract State\"
 	## Mode exited
 	func exit(): pass
 	
@@ -116,9 +117,9 @@ class InputMode:
 	func mouse_gui_press(button:MouseButton, shift:bool, ctrl:bool): pass
 	## Mouse button released in [code]_gui_input()[/code].
 	func mouse_gui_release(button:MouseButton, shift:bool, ctrl:bool): pass
-	## Mouse button pressed in [code]_input()[/code].
+	## Mouse button pressed in [code]_input()[/code] except if mouse is over a gizmo.
 	func mouse_press(button:MouseButton, shift:bool, ctrl:bool): pass
-	## Mouse button released in [code]_input()[/code].
+	## Mouse button released in [code]_input()[/code] except if mouse is over a gizmo.
 	func mouse_release(button:MouseButton, shift:bool, ctrl:bool): pass
 @warning_ignore_restore(\"unused_parameter\")
 
@@ -159,29 +160,25 @@ class IdleMode extends InputMode:
 		return true
 
 	func mouse_press(button:MouseButton, shift:bool, ctrl:bool):
-		if me._hover_gizmo != null: return
-		me.sel_wire.clear() 
-		mouse_over_vert()
-		if me.sel_vert == null: mouse_over_wire()
 		match button:
 			MOUSE_BUTTON_LEFT:
-				# Select and move things
+				# Select wires or verts
+				me.sel_vert = vert_under_mouse()
 				if not _on_selected_joint(shift, ctrl):
+					me.sel_wire = wire_under_mouse()
 					if not _on_selected_wire(shift, ctrl):
+						# No vert or wire were clicked on
 						pass
 			MOUSE_BUTTON_RIGHT:
-				if me.wiring_allowed:
-					# Wire things
-					if not me.sel_wire.is_empty():
-						if floori(me.sel_wire.subratio) == 1:
-							switch.call(\"wire_bend\")
-						else:
-							switch.call(\"wire_split\")
-					elif not me.sel_vert == null:
-						switch.call(\"wire_create\")
+				me.sel_wire = wire_under_mouse()
+				if _on_selected_wire(shift, ctrl) and floori(me.sel_wire.get(\"subratio\", 0)) == 1:
+					switch.call(\"wire_bend\")
+				else:
+					# Start wiring verts
+					me.wire_from.clear()
+					switch.call(\"wire_mode\")
 		
-	func mouse_release(button:MouseButton, _shift:bool, _ctrl:bool):
-		if me._hover_gizmo != null: return
+	func mouse_release(button:MouseButton, _shift:bool, ctrl:bool):
 		# Lasso Selection
 		if button == MOUSE_BUTTON_LEFT:
 			if me.lasso_allowed and me.lasso_canvas_rect.size > Flowchart.MINIMUM_LASSO:
@@ -194,47 +191,79 @@ class IdleMode extends InputMode:
 			if me.sel_vert == null and me.sel_wire.is_empty():
 				# Show Canvas Popup
 				me.get_node(\"Canvas_Menu\").popup(Rect2(global_screen_mouse(), Vector2.ZERO))
+			elif ctrl:
+				# Show vert or wire popup
+				return
+			else:
+				# Stop wiring verts
+				switch.call(\"wire_mode\")
 
 class WireMode extends InputMode:
 	func cancel():
-		me.wire_from.clear()
 		switch.call(\"idle\")
-		
+	
+	func exit():
+		me.wire_from.clear()
+		me.sel_vert = null
+	
+	func shifted(_pressed:bool):
+		me.queue_redraw()
+	
 	func enter():
 		me.get_node(\"%state\").text = \"WireMode\"
 		me.move_obj_allowed = false
 		me.lasso_allowed = false
+		
+		if not me.wire_from.is_empty(): return # Wire origin already known, like when wiring from a gizmo socket.
+		var joint = find_joint()
+		if joint == null:
+			cancel()
+			return 
+		
+		me.wire_from = {
+			\"netvert\": joint,
+			\"coord\": grid_mouse(),
+			\"canvas_position\": canvas_mouse(),
+			}
 	
-	#FIXME: dragging from Gizmos doesn't place via on release.
-	#FIXME: clicking to gizmos with a wire, doesn't connect.
 	func mouse_release(button:MouseButton, shift:bool, ctrl:bool):
-		if me._hover_gizmo == null:
-			if not button == MOUSE_BUTTON_RIGHT: switch.call(\"idle\"); return
-			if grid_mouse() == me.wire_from.get(\"coord\"): switch.call(\"idle\"); return
+		if button == MOUSE_BUTTON_RIGHT:
+			if me.sel_vert == null:  # Not wire to a gizmo socket
+				me.sel_vert = find_joint()
+			if me.wire_from.netvert == me.sel_vert:
+				# Tried releasing mouse on the same vert when pressing the mouse.
+				# This means an attempt of click-to-click wiring.
+				# We clear the sel_vert, so next time the user clicks, we don't
+				# run into this block again and can create a via.
+				me.sel_vert = null
+				return
+			if me.wire_from.is_empty() or me.sel_vert == null:
+				# No valid wire destination or origin
+				cancel()
+				return
 			
-			find_joint()  # Finding the destination joint of a wire
-		finish_wiring(me.wire_from.netvert, me.sel_vert, shift, ctrl)
+			finish_wiring(me.wire_from.netvert, me.sel_vert, shift, ctrl)
+			switch.call(\"idle\")
 	
 	func find_joint() -> NetBase.Joint:
-		mouse_over_vert()
-		if me.sel_vert == null:
-			mouse_over_wire()
-			if me.sel_wire.is_empty(): me.sel_vert = me.add_via(canvas_mouse())
-			else: me.sel_vert = split_wire().netvert
-		if me.sel_vert == me.wire_from.netvert: return null
-		return me.sel_vert
+		var joint = vert_under_mouse()
+		if joint == null:
+			me.sel_wire = wire_under_mouse()
+			if me.sel_wire.is_empty(): joint = me.add_via(canvas_mouse())
+			else: joint = split_wire().netvert
+		return joint
 		
 	func finish_wiring(origin:NetBase.Joint, destin:NetBase.Joint, shift:bool, _ctrl:bool):
-		me.wire_from.clear()
 		# Connect joints
 		var wire : NetBase.Link = net.linking(origin, destin)
+		#TODO Check if this is finding joint position correctly
 		var pos1 = joint_canvas_position(origin)
 		var pos2 = joint_canvas_position(destin)
 		wire.set_chi_from_len(pos1, pos2, shift)
 		wire.bend = Flowchart.SNAP
-		switch.call(\"idle\")
 	
 	func split_wire() -> Dictionary:
+		#TODO Check if joint creation logic is correct.
 		var wire0 : NetBase.Link = net.netlist.links.get(me.sel_wire.pair_hash)
 		var joints = net.netlist.pairs[me.sel_wire.pair_hash]
 		var where = wire0.position_along(me.sel_wire.ratio, 
@@ -252,44 +281,24 @@ class WireMode extends InputMode:
 		me.sel_wire.clear()
 		return {\"netvert\": new_joint, \"coord\": cell, \"canvas_position\": where}
 
-
-class WireCreate extends WireMode:
-	func enter():
-		super()
-		me.get_node(\"%state\").text = \"Wire Create\"
-		if not me.sel_vert is GizmoSocket:
-			me.wire_from = {
-				\"netvert\": me.sel_vert,
-				\"coord\": grid_mouse(),
-				\"canvas_position\": canvas_mouse(),
-				}
-	
-	func shifted(_pressed:bool):
-		me.queue_redraw()
-
-class WireSplit extends WireMode:
-	func enter():
-		super()
-		me.get_node(\"%state\").text = \"Wire Split\"
-		me.wire_from = split_wire()
-	
-	func shifted(_pressed:bool):
-		me.queue_redraw()
-
-class WireBend extends WireMode:
+class WireBend extends InputMode:
 	
 	func enter():
-		super()
+		me.move_obj_allowed = false
+		me.lasso_allowed = false
+		me.get_node(\"%state\").text = \"WireBend\"
 		wire = net.netlist.links.get(me.sel_wire.pair_hash)
 		var pair = net.netlist.pairs[me.sel_wire.pair_hash]
 		joints = [joint_canvas_position(pair[0]), joint_canvas_position(pair[1])]
-		
+	
+	func mouse_release(button:MouseButton, _shift:bool, _ctrl:bool):
+		if button == MOUSE_BUTTON_RIGHT:
+			switch.call(\"idle\")
+	
 	var joints : Array[Vector2]
 	var wire : NetBase.Link
-	func mouse_move(left:bool, right:bool, _shift:bool, _ctrl:bool):
-		if not(left or right): return
+	func mouse_move(_left:bool, _right:bool, _shift:bool, _ctrl:bool):
 		me.queue_redraw()
-		
 		var diff = joints[0] - joints[1]
 		var delta = me.get_local_mouse_position() - me.ini_mouse
 		
@@ -309,9 +318,6 @@ class WireBend extends WireMode:
 		delta = delta.length() * dir * 2
 		var ini_bend : float = me.sel_wire.ini_bend
 		wire.bend = clamp(ini_bend + delta, Flowchart.SNAP, shortest)
-	
-	func mouse_release(_button:MouseButton, _shift:bool, _ctrl:bool):
-		switch.call(\"idle\")
 "
 
 [node name="Flowchart" type="ColorRect" unique_id=117644141]

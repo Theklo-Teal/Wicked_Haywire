@@ -5,7 +5,10 @@ class_name Electronics
 @export var bitwidth : int = 1 : 
 	set(val):
 		bitwidth = max(1, val)
+		maxval = (1 << bitwidth) - 1
 		_set_bitwidth()
+
+var maxval : int = 1  ## The value of having all bits set high. This is set when also setting [code]bitwidth[/code], so don't change it otherwise.
 
 ## Override this function if something changes when the bitwidth changes
 func _set_bitwidth():

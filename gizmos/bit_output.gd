@@ -12,8 +12,8 @@ func _init() -> void:
 func mouse_press():
 	show_state = not show_state
 
-func _has_written(val:Electronics.BitSignal):
-	pressed = val.bits > 0
+#func _has_written(val:Electronics.BitSignal):
+	#pressed = val.bits > 0
 
 func draw(chart:Flowchart, canvas:Control, where:Vector2):
 	var color = Color.DARK_GRAY

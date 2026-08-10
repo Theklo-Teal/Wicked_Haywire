@@ -19,6 +19,7 @@ class_name InfiCanvas
 # Added object grouping feature. Objects in the same group move together.
 # Added `objects_selected` signal.
 # Enabled option to not draw highlight on objects, if their Rect2 doesn't have area.
+# Now is possible to check or block zoom with `zoom_allowed`.
 
 #TODO Make zoom into the center
 #TODO Implement more signals
@@ -127,10 +128,11 @@ func _on_rect_changed():
 var _selected : Array : set=set_selected  ## Objects in the canvas that the user selects as a group or individually.[br] InfiCanvas doesn't actually select objects. Either the script objects sets them to be selected or an extension of InfiCanvas decides what objects to select and how, based on lasso Rect2 or not.
 var _selected_positions : Array  ## Initial position of selected objects before drag-moving them.
 
-var is_moving_obj : bool = false  # Are selected objects in the canvas supposed to move in space? Activation flag.
-var move_obj_allowed : bool = true  # May the selected objects in canvas move? Inhibition flag.
+var is_moving_obj : bool = false  ## Are selected objects in the canvas supposed to move in space? Activation flag.
+var move_obj_allowed : bool = true  ## May the selected objects in canvas move? Inhibition flag.
 
-var pan_allowed : bool = true  # Is scrolling the view allowed?
+var pan_allowed : bool = true  ## Is scrolling the view allowed?
+var zoom_allowed : bool = true
 
 var lasso_allowed : bool = true
 var lasso_mode : bool  ## Type of selection last drawn. Depends on [code]chirality[/code].
@@ -145,24 +147,28 @@ func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		if event.is_pressed():
 			match event.button_index:
-				MOUSE_BUTTON_LEFT:
-					pass
 				MOUSE_BUTTON_MIDDLE:
 					_ini_origin = origin
 				MOUSE_BUTTON_WHEEL_UP:
-					if Input.is_key_pressed(KEY_CTRL):
-						zoom += ZOOM_SPEED
-					else:
-						origin.y += SCROLL_SPEED.y
+					if zoom_allowed:
+						if Input.is_key_pressed(KEY_CTRL):
+							if zoom_allowed:
+								zoom += ZOOM_SPEED
+						else:
+							if pan_allowed:
+								origin.y += SCROLL_SPEED.y
 				MOUSE_BUTTON_WHEEL_DOWN:
 					if Input.is_key_pressed(KEY_CTRL):
-						zoom -= ZOOM_SPEED
+						if zoom_allowed: zoom -= ZOOM_SPEED
 					else:
-						origin.y -= SCROLL_SPEED.y
+						if pan_allowed:
+							origin.y -= SCROLL_SPEED.y
 				MOUSE_BUTTON_WHEEL_LEFT:
-					origin.x += SCROLL_SPEED.x
+					if pan_allowed:
+						origin.x += SCROLL_SPEED.x
 				MOUSE_BUTTON_WHEEL_RIGHT:
-					origin.x -= SCROLL_SPEED.x
+					if pan_allowed:
+						origin.x -= SCROLL_SPEED.x
 
 func _input(event: InputEvent) -> void:
 	if overlay_mode == "Input Event": overlay.queue_redraw()

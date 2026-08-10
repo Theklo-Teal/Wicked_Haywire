@@ -107,12 +107,30 @@ var mode : Mode :
 	set(val):
 		mode = val
 		for gizmo : FlowchartPanel in $Network.netlist.gizmos.get(layer, []):
-			gizmo._on_flowchart_mode_changed(mode)
+			gizmo._on_flowchart_mode_changed(self, mode)
+		match val:
+			Mode.EDITING:
+				wiring_allowed = true
+				move_obj_allowed = true
+			Mode.SIMULAT:
+				wiring_allowed = false
+				move_obj_allowed = false
 
 var _hover_gizmo : FlowchartPanel :  ## Set by owned gizmos. This is an workaround to prioritize input events on gizmos over the canvas.
 	set(val):
 		_hover_gizmo = val
-		%gizmo.text = str(val != null)
+		%gizmo.text = str("Over Gizmo: ", val != null)
+		if val:
+			lasso_allowed = false
+			wiring_allowed = false
+			zoom_allowed = false
+			pan_allowed = false
+		else:
+			lasso_allowed = true
+			wiring_allowed = true
+			zoom_allowed = true
+			pan_allowed = true
+		
 	
 func _ready() -> void:
 	if not OS.has_feature("debug"): %coord.hide()
@@ -184,7 +202,7 @@ func draw_overlay(canvas:Control, _viewed_canvas_rect:Rect2):
 	%coord.position = get_local_mouse_position() + Vector2(0, -24)
 	
 	# Draw wire being pulled.
-	if $Act.at("wire_create") or $Act.at("wire_split") and not wire_from.is_empty():
+	if $Act.at("wire_mode") and not wire_from.is_empty():
 		var wire_type = $Network.link_classes[wire_from.netvert.port.default_link()]
 		var thickness = wire_type._wire_thick()
 		thickness = clamp(thickness, 1, MAX_WIRE) * zoom
@@ -203,12 +221,13 @@ func draw_overlay(canvas:Control, _viewed_canvas_rect:Rect2):
 func _gui_input(event: InputEvent) -> void:
 	super(event)
 	
+	if _hover_gizmo != null: return
+	
 	if event is InputEventMouseButton:
 		if event.is_pressed():
 			var grab_gizmo = G.grabbed_buttons.get_pressed_button()
 			if not is_moving_obj:
 				if event.button_index == MOUSE_BUTTON_LEFT:
-					_selected.clear()
 					if grab_gizmo != null:
 						add_gizmo(grab_gizmo.get_meta("name"), to_canvas_coord(event.position))
 				
@@ -219,6 +238,7 @@ func _gui_input(event: InputEvent) -> void:
 						Input.is_key_pressed(KEY_CTRL),
 						)
 		elif event.is_released():
+			_selected.clear()
 			$Act.now().mouse_gui_release(
 				event.button_index,
 				Input.is_key_pressed(KEY_SHIFT),
@@ -229,7 +249,7 @@ func _input(event: InputEvent) -> void:
 	super(event)
 	
 	if event is InputEventKey and not event.is_echo():
-		if event.keycode == KEY_DELETE and $Act.at("idle"):
+		if event.keycode == KEY_DELETE and $Act.at("idle") and event.is_released():
 			queue_redraw()
 			if not sel_wire.is_empty():
 				var joints = $Network.netlist.joints_of_hash(sel_wire.pair_hash)
@@ -251,34 +271,40 @@ func _input(event: InputEvent) -> void:
 			$Act.now().ctrled(event.is_pressed())
 	
 	if event is InputEventMouseButton:
-		if event.is_pressed():
+		if event.is_pressed() and _hover_gizmo == null:
 			$Act.now().mouse_press(
 				event.button_index,
 				Input.is_key_pressed(KEY_SHIFT),
 				Input.is_key_pressed(KEY_CTRL),
 				)
 		elif event.is_released():
-			$Act.now().mouse_release(
-				event.button_index,
-				Input.is_key_pressed(KEY_SHIFT),
-				Input.is_key_pressed(KEY_CTRL),
-				)
-		
+			if  _hover_gizmo == null:
+				$Act.now().mouse_release(
+					event.button_index,
+					Input.is_key_pressed(KEY_SHIFT),
+					Input.is_key_pressed(KEY_CTRL),
+					)
 			if event.button_index == MOUSE_BUTTON_LEFT:
 				move_obj_allowed = true
 				selected_obj_movement_stop()
 	
 	if event is InputEventMouseMotion:
-		if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) and not is_moving_obj and not _selected.is_empty():
-			selected_obj_movement_start()
-		elif not is_moving_obj:
-			$Act.now().mouse_move(Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT), 
-				Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT),
-				Input.is_key_pressed(KEY_SHIFT),
-				Input.is_key_pressed(KEY_CTRL),
-				)
+		if not is_moving_obj and mode == Mode.EDITING:
+			if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) and not _selected.is_empty():
+				selected_obj_movement_start()
+			else:
+				$Act.now().mouse_move(Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT), 
+					Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT),
+					Input.is_key_pressed(KEY_SHIFT),
+					Input.is_key_pressed(KEY_CTRL),
+					)
 
 var past_via_coord : Dictionary[NetBase.Joint, Vector3i]
+var last_valid_pos : Dictionary[NetBase.Joint, Vector2i]
+func selected_obj_movement_stop():
+	super()
+	# Ensure the Dictionary doesn't just keep growing.
+	past_via_coord.clear()
 func _selected_obj_movement_start(obj):
 	if obj is NetBase.Joint:
 		past_via_coord[obj] = Vector3i(obj.coord.x, obj.coord.y, obj.layer)
@@ -286,15 +312,16 @@ func _selected_obj_movement_stop(obj):
 	if obj is NetBase.Joint:
 		$Network.netlist.vias.erase(past_via_coord[obj])
 		$Network.netlist.vias[Vector3i(obj.coord.x, obj.coord.y, obj.layer)] = obj
-func selected_obj_movement_stop():
-	super()
-	# Ensure the Dictionary doesn't just keep growing.
-	past_via_coord.clear()
 func obj_movement_modulate(object, new_position:Vector2) -> Vector2:
 	if object is FlowchartPanel:
 		queue_redraw()  # Makes wires follow gizmo sockets.
 		return snap_grid(new_position) - Vector2(0.5, 0.5) * SNAP
 	if object is NetBase.Joint:
+		var cell := to_grid(position)
+		if Vector3i(cell.x, cell.y, layer) in $Network.netlist.vias:
+			# Make is so vias can't overlap.
+			return from_grid(last_valid_pos[object]) + Vector2(0.5, 0.5)
+		last_valid_pos[object] = cell
 		return snap_grid(new_position - Vector2(0.5, 0.5) * SNAP)
 	return snap_grid(new_position)
 
@@ -343,7 +370,7 @@ func add_gizmo(res:String, where:=Vector2.ZERO) -> FlowchartPanel:
 	where = snap_grid(where)
 	place_object(gizmo, where, parti.node)
 	$Network.register_gizmo(gizmo, layer)
-	gizmo._on_flowchart_mode_changed(mode)
+	gizmo._on_flowchart_mode_changed(self, mode)
 	return gizmo
 
 func rem_gizmo(gizmo:FlowchartPanel):
@@ -353,8 +380,9 @@ func rem_gizmo(gizmo:FlowchartPanel):
 	gizmo.queue_free()
 
 func add_via(where:Vector2) -> FlowchartVia:
+	#TODO Check if this is positioning vias correctly.
 	queue_redraw()
-	var via = $Network.get_or_add_vert(where, layer, FlowchartVia.new())
+	var via = $Network.get_or_add_via(to_grid(where), layer, FlowchartVia.new())
 	place_object(via, via.position, parti.joint)
 	return via
 
@@ -376,17 +404,16 @@ var sel_vert : NetBase.NetVert
 
 ## Gizmo socket has started a wire.
 func start_socket_wiring(sock_data:Dictionary):
-	wire_from = sock_data
-	sel_vert = sock_data.netvert
-	$Act.set_mode("wire_create")
+	if $Act.at("idle"):
+		wire_from = sock_data
+		$Act.set_mode("wire_mode")
 
 ## Wire stopped at a Gizmo socket.
 func stop_socket_wiring(sock_data:Dictionary):
-	if not ($Act.at("wire_create") or $Act.at("wire_split")): return
+	if not $Act.at("wire_mode"): return
 	if wire_from.is_empty(): return
-	if sock_data.netvert == wire_from.netvert: return
 	sel_vert = sock_data.netvert
-	$Act.now().finish_wiring(wire_from.netvert, sel_vert,
+	$Act.now().mouse_release(MOUSE_BUTTON_RIGHT,
 		Input.is_key_pressed(KEY_SHIFT), Input.is_key_pressed(KEY_CTRL))
 
 #endregion

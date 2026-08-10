@@ -35,34 +35,31 @@ func _set_show_grid(val:bool):
 	super(val)
 	_update_sockdex()
 
-var socket_tooltip : Control
+var socket_tooltip : Control : 
+	set(val):
+		if socket_tooltip != null: socket_tooltip.queue_free()
+		socket_tooltip = val
+		socket_tooltip.hide()
+		socket_tooltip.mouse_exited.connect(func(): socket_tooltip.hide())
+		add_child(socket_tooltip, false, Node.INTERNAL_MODE_FRONT)
+
+var socket_menu := PopupMenu.new()
 
 func _init() -> void:
 	super()
-	mouse_entered.connect(_on_mouse_enter)
 	mouse_exited.connect(_on_mouse_exit)
 	
-	await ready
-	set_socket_toolip(preload("uid://cxgvler3bpjqk").instantiate())
+	#await ready
+	#socket_tooltip = preload("uid://cxgvler3bpjqk").instantiate()
 
-func set_socket_toolip(tooltip:Control):
-	if socket_tooltip != null: socket_tooltip.queue_free()
-	socket_tooltip = tooltip
-	socket_tooltip.hide()
-	socket_tooltip.mouse_exited.connect(func(): socket_tooltip.hide())
-	add_child(socket_tooltip, false, Node.INTERNAL_MODE_FRONT)
 
 func _on_resized():
 	super()
 	_update_sockdex()
 
-func _on_mouse_enter():
-	# Allow the user to quickly pick on a socket if the mouse just entered the gizmo.
-	_mouse_stopped_frames = _MOUSE_MOVE_THRESHOLD + 1
-
 func _on_mouse_exit():
 	_mouse_hover = false
-	if not Input.is_key_pressed(KEY_CTRL): socket_tooltip.hide()
+	#if not Input.is_key_pressed(KEY_CTRL): socket_tooltip_visible(false)
 	if hover_socket != null:
 		hover_socket.hover=false
 		hover_socket = null
@@ -70,9 +67,9 @@ func _on_mouse_exit():
 
 func _input(event: InputEvent) -> void:
 	if not _mouse_hover: return
-	if event is InputEventKey:
-		if event.keycode == KEY_CTRL and event.is_released():
-			socket_tooltip.hide()
+	#if event is InputEventKey:
+	#	if event.keycode == KEY_CTRL and event.is_released():
+	#		socket_tooltip_visible(false)
 	
 	if not (owner is Flowchart and owner.mode == Flowchart.Mode.EDITING): return
 	if event is InputEventMouseMotion:
@@ -80,22 +77,26 @@ func _input(event: InputEvent) -> void:
 			_mouse_stopped = false
 			_on_mouse_started()
 		_mouse_stopped_frames = 0
+	
 	if event is InputEventMouseButton:
 		_on_mouse_stopped()  # Force testing if mouse is over a socket.
 		if hover_socket != null:
 			if event.button_index == MOUSE_BUTTON_RIGHT:
-				if Input.is_key_pressed(KEY_CTRL):
+				if Input.is_key_pressed(KEY_CTRL) and event.is_pressed():
+					#socket_menu_visible(true, hover_socket)
 					pass
 				else:
 					var pos = canvas_socket_position(hover_socket)
 					var sock_data = {
-							"netvert": hover_socket,
-							"coord": Flowchart.to_grid(pos),
-							"canvas_position": pos,
-							}
-					if sock_data.netvert != null:
-						if event.is_pressed(): owner.start_socket_wiring(sock_data)
-						elif event.is_released(): owner.stop_socket_wiring(sock_data)
+						"netvert": hover_socket,
+						"coord": Flowchart.to_grid(pos),
+						"canvas_position": pos,
+						}
+					if event.is_pressed():
+						owner.start_socket_wiring(sock_data)
+					elif event.is_released():
+						owner.stop_socket_wiring(sock_data)
+			
 			elif event.button_index == MOUSE_BUTTON_LEFT:
 				queue_redraw()
 				if event.is_pressed():
@@ -139,12 +140,12 @@ var hover_socket : GizmoSocket :
 		
 		if hover_socket != null:
 			# Was previously on a socket
-			if not Input.is_key_pressed(KEY_CTRL): socket_tooltip.hide()
+			#if not Input.is_key_pressed(KEY_CTRL): socket_tooltip_visible(false)
 			hover_socket.hover = false
 		
 		if val != null:
 			# Now hovering a socket.
-			show_socket_tooltip(val)
+			socket_tooltip_visible(true, val)
 			val.hover = true
 		
 		hover_socket = val
@@ -193,11 +194,21 @@ func rem_socket(_socket : GizmoSocket):
 	##_sockdex.erase(get_socket_true_coord(socket))
 	##sockets.erase(socket)
 	##queue_sort()
-#
-func show_socket_tooltip(sock:GizmoSocket):
-	if owner is Flowchart:
-		socket_tooltip.show()
-		socket_tooltip.position = sock.position + Vector2.ONE * Flowchart.SNAP
-		socket_tooltip.get_node("%Body").text = str(sock.port)
-		socket_tooltip.get_node("%Show_State").button_pressed = sock.pressed
+
+func socket_tooltip_visible(shown:bool, sock:GizmoSocket=null):
+	if owner is Flowchart and socket_tooltip != null:
+		if shown:
+			socket_tooltip.show()
+			socket_tooltip.position = sock.position + Vector2.ONE * Flowchart.SNAP
+			socket_tooltip.get_node("%Body").text = str(sock.port)
+			socket_tooltip.get_node("%Show_State").button_pressed = sock.pressed
+		else:
+			socket_tooltip.hide()
+
+func socket_menu_visible(shown:bool, sock:GizmoSocket=null):
+	if owner is Flowchart and socket_tooltip != null:
+		if shown:
+			socket_menu.popup(Rect2(sock.position, Vector2.ZERO))
+		else:
+			socket_menu.hide()
 #endregion

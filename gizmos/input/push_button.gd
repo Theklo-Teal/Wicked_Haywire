@@ -13,21 +13,23 @@ static func toybox_included() -> bool:
 func _ready() -> void:
 	sock = sockets.keys()[0]
 
-func _gui_input(event: InputEvent) -> void:
+func _input(event: InputEvent) -> void:
+	if owner is Flowchart:
+		if owner.mode == Flowchart.Mode.SIMULAT:
+			if event is InputEventMouseButton:
+				if event.is_pressed() and event.button_index == MOUSE_BUTTON_LEFT:
+					state = not state
+					queue_redraw()
+			
+			if event is InputEventKey:
+				var bit = key_bit.get(event.keycode, -1)
+				var toggle = key_mode.get(event.keycode, false)
+				if bit >= 0:
+					if event.is_pressed() and not event.is_echo():
+						state = not state if toggle else true
+					elif event.is_released():
+						if not toggle: state = false
 	super(event)
-	if event is InputEventMouseButton:
-		if event.is_pressed() and event.button_index == MOUSE_BUTTON_LEFT:
-			state = not state
-			queue_redraw()
-	
-	if event is InputEventKey:
-		var bit = key_bit.get(event.keycode, -1)
-		var toggle = key_mode.get(event.keycode, false)
-		if bit >= 0:
-			if event.is_pressed() and not event.is_echo():
-				state = not state if toggle else true
-			elif event.is_released():
-				if not toggle: state = false
 
 func _draw():
 	super()

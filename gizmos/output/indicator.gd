@@ -23,13 +23,13 @@ func _set_bitwidth():
 	size.x = Flowchart.SNAP * bitwidth
 	queue_redraw()
 
-func _sim_update_sampling(_graph:FlowchartNetwork):
-	var old_state = state_int
-	states.assign(sock.read("array", bitwidth))
-	states.resize(bitwidth)
-	state_int = sock.read("int", bitwidth)
-	if state_int != old_state:
-		queue_redraw()
+#func _sim_update_sampling(_graph:FlowchartNetwork):
+	#var old_state = state_int
+	#states.assign(sock.read("array", bitwidth))
+	#states.resize(bitwidth)
+	#state_int = sock.read("int", bitwidth)
+	#if state_int != old_state:
+		#queue_redraw()
 
 func _draw() -> void:
 	for i in range(bitwidth):

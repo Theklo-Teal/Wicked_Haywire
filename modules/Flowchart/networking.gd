@@ -99,17 +99,24 @@ func unregister_gizmo(gizmo:FlowchartPanel, layer:int):
 
 ## Tries to returns an existing vertex at [code]where[/code], otherwise registers
 ## the given vertex. Whatever vertex is used, is returned.
-func get_or_add_vert(where:Vector2, layer:int, added_vert:NetVert) -> NetVert:
-	var cell = Flowchart.to_grid(where)
-	var vert = netlist.vias.get_or_add(Vector3i(cell.x, cell.y, layer), added_vert)
-	vert.coord = cell
+func get_or_add_via(coord:Vector2i, layer:int, added_vert:NetVert) -> NetVert:
+	var cell = Vector3i(coord.x, coord.y, layer)
+	if netlist.vias.has(cell):
+		return netlist.vias[cell]
+	else:
+		netlist.vias[cell] = added_vert
+		add_vert(added_vert, coord, layer)
+		return added_vert
+
+## Registers and positions a vertex. If it's a via, use [code]get_or_add_via()[/code] instead.
+func add_vert(vert:NetVert, coord:Vector2i, layer:int):
+	vert.port = port_new(vert.port_class)
 	vert.layer = layer
+	vert.coord = coord
 	netlist.verts[hash(vert)] = vert
-	return vert
-	#NOTE: Via are only connected by tunnel when they are wired to something. 
-	# So we don't get their tunnel name at registering.
 
 func move_vert(vert:NetVert, where:Vector2) -> Error:
+	#TODO Check if this isn't conflicting with node movement in the SpatialPartitioning, producing bad coordinate or position.
 	if vert is GizmoSocket: return ERR_INVALID_PARAMETER
 	var cell_from = Vector3i(vert.coord.x, vert.coord.y, vert.layer)
 	var to = Flowchart.to_grid(where)
