@@ -13,6 +13,10 @@ Gizmo ideas:
 		_Maestro - A synchronization clock.
 		Relay - Switches between two network ports depending on a control signal.
 		Monostable - A pulse flips output, which then returns after a set time.
+	Arithmetic:
+		Negator - Finds 2s Complement
+		Adder - Adds and Subtracts
+		Multipler - Multiplies or Divides
 	Combinational:
 		Bus Match - Compares input with given value, outputting high if they are equal.
 		Bit Counter - Counts how many bits in a value are High or LowBit Counter - Counts how many bits in a value are High or Low
@@ -29,6 +33,7 @@ Gizmo ideas:
 	Automata:
 		ROM - The user can write data in that persist, or take it from a file. Can only be read.
 		RAM - The user can write data in to start as a default, but can be written along with writing.
+		Lookup - A rudimentary scriptable finite state machine. A "data" input can be used to load a "page" ID (state). Multiple outputs combinatorily respond to multiple inputs defined according to Page ID. Certain input permutates cause an internal change in Page ID.
 		Turing - As in "Turing Machine", a microcontroller or central processor; can have a script written to it to manage inputs and outputs.
 		Teletype - A text line that can be written to, producing output signals and displays text according to inputs.
 	Input:

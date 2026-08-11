@@ -35,7 +35,7 @@ func _draw():
 	super()
 	
 	draw_style_box(button_panel, Rect2(
-		Vector2(size.x - Flowchart.SNAP * 2 if state else 0, Flowchart.SNAP * 0.14),
+		Vector2(size.x - Flowchart.SNAP * (2 if state else 0), Flowchart.SNAP * 0.14),
 		Vector2(Flowchart.SNAP, Flowchart.SNAP * 0.8)
 		))
 

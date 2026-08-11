@@ -6,8 +6,12 @@ class_name FlowchartGizmo
 ## receive signals in the simulation system.[br]
 ## Sockets are grouped by sharing [code]GizmoCluster[/code] which have their own
 ## coordinate.[br]
-## Changing layout means changing the coordinate of . Socket positioning will
-## be relative to that surface's coordinate on the grid.
+## Changing layout means changing the coordinate of panels and clusters.
+## Socket positioning will be relative to that surface's coordinate on the grid. [br]
+##NOTE To have sockets that hang halfway over the edge, we have to do a visual trick.
+## Actually doing this would make it hard to mouse over sockets at the edge, so instead
+## we have an undersized panel shape (by 0.5) and then we can still have sockets totally
+## enclose the Gizmo area while it looks like they hang off.
 
 @export var sockets : Dictionary[GizmoSocket, Cluster] :  ## GizmoSockets and the cluster they belong to.
 	set(val):
@@ -39,11 +43,19 @@ var socket_tooltip : Control :
 	set(val):
 		if socket_tooltip != null: socket_tooltip.queue_free()
 		socket_tooltip = val
-		socket_tooltip.hide()
-		socket_tooltip.mouse_exited.connect(func(): socket_tooltip.hide())
-		add_child(socket_tooltip, false, Node.INTERNAL_MODE_FRONT)
+		if socket_tooltip != null:
+			socket_tooltip.hide()
+			socket_tooltip.mouse_exited.connect(func(): socket_tooltip.hide())
+			add_child(socket_tooltip, false, Node.INTERNAL_MODE_FRONT)
 
-var socket_menu := PopupMenu.new()
+var socket_menu : PopupMenu :
+	set(val):
+		if socket_menu != null: 
+			socket_menu.queue_free()
+		socket_menu = val
+		if socket_menu != null:
+			socket_menu.hide()
+			add_child(val, false, Node.INTERNAL_MODE_FRONT)
 
 func _init() -> void:
 	super()
@@ -51,7 +63,7 @@ func _init() -> void:
 	
 	#await ready
 	#socket_tooltip = preload("uid://cxgvler3bpjqk").instantiate()
-
+	socket_menu = PopupMenu.new()
 
 func _on_resized():
 	super()
@@ -83,19 +95,18 @@ func _input(event: InputEvent) -> void:
 		if hover_socket != null:
 			if event.button_index == MOUSE_BUTTON_RIGHT:
 				if Input.is_key_pressed(KEY_CTRL) and event.is_pressed():
-					#socket_menu_visible(true, hover_socket)
-					pass
-				else:
-					var pos = canvas_socket_position(hover_socket)
-					var sock_data = {
-						"netvert": hover_socket,
-						"coord": Flowchart.to_grid(pos),
-						"canvas_position": pos,
-						}
-					if event.is_pressed():
-						owner.start_socket_wiring(sock_data)
-					elif event.is_released():
-						owner.stop_socket_wiring(sock_data)
+					socket_menu_visible(true, hover_socket)
+				#else:
+					#var pos = canvas_socket_position(hover_socket)
+					#var sock_data = {
+						#"netvert": hover_socket,
+						#"coord": Flowchart.to_grid(pos),
+						#"canvas_position": pos,
+						#}
+					#if event.is_pressed():
+						#owner.start_socket_wiring(sock_data)
+					#elif event.is_released():
+						#owner.stop_socket_wiring(sock_data)
 			
 			elif event.button_index == MOUSE_BUTTON_LEFT:
 				queue_redraw()
@@ -168,18 +179,27 @@ func _on_socket_pressed(socket:GizmoSocket):
 func _on_socket_released(socket:GizmoSocket):
 	pass
 
-func local_socket_coord(sock:GizmoSocket) -> Vector2i:
+func local_socket_coord(sock:GizmoSocket=null) -> Vector2i:
+	if sock == null: sock = hover_socket
+	if not sock in sockets: return Vector2i.ZERO
 	var cluster = sockets[sock]
 	return cluster.transform_coord(sock.coord, get_bound_coord)
 
-func local_socket_position(sock:GizmoSocket) -> Vector2:
+func local_socket_position(sock:GizmoSocket=null) -> Vector2:
 	return Flowchart.from_grid(Vector2(local_socket_coord(sock)))
 
-func canvas_socket_coord(sock:GizmoSocket) -> Vector2i:
+func canvas_socket_coord(sock:GizmoSocket=null) -> Vector2i:
 	return local_socket_coord(sock) + _grid.position
 
-func canvas_socket_position(sock:GizmoSocket) -> Vector2:
-	return sock.position + position
+func canvas_socket_position(sock:GizmoSocket=null) -> Vector2:
+	return local_socket_position(sock) + position
+
+func global_socket_position(sock:GizmoSocket=null) -> Vector2:
+	if owner is Flowchart:
+		return owner.to_screen_coord(canvas_socket_position(sock)) + owner.global_position
+	if owner != null:
+		return canvas_socket_position(sock) + owner.global_position
+	return canvas_socket_position(sock)
 
 ## Registering new sockets when dynamically adding them during simulation.
 func add_socket(_socket : GizmoSocket):
@@ -206,9 +226,17 @@ func socket_tooltip_visible(shown:bool, sock:GizmoSocket=null):
 			socket_tooltip.hide()
 
 func socket_menu_visible(shown:bool, sock:GizmoSocket=null):
-	if owner is Flowchart and socket_tooltip != null:
+	if owner is Flowchart and socket_menu != null:
 		if shown:
-			socket_menu.popup(Rect2(sock.position, Vector2.ZERO))
+			socket_menu.clear(true)
+			if sock is BitInput:
+				socket_menu.add_radio_check_item("No State Bias")
+				socket_menu.add_radio_check_item("Biased Low")
+				socket_menu.add_radio_check_item("Biased High")
+			elif sock is BitOutput:
+				socket_menu.add_check_item("Show Value")
+				socket_menu.add_check_item("Invert Value")
+			socket_menu.popup(Rect2(global_socket_position(sock), Vector2.ZERO))
 		else:
 			socket_menu.hide()
 #endregion

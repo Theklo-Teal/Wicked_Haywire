@@ -137,7 +137,7 @@ class xWire extends Resource:
 			var segm = v1 - v2
 			var rel = (v1 - point)
 			var direct = segm.normalized()
-			var normal = Saliko.perpendicular(direct)
+			var normal = Vector2(-direct.y, direct.x)
 			var leng = direct.dot(segm)  # Length of segment.
 			var dist = direct.dot(rel)  # Distance of point along the segment.
 			var along = inverse_lerp(0, leng, dist)  # Distance as a value from 0 to 1.

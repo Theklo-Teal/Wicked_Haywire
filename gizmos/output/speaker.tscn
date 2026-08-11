@@ -1,0 +1,58 @@
+[gd_scene format=3 uid="uid://dtxjstbdobfwt"]
+
+[ext_resource type="Script" uid="uid://cbpilxwqyxp24" path="res://gizmos/output/speaker.gd" id="1_jip0h"]
+[ext_resource type="Script" uid="uid://ddaiqnfpchm0j" path="res://modules/Flowchart/Joints/flowchart_socket.gd" id="2_j1i25"]
+[ext_resource type="Script" uid="uid://dixllb5r68rvk" path="res://modules/Flowchart/Gizmos/gizmo_cluster.gd" id="3_3jc01"]
+[ext_resource type="Script" uid="uid://cvcm4bskckdtj" path="res://gizmos/bit_input.gd" id="4_rr3jx"]
+
+[sub_resource type="Resource" id="Resource_18uw1"]
+resource_local_to_scene = true
+script = ExtResource("4_rr3jx")
+mode = 1
+port_class = &"BitPort"
+accepted_port = Array[StringName]([&"BitPort"])
+refuse_port = Array[StringName]([])
+layer = 0
+coord = Vector2i(0, 0)
+position = Vector2(84, 36)
+metadata/_custom_type_script = "uid://cvcm4bskckdtj"
+
+[sub_resource type="Resource" id="Resource_0vg5t"]
+script = ExtResource("3_3jc01")
+coord = Vector2i(-1, 1)
+metadata/_custom_type_script = "uid://dixllb5r68rvk"
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_jnm3w"]
+border_width_left = 8
+border_width_top = 8
+border_width_right = 8
+border_width_bottom = 8
+border_color = Color(0.296875, 0.296875, 0.296875, 1)
+border_blend = true
+corner_radius_top_left = 24
+corner_radius_top_right = 24
+corner_radius_bottom_right = 24
+corner_radius_bottom_left = 24
+
+[sub_resource type="AudioStreamGenerator" id="AudioStreamGenerator_kwtlo"]
+mix_rate = 22050.0
+
+[node name="Speaker" type="Control" unique_id=947591575]
+custom_minimum_size = Vector2(24, 24)
+layout_mode = 3
+anchors_preset = 0
+offset_right = 96.0
+offset_bottom = 72.0
+script = ExtResource("1_jip0h")
+sockets = Dictionary[ExtResource("2_j1i25"), ExtResource("3_3jc01")]({
+SubResource("Resource_18uw1"): SubResource("Resource_0vg5t")
+})
+panelstyle = Array[StyleBox]([SubResource("StyleBoxFlat_jnm3w")])
+panels = Dictionary[Vector4, int]({
+Vector4(0, 0, -1.5, -1): 0
+})
+metadata/_custom_type_script = "uid://dxbdnxmvfy5cw"
+
+[node name="Player" type="AudioStreamPlayer" parent="." unique_id=1920297970]
+stream = SubResource("AudioStreamGenerator_kwtlo")
+autoplay = true

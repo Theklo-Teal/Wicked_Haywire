@@ -308,7 +308,7 @@ func find_schematics():
 			entry.title = scheme_meta.get_value(\"0\", \"title\", \"My Schematic\")
 			entry.metadat = \"user://Schematics/\" + filename
 			entry.netlist = scheme_meta.get_value(\"0\", \"netlist\", \"\")
-			entry.load_scheme.connect(%Flowchart.set_netlist)
+			#entry.load_scheme.connect(%Flowchart.set_netlist)
 			%Files.add_child(entry)
 	
 	if schematic == null:
@@ -852,7 +852,6 @@ layout_mode = 2
 layout_mode = 2
 size_flags_vertical = 3
 theme_override_styles/panel = SubResource("StyleBoxFlat_d13ii")
-current_tab = 5
 tabs_position = 1
 tabs_visible = false
 deselect_enabled = true
@@ -1203,6 +1202,7 @@ func loop():
 	pass"
 
 [node name="GIZ_TAB" type="HBoxContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/Ribbon/TabContainer" unique_id=954640791]
+visible = false
 layout_mode = 2
 theme_override_constants/separation = 0
 metadata/_tab_index = 5

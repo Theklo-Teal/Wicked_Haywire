@@ -25,7 +25,6 @@ func _sim_update_respond(_graph:FlowchartNetwork):
 	sock.write(value, "int")
 
 func _on_h_slider_value_changed(val: float) -> void:
-	var maxval = (1 << bitwidth) - 1
 	if exponential:
 		value = roundi(expo_curve.sample_baked(val) * maxval)
 	else:

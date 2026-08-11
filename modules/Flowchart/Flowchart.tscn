@@ -1,18 +1,7 @@
 [gd_scene format=3 uid="uid://bnatph83g21s6"]
 
-[ext_resource type="Script" uid="uid://ch21vd3wceeie" path="res://modules/Flowchart/flowchart.gd" id="1_88cu4"]
-[ext_resource type="Script" uid="uid://d02c16crluegs" path="res://modules/InfiCanvas/spatial_partitioning.gd" id="2_3gi3x"]
+[ext_resource type="Script" uid="uid://5qpuotkrgg4p" path="res://modules/Flowchart/flowchart.gd" id="1_88cu4"]
 [ext_resource type="Script" uid="uid://ctv2i7rdaj44r" path="res://modules/Flowchart/networking.gd" id="3_3gi3x"]
-
-[sub_resource type="Resource" id="Resource_tpykx"]
-script = ExtResource("2_3gi3x")
-
-[sub_resource type="Resource" id="Resource_gatyp"]
-script = ExtResource("2_3gi3x")
-metadata/_custom_type_script = "uid://d02c16crluegs"
-
-[sub_resource type="Resource" id="Resource_3gi3x"]
-script = ExtResource("2_3gi3x")
 
 [sub_resource type="GDScript" id="GDScript_x8yhq"]
 resource_name = "FlowchartInputFSM"
@@ -187,6 +176,8 @@ class IdleMode extends InputMode:
 					me._selected += me.parti.node.find_objects_tolerant(me.lasso_canvas_rect)
 				else:
 					me._selected += me.parti.node.find_objects_zealous(me.lasso_canvas_rect)
+			else:
+				me._selected.clear()
 		elif button == MOUSE_BUTTON_RIGHT:
 			if me.sel_vert == null and me.sel_wire.is_empty():
 				# Show Canvas Popup
@@ -320,7 +311,7 @@ class WireBend extends InputMode:
 		wire.bend = clamp(ini_bend + delta, Flowchart.SNAP, shortest)
 "
 
-[node name="Flowchart" type="ColorRect" unique_id=117644141]
+[node name="Flowchart" type="ColorRect" unique_id=1113625543]
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -329,12 +320,7 @@ grow_vertical = 2
 offset_transform_enabled = true
 color = Color(0.27387273, 0.27387273, 0.27387273, 1)
 script = ExtResource("1_88cu4")
-parti = Dictionary[Variant, ExtResource("2_3gi3x")]({
-0: SubResource("Resource_tpykx"),
-"joint": SubResource("Resource_gatyp"),
-"node": SubResource("Resource_3gi3x")
-})
-chirality = 1
+metadata/_custom_type_script = "uid://5qpuotkrgg4p"
 
 [node name="Act" type="Node" parent="." unique_id=514495943]
 script = SubResource("GDScript_x8yhq")
@@ -343,7 +329,7 @@ script = SubResource("GDScript_x8yhq")
 script = ExtResource("3_3gi3x")
 metadata/_custom_type_script = "uid://ctv2i7rdaj44r"
 
-[node name="VBoxContainer2" type="VBoxContainer" parent="." unique_id=147196501]
+[node name="state_info" type="VBoxContainer" parent="." unique_id=147196501]
 layout_mode = 1
 anchors_preset = 5
 anchor_left = 0.5
@@ -353,13 +339,13 @@ offset_right = 20.0
 offset_bottom = 50.0
 grow_horizontal = 2
 
-[node name="state" type="Label" parent="VBoxContainer2" unique_id=627417524]
+[node name="state" type="Label" parent="state_info" unique_id=627417524]
 unique_name_in_owner = true
 layout_mode = 2
 text = "???"
 horizontal_alignment = 1
 
-[node name="gizmo" type="Label" parent="VBoxContainer2" unique_id=1417366262]
+[node name="gizmo" type="Label" parent="state_info" unique_id=1417366262]
 unique_name_in_owner = true
 layout_mode = 2
 text = "false"

@@ -24,7 +24,6 @@ func _update_layout():
 var delta : Vector2
 var ini_mouse : Vector2
 func _gui_input(event: InputEvent) -> void:
-	super(event)
 	if owner is Flowchart and owner.mode == Flowchart.Mode.SIMULAT or owner == null:
 		if event is InputEventMouseMotion and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 			var limit = size.y / 2.0
