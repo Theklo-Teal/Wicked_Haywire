@@ -186,7 +186,8 @@ class Hover extends State:
 	var move_primed : bool
 	
 	func enter(_prev:StringName):
-		if me.hover_object == null or not "position" in me.hover_object:
+		if me.hover_object == null or \
+		not("position" in me.hover_object or "rect" in me.hover_object):
 			switch_state.emit("Idle")
 	
 	func hover_object(object):
@@ -223,11 +224,11 @@ class Move extends State:
 		# Track the initial position of selected objects
 		# Add all objects in common with group of a selected one to the selected list.
 		for obj in me._selected.duplicate():
+			me._selected[obj] = _move_unmodulate(obj, get_position(obj))
 			var data = me.get_obj_data(obj)
-			me._selected[obj] = me.get_obj_data(obj).position
 			var group = data.get("obj_group", "")
 			for other in me.obj_groups.get(group, []):
-				me._selected[other] = other.me.get_obj_data(other).position
+				me._selected[other] = _move_unmodulate(other, get_position(other))
 			_move_start(obj)
 	
 	func exit(_next:StringName):
@@ -249,11 +250,25 @@ class Move extends State:
 			me.queue_redraw()
 			for obj in me._selected:
 				var data : Dictionary = me.get_obj_data(obj)
-				data.position = _move_modulate(obj,  me._selected[obj] + me.displacement() / me.zoom)
-				if "position" in obj:
-					obj.position = data.position
-					if obj.has_method("_canvas_repositioning"):
-						obj._canvas_repositioning(data)
+				var new_pos = _move_modulate(obj,  me._selected[obj] + me.displacement() / me.zoom)
+				set_position(obj, new_pos)
+				if obj is Object and obj.has_method("_canvas_repositioning"):
+					obj._canvas_repositioning(data)
+	
+	func get_position(object) -> Vector2:
+		if "position" in object:
+			return object.position
+		elif "rect" in object:
+			return object.rect.position
+		elif object is Object and object.has_method("get_rect"):
+			return object.get_rect().position
+		return Vector2.ZERO
+	
+	func set_position(object, position:Vector2) -> void:
+		if "position" in object:
+			object.position = position
+		elif "rect" in object:
+			object.rect.position = position
 	
 	@warning_ignore("unused_parameter")
 	func _move_start(obj):
@@ -263,6 +278,8 @@ class Move extends State:
 		me._selected_obj_movement_stop(obj)
 	func _move_modulate(obj, new_position:Vector2) -> Vector2:
 		return me._obj_movement_modulate(obj, new_position)
+	func _move_unmodulate(obj, raw_position:Vector2) -> Vector2:
+		return me._obj_movement_unmodulate(obj, raw_position)
 	
 #endregion
 
@@ -270,7 +287,7 @@ class Move extends State:
 var ini_mouse : Vector2  ## Coordinate of the mouse when the left button was last pressed.
 var fin_mouse : Vector2  ## Coordinate of the mouse when the left button was last released. Current mouse button can be found with [code]get_local_mouse_position()[/code].
 
-var hover_object : FlowchartPanel : set=_set_hover_object  # Define a way to tell which canvas object the mouse is over and implement the `_sethover_object()` to disable functions that would conflict with object interaction. Set `null` if no relevant object is under the mouse.
+var hover_object : set=_set_hover_object  # Define a way to tell which canvas object the mouse is over and implement the `_sethover_object()` to disable functions that would conflict with object interaction. Set `null` if no relevant object is under the mouse.
 func _set_hover_object(val):
 	hover_object = val
 	state(&"hover_object", val)
@@ -304,6 +321,8 @@ func _init():
 
 func _process(_delta: float) -> void:
 	if overlay_mode == "Process": overlay.queue_redraw()
+	
+	
 func _physics_process(_delta: float) -> void:
 	if overlay_mode == "Physics": overlay.queue_redraw()
 
@@ -381,6 +400,11 @@ func draw_overlay():
 ## Override this function to implement things like grid snapping.
 @warning_ignore("unused_parameter")
 func _obj_movement_modulate(object, new_position:Vector2) -> Vector2:
+	return new_position
+
+## Override this function to undo things like grid snapping.
+@warning_ignore("unused_parameter")
+func _obj_movement_unmodulate(object, new_position:Vector2) -> Vector2:
 	return new_position
 
 ## Override this function to define what to do with an object being repositioned.

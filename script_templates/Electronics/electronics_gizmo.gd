@@ -19,17 +19,17 @@ func _update_layout():
 	match facing:
 		pass
 
-func _sim_update(graph:FlowchartNetwork):
+func _sim_update(_raph:FlowchartNetwork):
 	pass
 
-func _edge_triggered(graph:FlowchartNetwork, socket: BitInput, rising:int, falling:int):
+func _edge_triggered(_graph:FlowchartNetwork, _socket: BitInput, _rising:int, _falling:int):
 	pass
 
-func _sim_update_sampling(graph:FlowchartNetwork):
+func _sim_update_sampling(_graph:FlowchartNetwork):
 	pass
 
-func _edge_triggered_sampling(graph:FlowchartNetwork, socket: BitInput, rising:int, falling:int):
+func _edge_triggered_sampling(_graph:FlowchartNetwork, _socket: BitInput, _rising:int, _falling:int):
 	pass
 
-func _sim_update_respond(graph:FlowchartNetwork):
+func _sim_update_respond(_graph:FlowchartNetwork):
 	pass

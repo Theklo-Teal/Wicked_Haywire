@@ -108,12 +108,14 @@ func global_screen_mouse() -> Vector2:
 	return get_global_mouse_position()
 
 func joint_canvas_position(joint:NetBase.NetVert) -> Vector2:
-	if joint.coord in $Network.netlist.vias:
+	var cell := Vector3i(joint.coord.x, joint.coord.y, joint.layer)
+	if cell in $Network.netlist.vias:
 		return from_grid(joint.coord)
 	elif joint in $Network.netlist.sockets:
 		var gizmo : FlowchartGizmo = $Network.netlist.sockets[joint]
 		return gizmo.canvas_socket_position(joint)
 	else:
+		printerr("Flowchart.joint_canvas_position(): Can't find the joint in netlist.")
 		return Vector2.ZERO
 
 func vert_under_mouse() -> NetBase.NetVert:
@@ -122,14 +124,15 @@ func vert_under_mouse() -> NetBase.NetVert:
 	return $Network.netlist.vias.get(cell)
 
 func wire_under_mouse():
-	var conns : PackedInt64Array
+	var conns : Dictionary
 	for via in parti.joint.find_objects_simple(_view_rect):
-		conns.append_array($Network.netlist.get_links(via, true, false))
+		for link in $Network.netlist.get_links(via):
+			conns[link] = false
 	for gizmo in parti.node.find_objects(_view_rect):
 		if gizmo.get("sockets") == null: continue
 		for sock in gizmo.sockets:
-			var links = $Network.netlist.get_links(sock, true, false)
-			conns.append_array(links)
+			for link in $Network.netlist.get_links(sock):
+				conns[link] = false
 	var wire_info : Dictionary
 	for link in conns:
 		var wire = $Network.netlist.links[link]
@@ -150,7 +153,12 @@ func _on_curr_state_set(val:StringName):
 	if is_node_ready(): %state.text = val
 
 func lasso_select_objects(lasso_rect:Rect2) -> void:
-	super(lasso_rect)
+	var gizmos : Array = [parti.node.find_objects_tolerant, parti.node.find_objects_zealous][chirality].call(lasso_rect)
+	var vias : Array = parti.joint.find_objects_simple(lasso_rect)
+	if Input.is_key_pressed(KEY_SHIFT):
+		add_selected.callv(gizmos + vias)
+	else:
+		set_selected.callv(gizmos + vias)
 
 func on_vert_selected(vert:NetBase.NetVert):
 	sel_vert = vert
@@ -168,10 +176,10 @@ func on_wire_selected(wire:Dictionary):
 	# If the joint is part of a gizmo, we use the gizmo instead for repositioning.
 	moved_joint[0] = $Network.netlist.sockets.get(moved_joint[0], moved_joint[0])
 	moved_joint[1] = $Network.netlist.sockets.get(moved_joint[1], moved_joint[1])
-	if Input.is_key_pressed(KEY_SHIFT):
-		add_selected(moved_joint)
-	else:
-		set_selected(moved_joint)
+	#if Input.is_key_pressed(KEY_SHIFT):
+		#add_selected(moved_joint)
+	#else:
+		#set_selected(moved_joint)
 
 
 class ChartIdle extends Idle:
@@ -180,45 +188,49 @@ class ChartIdle extends Idle:
 	
 	func drag_started(drag_button:MouseButton) -> bool:
 		# Selecting wires or vias
-		me.sel_wire.is_empty()
+		me.queue_redraw()
+		me.sel_wire.clear()
 		me.sel_vert = null
 		var vert = me.vert_under_mouse()
 		if vert == null:
 			var wire = me.wire_under_mouse()
 			if not wire.is_empty():
 				me.on_wire_selected(wire)
-				if floori(wire.subratio) == 1:
+				if floori(wire.subratio) == 1 and drag_button == MOUSE_BUTTON_LEFT:
 					switch_state.emit("WireBend")
+					return true
 		else:
-			me.on_vert_selected(me.sel_vert)
+			me.on_vert_selected(vert)
 		
 		return super(drag_button)
+
 
 class ChartHover extends Hover:
 	static func override_state() -> StringName:
 		return &"Hover" 
 	
 	func enter(prev:StringName):
+		super(prev)
 		if me.mode == Flowchart.Mode.SIMULAT:
 			switch_state.emit("Interact")
-		super(prev)
 	
 	func drag_started(drag_button:MouseButton) -> bool:
 		if me.mode != Flowchart.Mode.EDITING: return false
-		if me.hover_object is FlowchartGizmo and me.hover_object.hover_socket != null:
-			# Allow Gizmo to take over control
-			if drag_button == MOUSE_BUTTON_RIGHT:  # Start wiring.
-				me.wire_from = me.hover_object.hover_socket
-				switch_state.emit("Wire")
-				return true
-		else:
-			return super(drag_button)
-		return false
+		if me.hover_object is FlowchartGizmo:
+			me.hover_object._on_mouse_stopped()  # Force the Gizmo to check socket under mouse.
+			if me.hover_object.hover_socket != null:
+				# Allow Gizmo to take over control
+				if drag_button == MOUSE_BUTTON_RIGHT:  # Start wiring.
+					me.wire_from = me.hover_object.hover_socket
+					switch_state.emit("Wire")
+					return true
+		return super(drag_button)
 	
 	func drag_stopped(drag_button:MouseButton):
 		super(drag_button)
-		if me.hover_object is FlowchartGizmo and me.hover_object.hover_socket != null:
-			me.sel_vert = me.hover_object.hover_socket
+		if drag_button == MOUSE_BUTTON_RIGHT:
+			if me.hover_object is FlowchartGizmo and me.hover_object.hover_socket != null:
+				me.sel_vert = me.hover_object.hover_socket
 			switch_state.emit("Wire")
 
 class ChartMove extends Move:
@@ -244,16 +256,24 @@ class ChartMove extends Move:
 	
 	func _move_modulate(object, new_position:Vector2) -> Vector2:
 		if object is FlowchartPanel:
-			#queue_redraw()  # Makes wires follow gizmo sockets.
 			return me.snap_grid(new_position) - Vector2(0.5, 0.5) * SNAP
-		if object is NetBase.Joint:
-			var cell : Vector2i = me.to_grid(new_position)
-			if Vector3i(cell.x, cell.y, me.layer) in my("$Network").netlist.vias:
-				# Make it so vias can't overlap.
-				return me.from_grid(last_valid_pos[object]) + Vector2(0.5, 0.5)
-			last_valid_pos[object] = cell
-			return me.snap_grid(new_position - Vector2(0.5, 0.5) * SNAP)
+		#if object is NetBase.Joint:
+			#var cell : Vector2i = me.to_grid(new_position)
+			#if Vector3i(cell.x, cell.y, me.layer) in my("$Network").netlist.vias:
+				## Make it so vias can't overlap.
+				#return me.from_grid(last_valid_pos[object]) + Vector2(0.5, 0.5)
+			#last_valid_pos[object] = cell
+			#return me.snap_grid(new_position - Vector2(0.5, 0.5) * SNAP)
 		return me.snap_grid(new_position)
+	
+	## FIXME This is supposed to counteract the effect of snapping in modulate on
+	## moving multiple objects at once and they don't seem to step at the same time.
+	## It isn't working.
+	func _move_unmodulate(object, new_position:Vector2) -> Vector2:
+		if object is FlowchartPanel:
+			return new_position + Vector2(0.5, 0.5) * SNAP
+		return new_position
+
 
 class Interact extends State:
 	func hover_object(object):
@@ -273,8 +293,21 @@ class Wire extends State:
 		_prev = prev
 		if me.sel_wire.is_empty():
 			find_origin()
+		
+		if not Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
+			find_destin()
+			if origin == null or destin == null:
+				switch_state.emit(_prev)
+			elif origin != destin:  # This check allows click-to-click wiring.
+				finish_wire()
+				cancel()
 	
 	func input(event:InputEvent):
+		if event is InputEventKey and not event.is_echo():
+			if event.keycode == KEY_SHIFT:
+				# Update the chirality of the new wire preview.
+				me.overlay.queue_redraw()
+		
 		if event is InputEventMouseButton:
 			if event.is_released() and event.button_index == MOUSE_BUTTON_RIGHT:
 				find_destin()
@@ -345,7 +378,7 @@ class WireBend extends State:
 		if me.sel_wire.is_empty(): cancel()
 		var link = me.sel_wire.pair_hash
 		wire = my("Network").netlist.links[ link ]
-		pair = my("Network").netlist.pairs[ link ]
+		pair.assign( my("Network").netlist.pairs[ link ] )
 		joints = [me.joint_canvas_position(pair[0]), me.joint_canvas_position(pair[1])]
 	
 	func drag_stopped(_drag_button:MouseButton):
@@ -427,7 +460,20 @@ func _input(event: InputEvent) -> void:
 						rem_gizmo(each)
 					if each is FlowchartVia:
 						rem_via(each)
-			_selected.clear()
+			clear_selected()
+	
+	if event is InputEventMouseMotion:
+		if _mouse_stopped:
+			_mouse_stopped = false
+		_mouse_stopped_frames = 0
+
+
+const _MOUSE_MOVE_THRESHOLD = 6  # How many process frames have to pass to consider the mouse stopped?
+var _mouse_stopped_frames : int  # How many frames the mouse hasn't moved.
+var _mouse_stopped : bool = false
+func _on_mouse_stopped():
+	if hover_object == null or hover_object is FlowchartVia:
+		hover_object = vert_under_mouse()
 
 
 func _on_line_edit_submit(_txt:String):
@@ -495,8 +541,8 @@ func _draw_fore_geometry(canvas:Control, viewed_canvas_rect:Rect2):
 		var wire : NetBase.Link = $Network.netlist.links[link]
 		var pair : Array[NetBase.NetVert]
 		pair.assign($Network.netlist.pairs[link])
-		var pos1 = $Network.netlist.sockets.get(pair[0]).canvas_socket_position(pair[0]) if pair[0] in $Network.netlist.sockets else from_grid(pair[0].coord)
-		var pos2 = $Network.netlist.sockets.get(pair[1]).canvas_socket_position(pair[1]) if pair[1] in $Network.netlist.sockets else from_grid(pair[1].coord)
+		var pos1 = joint_canvas_position(pair[0])
+		var pos2 = joint_canvas_position(pair[1])
 		wire.draw(self, canvas, to_screen_coord(pos1), to_screen_coord(pos2))
 
 func _draw_overlay(canvas:Control, _viewed_canvas_rect:Rect2):
@@ -511,8 +557,8 @@ func _draw_overlay(canvas:Control, _viewed_canvas_rect:Rect2):
 		var wire_type = $Network.link_classes[wire_from.port.default_link()]
 		var thickness = wire_type._wire_thick()
 		thickness = clamp(thickness, 1, MAX_WIRE) * zoom
-		#FIXME For some reason, `Link.set_chi_from_len()` doesn't agree on the effect of `longest` with `Link.draw_length()`
-		wire_type.draw_length(canvas, joint_canvas_position(wire_from), get_local_mouse_position(), Input.is_key_pressed(KEY_SHIFT), thickness, SNAP, trace_color_highlight)
+		#FIXME Fixed? For some reason, `Link.set_chi_from_len()` doesn't agree on the effect of `longest` with `Link.draw_length()`
+		wire_type.draw_length(canvas, joint_canvas_position(wire_from), get_local_mouse_position(), not Input.is_key_pressed(KEY_SHIFT), thickness, SNAP, trace_color_highlight)
 	
 	# Highlight grid cell under mouse.
 	if at_state("Idle"):
@@ -573,7 +619,19 @@ var process_elapse : float = 0
 var tick_countdown : int = -1
 
 func _process(delta: float) -> void:
+	super(delta)
 	if OS.has_feature("editor_hint"): return
+
+	# Mouse stop detection.
+	# The _MOUSE_MOVE_THRESHOLD here acts a bit like an input debouncing mechanism.
+	if _mouse_stopped_frames > _MOUSE_MOVE_THRESHOLD and not _mouse_stopped:
+		_mouse_stopped = true
+		_on_mouse_stopped()
+	else:
+		_mouse_stopped_frames = _mouse_stopped_frames + 1
+		# Keep number above threshold if it wraps around the larges possible int.
+		if _mouse_stopped_frames < 0: _mouse_stopped_frames = _MOUSE_MOVE_THRESHOLD
+	
 	process_elapse += delta
 	if process_elapse > update_rate:
 		process_elapse = 0.0
