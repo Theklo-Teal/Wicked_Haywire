@@ -95,8 +95,12 @@ func _on_rect_changed():
 	#_camera.offset = center
 
 var lasso_mode : bool  ## Type of selection last drawn. Depends on [code]chirality[/code].
-var lasso_screen_rect : Rect2  ## This is the area of the last box selection. Only updated when the selection operation ends. Even when the [code]lasso_allowed[/code] is [code]false[/code], this variable is still computed as it provides utility to mouse drag operations in general.
-var lasso_canvas_rect : Rect2  ## This the area of the last box selection performed, and is being performed; it updates as the box is drawn. Even when the [code]lasso_allowed[/code] is [code]false[/code], this variable is still computed as it provides utility to mouse drag operations in general.
+var lasso_screen_rect : Rect2 :  ## This is the area of the last box selection. Only updated when the selection operation ends. Even outside lassoing operations, this variable is still computed as it provides utility to mouse drag operations in general.
+	set(val):
+		lasso_screen_rect = val
+		lasso_canvas_rect = to_canvas_rect(val)
+var lasso_canvas_rect : Rect2  ## This the area of the last box selection performed, and is being performed; it updates as the box is drawn. Even outside lassoing operations, this variable is still computed as it provides utility to mouse drag operations in general.
+
 
 #region Canvas Handling
 var origin := Vector2.ZERO :  ## position in Canvas frame of reference.
@@ -144,31 +148,70 @@ func to_canvas_rect(screen_rect:Rect2) -> Rect2:
 #region Object selection
 signal objects_selected(objects:Array)
 
-var _selected : Array : set=set_selected  ## Objects in the canvas that the user selects as a group or individually.[br] InfiCanvas doesn't actually select objects. Either the script objects sets them to be selected or an extension of InfiCanvas decides what objects to select and how, based on lasso Rect2 or not.
-var obj_groups : Dictionary[StringName, Array]  # Objects which are grouped together such as they always move or are selected together.
+var _selected : Dictionary  ## Objects in the canvas that the user selects as a group or individually.[br] Don't write directly to this variable use [code]*_selected()[/code] functions instead.
+var obj_groups : Dictionary[StringName, Array] ## Objects which are grouped together such as they always move or are selected together.
 
-## Override this function if something is to happen when selecting objects.
-func set_selected(objs:Array):
-		_selected = objs
-		objects_selected.emit(objs)
-		_set_selected(objs)
+func set_selected(...objs):
+	_selected.clear()
+	for obj in objs:
+		var pos := Vector2.ZERO
+		if "position" in obj: pos = obj.position
+		elif obj is Object:
+			if obj.has_method("get_rect"): pos = obj.get_rect().position
+			elif "rect" in obj: pos = obj.rect
+		else:
+			if "rect" in obj: pos = obj.rect
+		
+		_selected[obj] = get_obj_data(obj).get_or_add("position", pos)
+		objects_selected.emit(_selected.keys())
+		selected_changed()
 
-@warning_ignore("unused_parameter")
-func _set_selected(objs:Array):
+func add_selected(...objs):
+	for obj in objs:
+		var pos := Vector2.ZERO
+		if "position" in obj: pos = obj.position
+		elif obj is Object:
+			if obj.has_method("get_rect"): pos = obj.get_rect().position
+			elif "rect" in obj: pos = obj.rect
+		else:
+			if "rect" in obj: pos = obj.rect
+		_selected[obj] = get_obj_data(obj).get_or_add("position", pos)
+		selected_changed()
+
+func rem_selected(...objs):
+	var ini_count = _selected.size()
+	for obj in objs:
+		_selected.erase(obj)
+	if ini_count != _selected.size():
+		selected_changed()
+
+func clear_selected():
+	var ini_count = _selected.size()
+	_selected.clear()
+	if ini_count != _selected.size():
+		selected_changed()
+
+func selected_changed():
+	queue_redraw()
+	_selected_changed()
+
+func _selected_changed():
 	pass
 #endregion
 
-## Register an object to a partition. If no partition is provided, it uses a default one.[br]
-## Objects can be anything which contains a [code]position[/code] key or property, and optionally a [code]get_rect()[/code] method.
+## Register an object to a partition and sets its position, if possible. If no partition is provided, it uses a default one.[br]
+## Objects can be anything which contains a [code]position[/code] key or property, or a [code]rect[/code] key or property.
 ## This includes Dictionaries like [code]{"position"=Vector2.ZERO}[/code], instances of inner classes and obviously, normal classes like Godot nodes.
 ## Returns the partition data of that object, where options can be changed. If the object changes position, call [code]SpatialPartition.update_object()[/code].
 func place_object(obj, canvas_coord:Vector2, partition:SpatialPartition=parti[0 as Variant]) -> Dictionary:
 	all_objs[obj] = partition
 	var data = partition.add_object(obj, canvas_coord)
-	obj.position = canvas_coord
 	if obj is Node:
 		_nodes.add_child(obj)
 		obj.owner = self
+	if "position" in obj:
+		obj.position = canvas_coord
+	if "rect" in obj: obj.rect.position = canvas_coord
 	return data
 
 ## Removes an object from its partition. If the object is a Godot node, it must
@@ -197,7 +240,7 @@ func _draw():
 		draw_compass(self)
 	
 	draw_back_geometry(self, _view_rect)
-	highlight_selection(self, _selected)
+	highlight_objects(self, _selected.keys())
 	forecanvas.queue_redraw()
 	overlay.queue_redraw()
 	
@@ -282,7 +325,7 @@ func draw_lasso(canvas:Control):  # Drawn on the overlay, so we don't have to do
 	canvas.draw_rect(lasso_screen_rect, [lasso_main_color, lasso_alter_color][int(lasso_mode)], false, lasso_thick)
 
 ## Draw highlight effect on selected objects. Objects where the Rect2 doesn't have area are ignored.
-func highlight_selection(canvas:Control, selected_objs:Array):
+func highlight_objects(canvas:Control, selected_objs:Array):
 	for obj in selected_objs:
 		var rect = get_obj_rect(obj)
 		if rect.size == Vector2.ZERO: continue

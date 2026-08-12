@@ -3,6 +3,7 @@
 [ext_resource type="PackedScene" uid="uid://bnatph83g21s6" path="res://modules/Flowchart/Flowchart.tscn" id="1_ig7tw"]
 [ext_resource type="Texture2D" uid="uid://buorl1ocq0h64" path="res://assets/flags.png" id="1_lquwl"]
 [ext_resource type="Texture2D" uid="uid://dqhydn3r8vuvq" path="res://Wicked_Haywire_Logo.svg" id="2_lquwl"]
+[ext_resource type="Script" uid="uid://d02c16crluegs" path="res://modules/InfiCanvas/spatial_partitioning.gd" id="4_7mycd"]
 [ext_resource type="Script" uid="uid://b07ljhmg8l7ne" path="res://modules/Sidebars/Sidebar.gd" id="6_7mycd"]
 [ext_resource type="Shader" uid="uid://d1gg4mr8iu7ia" path="res://modules/Sidebars/SidebarTray_Glass.gdshader" id="6_272bh"]
 
@@ -234,6 +235,12 @@ func populate_toybox():
 			dev_button.toggle_mode = true
 			dev_button.button_group = G.grabbed_buttons
 			innerbox.add_child(dev_button)
+		
+		# Special devices that don't appear in the Toybox.
+		#%Flowchart.gizmo_pallet[\"_info_panel\"] = load(\"uid://biwbp7mhl3co\")
+		%Flowchart.gizmo_pallet[\"_constant\"] = load(\"uid://cvjc33kw2imnf\")
+		%Flowchart.gizmo_pallet[\"_buffer_gate\"] = load(\"uid://ddbqln6sbtevv\")
+		%Flowchart.gizmo_pallet[\"_maestro\"] = load(\"uid://cbbug0x8tjj2p\")
 
 var parts_categories = {
 	\"input\" : [],
@@ -556,6 +563,15 @@ func _draw() -> void:
 		span += step
 	draw_polyline(line, Color.REBECCA_PURPLE, 3)
 "
+
+[sub_resource type="Resource" id="Resource_7mycd"]
+script = ExtResource("4_7mycd")
+
+[sub_resource type="Resource" id="Resource_272bh"]
+script = ExtResource("4_7mycd")
+
+[sub_resource type="Resource" id="Resource_kek77"]
+script = ExtResource("4_7mycd")
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_7mycd"]
 shader = ExtResource("6_272bh")
@@ -1269,6 +1285,11 @@ unique_name_in_owner = true
 clip_contents = true
 layout_mode = 2
 size_flags_vertical = 3
+parti = Dictionary[Variant, ExtResource("4_7mycd")]({
+0: SubResource("Resource_kek77"),
+"joint": SubResource("Resource_7mycd"),
+"node": SubResource("Resource_272bh")
+})
 
 [node name="MarginContainer" type="MarginContainer" parent="MarginContainer/HBoxContainer/VBoxContainer/TraySplitter/VBoxContainer/Flowchart" unique_id=1137236957]
 layout_mode = 1

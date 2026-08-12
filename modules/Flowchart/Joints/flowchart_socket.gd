@@ -18,6 +18,7 @@ func mouse_press():
 		pressed = not pressed
 	else:
 		pressed = true
+
 func mouse_release():
 	if not toggle: pressed = false
 

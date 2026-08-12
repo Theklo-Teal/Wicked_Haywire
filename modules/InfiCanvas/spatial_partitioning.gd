@@ -175,7 +175,7 @@ func get_obj_position(obj) -> Vector2:
 		return Vector2.ZERO
 
 #region Managing Objects
-## Register object in a partition.[br] 
+## Register object this partition.[br] 
 ## [b]NOTE: [/b][u]If the obj has the same data as an existing one, their hashes,
 ## thus index in the partition keys will be the same, leading to overwriting, so
 ## you should add some "unique id" or "hash" property to such objects.[/u][br]
@@ -193,10 +193,7 @@ func add_object(obj, pos:Vector2) -> Dictionary:
 	
 	var obj_pos : Array[Vector2]
 	for each in parti:
-		if obj_intel[each].centered:
-			obj_pos.append(get_obj_rect(each).get_center())
-		else:
-			obj_pos.append(get_obj_rect(each).position)
+		obj_pos.append(get_obj_rect(each).position)
 	
 	var quad : QuadTree = quadtrees.get_or_add( id, QuadTree.new(Rect2(id, Vector2.ONE * root_size), min_size, max_obj) )
 	quad.subdivide(obj_pos)

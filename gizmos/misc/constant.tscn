@@ -28,7 +28,7 @@ func _update_layout():
 	match facing:
 		pass
 
-func _sim_update(graph:FlowchartNetwork):
+func _sim_update(_graph:FlowchartNetwork):
 	var negat = (1 << bitwidth - 1) ^ value
 	sock.write(value, \"pull_up\", bitwidth)
 	sock.write(negat, \"pull_down\", bitwidth)
@@ -58,7 +58,6 @@ anchors_preset = 0
 offset_right = 48.0
 offset_bottom = 24.0
 script = SubResource("GDScript_byh3h")
-value = null
 description = "Provides a set binary value so wires aren't noisy."
 sockets = Dictionary[ExtResource("2_sw37b"), ExtResource("3_ka8ik")]({
 SubResource("Resource_jnm3w"): SubResource("Resource_kwtlo")

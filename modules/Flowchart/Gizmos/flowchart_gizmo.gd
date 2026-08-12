@@ -96,18 +96,6 @@ func _input(event: InputEvent) -> void:
 			if event.button_index == MOUSE_BUTTON_RIGHT:
 				if Input.is_key_pressed(KEY_CTRL) and event.is_pressed():
 					socket_menu_visible(true, hover_socket)
-				#else:
-					#var pos = canvas_socket_position(hover_socket)
-					#var sock_data = {
-						#"netvert": hover_socket,
-						#"coord": Flowchart.to_grid(pos),
-						#"canvas_position": pos,
-						#}
-					#if event.is_pressed():
-						#owner.start_socket_wiring(sock_data)
-					#elif event.is_released():
-						#owner.stop_socket_wiring(sock_data)
-			
 			elif event.button_index == MOUSE_BUTTON_LEFT:
 				queue_redraw()
 				if event.is_pressed():
