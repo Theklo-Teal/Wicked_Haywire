@@ -13,6 +13,3 @@ func draw(chart:Flowchart, canvas:Control, where:Vector2):
 	if chart.sel_vert == self or self in chart._selected:
 		color = G.appearance.trace_primary
 	canvas.draw_circle(where, Flowchart.JOINT_RAD * 0.5 * chart.zoom, color, false, Flowchart.JOINT_RAD * 0.3)
-
-func _canvas_repositioning(data:Dictionary):
-	coord = Flowchart.to_grid(data.position)

@@ -227,7 +227,7 @@ func remove_object(obj) -> Dictionary:
 ## After the object's position is changed, call this method to update its partition.[br]
 ## If the object includes a [code]_parti_updated()[/code] method, it will be called
 ## with its data as argument.[br]
-## The data is returned, in case you need it to get computed positions.
+## The data is returned.
 func update_object(obj) -> Dictionary:
 	var data : Dictionary = obj_intel[obj]
 	

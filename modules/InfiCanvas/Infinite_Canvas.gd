@@ -82,10 +82,11 @@ func switch_state(next:StringName):
 	func fore_draw(canvas:Control, viewed_canvas_rect:Rect2): pass
 	func over_draw(canvas:Control, viewed_canvas_rect:Rect2): pass
 	## A drag operation was attempted. Return [code]true[/code] if the [code]drag_button[/code]
-	## is acceptable.
+	## is acceptable. Once releasing the same button, [code]drag_stopped[/code] is called.[br]
+	## NOTE: Don't change state during this function.
 	func drag_started(drag_button:MouseButton) -> bool: return true
 	## Drag operation was finished. [code]drag_button()[/code] provided as a convinience.
-	## This function is only call if the button that made [code]drag_started()[/code]
+	## This function is only called if the button that made [code]drag_started()[/code]
 	## return [code]true[/code] is released.
 	func drag_stopped(drag_button:MouseButton): pass
 	func gui_input(event:InputEvent): pass
@@ -247,7 +248,7 @@ class Move extends State:
 	
 	func input(event:InputEvent):
 		if event is InputEventMouseMotion:
-			me.queue_redraw()
+			me.queue_redraw()  # Keeps selection highlighting updated.
 			for obj in me._selected:
 				var data : Dictionary = me.get_obj_data(obj)
 				var new_pos = _move_modulate(obj,  me._selected[obj] + me.displacement() / me.zoom)
@@ -280,7 +281,7 @@ class Move extends State:
 		return me._obj_movement_modulate(obj, new_position)
 	func _move_unmodulate(obj, raw_position:Vector2) -> Vector2:
 		return me._obj_movement_unmodulate(obj, raw_position)
-	
+
 #endregion
 
 #region Boilerplate
@@ -415,9 +416,5 @@ func _selected_obj_movement_start(obj):
 ## Override this function to define what to do with an object after repositioned.
 @warning_ignore("unused_parameter")
 func _selected_obj_movement_stop(obj):
-	pass
-
-@warning_ignore("unused_parameter")
-func _set_selected(val:Array):
 	pass
 #endregion

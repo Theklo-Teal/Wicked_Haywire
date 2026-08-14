@@ -2,36 +2,26 @@
 extends InfiCanvas
 class_name Flowchart
 
-## An Infinite Canvas were you can place panels with sockets, called "graph nodes".
-## Their sockets can be connected together to form flowchart visualizations which 
-## can process some operations or simulations for interactive and dynamic behaviours 
-## between graph nodes. The data about the relationships between graph nodes is 
-## stored in a FlowchartGraph resource. [br]
+## An Infinite Canvas were you can place panels called "graph nodes", which may
+## contain sockets. The sockets can be connected together to form flowchart
+## visualizations which can process some operations or simulations for interactive
+## and dynamic behaviours between graph nodes.[br]
+## The data about the connections of sockets is stored in a FlowchartNetwork.NetData,
+## Specifically the instance in the [code]$Network.netlist[/code] variable.[br]
 ## This is very similar to Godot's GraphEdit node, but being a custom implementation,
 ## we can make it display things or operate on things in our custom way and without 
 ## being afraid of the "Experimental" tag.[br][br]
-## Networks can be extended to have different sets of Link types, which extend the
-## generic "Link" inner class.[br]
-## Different Links carry different formats of data and can behave differently when
-## written or read to.[br]
-## Each Link mentions the UID of FlowchartWire, so different types of signals can
-## be represented with different colors or thickness, for example.[br]
-## The generic Wire can vary in color or thickness. You can create several ".tres"
-## resource files for varieties on those properties, or you can make scripts
-## extending FlowchartWire to include more properties and behaviors. The UID in
-## each Link doesn't mind if it's a resource file or the script of a Wire class.[br]
-## The ChartSockets can extended to use different Link types, thus deciding
-## What kind of wire they produce and which other sockets they are allowed to
-## connect to.[br]
-## Finally, graph nodes, or class FlowchartPanel derivations contain Sockets as
-## child nodes that automatically position to respect a snapping grid. Just don't
-## forget to register them in the [code]FlowchartPanel.sockets[/code] dictionary.[br]
-## You are meant to be at the root of a scene and extended to define the behavior
-## of their sockets. The can read or write to Links during the update part of the
-## simulation cycle. The typical idea is to read from ChartSocketSink nodes, transform the
-## value to something meaningful and write with ChartSocketSource nodes.[br]
-## These classes of these sockets can be extended for different kinds of signals
-## or protocols, thus different Links, thus different Wires.
+## Networks can be extended to have different sets of Port types, which extend the
+## generic "Port" inner class.[br]
+## Different Ports carry different formats of data and can behave differently when
+## written or read to for simulation.[br]
+## The visual representation of connections is the Link class, which can be extended
+## To define different ways of rendering the wire.[br]
+## The FlowchartSockets can extended to use different Ports types, and ports decide
+## a preferred Link type , thus deciding what kind of wire they produce and which
+## other sockets they are allowed to connect to.[br]
+## Finally, graph nodes, of the class FlowchartGizmo contain a dictionary of Sockets
+## that automatically position to respect a snapping grid.
 
 
 #TODO Allow Rotating and Mirroring Graph Nodes
@@ -108,21 +98,25 @@ func global_screen_mouse() -> Vector2:
 	return get_global_mouse_position()
 
 func joint_canvas_position(joint:NetBase.NetVert) -> Vector2:
-	var cell := Vector3i(joint.coord.x, joint.coord.y, joint.layer)
-	if cell in $Network.netlist.vias:
-		return from_grid(joint.coord)
-	elif joint in $Network.netlist.sockets:
+	if joint in $Network.netlist.sockets:
 		var gizmo : FlowchartGizmo = $Network.netlist.sockets[joint]
 		return gizmo.canvas_socket_position(joint)
 	else:
-		printerr("Flowchart.joint_canvas_position(): Can't find the joint in netlist.")
-		return Vector2.ZERO
+		return joint.position
+
+func socket_under_mouse() -> NetBase.Socket:
+	hover_object._on_mouse_stopped()  # Force the Gizmo to check socket under mouse.
+	#NOTE: Gizmos already check their sockets on click, but they receive input later than Flowchart, so it's moot.
+	if hover_object.hover_socket != null:
+		return hover_object.hover_socket
+	return null
 
 func vert_under_mouse() -> NetBase.NetVert:
 	var cell = grid_mouse()
 	cell = Vector3i(cell.x, cell.y, layer)
-	return $Network.netlist.vias.get(cell)
+	return $Network.netlist.vias.get(cell, null)
 
+var _wire_skip : int = 0  # (Not implemented yet) If wires overlap, this skips a match if the user wants to.
 func wire_under_mouse():
 	var conns : Dictionary
 	for via in parti.joint.find_objects_simple(_view_rect):
@@ -137,12 +131,17 @@ func wire_under_mouse():
 	for link in conns:
 		var wire = $Network.netlist.links[link]
 		var pair = $Network.netlist.pairs[link]
-		wire_info = wire.near(canvas_mouse(), joint_canvas_position(pair[0]), joint_canvas_position(pair[1]))
+		var pos1 = joint_canvas_position(pair[0])
+		var pos2 = joint_canvas_position(pair[1])
+		wire_info = wire.near(screen_mouse(), to_screen_coord(pos1), to_screen_coord(pos2))
 		if not wire_info.is_empty():
-			wire_info["wire"] = wire
-			wire_info["pair_hash"] = link
-			wire_info["ini_bend"] = wire.bend
-			break
+			if _wire_skip <= 0:
+				wire_info["wire"] = wire
+				wire_info["pair_hash"] = link
+				wire_info["ini_bend"] = wire.bend
+				break
+			else:
+				_wire_skip -= 1
 	return wire_info
 #endregion
 
@@ -152,6 +151,26 @@ func _on_curr_state_set(val:StringName):
 	super(val)
 	if is_node_ready(): %state.text = val
 
+func _selected_changed():
+	# Cancels a gizmo from being placed if clicked on a canvas gizmo.
+	var grab_gizmo = G.grabbed_buttons.get_pressed_button()
+	if grab_gizmo != null: grab_gizmo.button_pressed = false
+
+func _obj_movement_modulate(object, new_position:Vector2) -> Vector2:
+	if object is FlowchartPanel:
+		return snap_grid(new_position) - Vector2(0.5, 0.5) * SNAP
+	#NOTE the way repositioning Vias works is that we maintain their `coord`
+	# untouched. We only change the `position` and drawing functions use that
+	# variable as well. After the movement stops, we call `Flowchart.move_via()`
+	# which sets the new `coord`, given the final position.
+	# Changing `coord` directly messes up with `move_via()` and we need that
+	# to update spatial partitioning and netlist.
+	return snap_grid(new_position)
+
+func _selected_obj_movement_stop(obj):
+	if obj is FlowchartVia:
+		move_via(obj, to_grid(obj.position))
+
 func lasso_select_objects(lasso_rect:Rect2) -> void:
 	var gizmos : Array = [parti.node.find_objects_tolerant, parti.node.find_objects_zealous][chirality].call(lasso_rect)
 	var vias : Array = parti.joint.find_objects_simple(lasso_rect)
@@ -160,8 +179,10 @@ func lasso_select_objects(lasso_rect:Rect2) -> void:
 	else:
 		set_selected.callv(gizmos + vias)
 
+
 func on_vert_selected(vert:NetBase.NetVert):
 	sel_vert = vert
+	hover_object = vert
 	if sel_vert == null: return
 	if Input.is_key_pressed(KEY_SHIFT):
 		add_selected(sel_vert)
@@ -182,164 +203,119 @@ func on_wire_selected(wire:Dictionary):
 		#set_selected(moved_joint)
 
 
+signal picked_gizmo(gizmo:FlowchartGizmo)
+## Sets a grabbed gizmo with the same settings as the picked one.
+func picker_tool(gizmo:FlowchartGizmo):
+	picked_gizmo.emit(gizmo)
+
+
 class ChartIdle extends Idle:
 	static func override_state() -> StringName:
 		return &"Idle"
 	
-	func drag_started(drag_button:MouseButton) -> bool:
-		# Selecting wires or vias
-		me.queue_redraw()
-		me.sel_wire.clear()
-		me.sel_vert = null
-		var vert = me.vert_under_mouse()
-		if vert == null:
-			var wire = me.wire_under_mouse()
-			if not wire.is_empty():
-				me.on_wire_selected(wire)
-				if floori(wire.subratio) == 1 and drag_button == MOUSE_BUTTON_LEFT:
-					switch_state.emit("WireBend")
-					return true
-		else:
-			me.on_vert_selected(vert)
+	func gui_input(event:InputEvent):
+		super(event)
 		
-		return super(drag_button)
-
+		if event is InputEventMouseButton:
+			if event.is_pressed():
+				me.queue_redraw()
+				me.sel_wire.clear()
+				var vert = me.vert_under_mouse()
+				if vert == null:
+					var wire = me.wire_under_mouse()
+					if not wire.is_empty():
+						me.on_wire_selected(wire)
+				else:
+					me.on_vert_selected(vert)
+					
+			if event.button_index == MOUSE_BUTTON_RIGHT and event.is_pressed():
+				if me.sel_wire.is_empty() and me.sel_vert == null:
+						my("Canvas_Menu").popup(Rect2(me.global_screen_mouse(), Vector2.ZERO))
+				elif not me.sel_wire.is_empty():
+					if Input.is_key_pressed(KEY_CTRL):
+						# Open some wire menu.
+						pass
+					elif floori(me.sel_wire.subratio) == 1:
+						switch_state.emit("WireBend")
+			elif event.button_index == MOUSE_BUTTON_LEFT and event.is_released():
+				if me.sel_vert == null:
+					var grab_gizmo = G.grabbed_buttons.get_pressed_button()
+					if grab_gizmo != null:
+						me.add_gizmo(grab_gizmo.get_meta("name"), me.canvas_mouse())
+				
 
 class ChartHover extends Hover:
 	static func override_state() -> StringName:
-		return &"Hover" 
-	
-	func enter(prev:StringName):
-		super(prev)
-		if me.mode == Flowchart.Mode.SIMULAT:
-			switch_state.emit("Interact")
-	
-	func drag_started(drag_button:MouseButton) -> bool:
-		if me.mode != Flowchart.Mode.EDITING: return false
-		if me.hover_object is FlowchartGizmo:
-			me.hover_object._on_mouse_stopped()  # Force the Gizmo to check socket under mouse.
-			if me.hover_object.hover_socket != null:
-				# Allow Gizmo to take over control
-				if drag_button == MOUSE_BUTTON_RIGHT:  # Start wiring.
-					me.wire_from = me.hover_object.hover_socket
-					switch_state.emit("Wire")
-					return true
-		return super(drag_button)
-	
-	func drag_stopped(drag_button:MouseButton):
-		super(drag_button)
-		if drag_button == MOUSE_BUTTON_RIGHT:
-			if me.hover_object is FlowchartGizmo and me.hover_object.hover_socket != null:
-				me.sel_vert = me.hover_object.hover_socket
-			switch_state.emit("Wire")
-
-class ChartMove extends Move:
-	static func override_state() -> StringName:
-		return &"Move"
-	
-	var last_valid_pos : Dictionary[FlowchartVia, Vector2i]
-	var past_via_coord : Dictionary[FlowchartVia, Vector3i]
-	
-	func exit(next:StringName):
-		super(next)
-		## Ensure the Dictionary doesn't just keep growing.
-		past_via_coord.clear()
-	
-	func move_start(obj):
-		if obj is FlowchartVia:
-			past_via_coord[obj] = Vector3i(obj.coord.x, obj.coord.x, obj.layer)
-		
-	func move_stop(obj):
-		if obj is FlowchartVia:
-			my("$Network").netlist.vias.erase(past_via_coord[obj])
-			my("$Network").netlist.vias[Vector3i(obj.coord.x, obj.coord.y, obj.layer)] = obj
-	
-	func _move_modulate(object, new_position:Vector2) -> Vector2:
-		if object is FlowchartPanel:
-			return me.snap_grid(new_position) - Vector2(0.5, 0.5) * SNAP
-		#if object is NetBase.Joint:
-			#var cell : Vector2i = me.to_grid(new_position)
-			#if Vector3i(cell.x, cell.y, me.layer) in my("$Network").netlist.vias:
-				## Make it so vias can't overlap.
-				#return me.from_grid(last_valid_pos[object]) + Vector2(0.5, 0.5)
-			#last_valid_pos[object] = cell
-			#return me.snap_grid(new_position - Vector2(0.5, 0.5) * SNAP)
-		return me.snap_grid(new_position)
-	
-	## FIXME This is supposed to counteract the effect of snapping in modulate on
-	## moving multiple objects at once and they don't seem to step at the same time.
-	## It isn't working.
-	func _move_unmodulate(object, new_position:Vector2) -> Vector2:
-		if object is FlowchartPanel:
-			return new_position + Vector2(0.5, 0.5) * SNAP
-		return new_position
-
-
-class Interact extends State:
-	func hover_object(object):
-		if object == null:
-			switch_state.emit("Idle")
-
-class Wire extends State:
-	var origin : NetBase.NetVert
-	var destin : NetBase.NetVert
-	var _prev : StringName
-	
-	func cancel():
-		me.wire_from = null
-		switch_state.emit("Idle")
-	
-	func enter(prev:StringName):
-		_prev = prev
-		if me.sel_wire.is_empty():
-			find_origin()
-		
-		if not Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
-			find_destin()
-			if origin == null or destin == null:
-				switch_state.emit(_prev)
-			elif origin != destin:  # This check allows click-to-click wiring.
-				finish_wire()
-				cancel()
+		return &"Hover"
 	
 	func input(event:InputEvent):
-		if event is InputEventKey and not event.is_echo():
-			if event.keycode == KEY_SHIFT:
-				# Update the chirality of the new wire preview.
-				me.overlay.queue_redraw()
-		
+		super(event)
 		if event is InputEventMouseButton:
-			if event.is_released() and event.button_index == MOUSE_BUTTON_RIGHT:
-				find_destin()
-				if origin == null or destin == null:
-					switch_state.emit(_prev)
-				elif origin != destin:  # This check allows click-to-click wiring.
-					finish_wire()
-					cancel()
+			if event.button_index == MOUSE_BUTTON_RIGHT:
+				if event.is_pressed():
+					me.wire_from = null  # Probably pointless, but just to make sure.
+					if me.hover_object is FlowchartGizmo:
+						if Input.is_key_pressed(KEY_CTRL):
+							me.picker_tool(me.hover_object)
+						else:
+							me.wire_from = me.socket_under_mouse()
+					elif me.hover_object is FlowchartVia:
+						me.wire_from = me.hover_object
+					switch_state.emit("Wire")
+
+class Wire extends State:
+	var origin : NetBase.Joint
+	var destin : NetBase.Joint
 	
-	func finish_wire():
-		var wire : NetBase.Link = my("Network").linking(origin, destin)
-		var pos1 = me.joint_canvas_position(origin)
-		var pos2 = me.joint_canvas_position(destin)
-		wire.set_chi_from_len(pos1, pos2, not Input.is_key_pressed(KEY_SHIFT))
-		wire.bend = Flowchart.SNAP
+	func cancel():
+		if me.hover_object == null: switch_state.emit("Idle")
+		else: switch_state.emit("Hover")
 	
-	func find_origin():
-		if me.wire_from == null:
-			me.wire_from = find_joint()
+	func exit(_next:StringName):
+		me.queue_redraw()
+		me.wire_from = null
+		origin = null
+		destin = null
+	
+	func enter(prev:StringName):
 		origin = me.wire_from
+		if origin == null:
+			me.sel_wire = me.wire_under_mouse()
+			if me.sel_wire.is_empty():
+				switch_state.emit(prev)
+			else:
+				origin = split_wire(me.sel_wire.pair_hash).netvert
+		if origin == null:
+			cancel()
 	
-	func find_destin():
-		if me.sel_vert == null:
-			me.sel_vert = find_joint()
-		destin = me.sel_vert
+	func input(event:InputEvent):
+		if event is InputEventKey and event.keycode == KEY_SHIFT:
+			me.queue_redraw()
+		
+		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT:
+			if event.is_released():
+				# Find a joint to connect to or create one.
+				destin = find_joint()
+				if destin == null: cancel(); return
+				if origin != destin:
+					# Connect Joints
+					var wire : NetBase.Link = my("Network").linking(origin, destin)
+					var pos1 = me.joint_canvas_position(origin)
+					var pos2 = me.joint_canvas_position(destin)
+					wire.set_chi_from_len(pos1, pos2, not Input.is_key_pressed(KEY_SHIFT))
+					wire.bend = Flowchart.SNAP
+					cancel()
+				#NOTE if finding a joint fails, we do nothing. The user may try
+				# clicking on something again, allowing click-to-click wiring.
 	
 	func find_joint() -> NetBase.NetVert:
 		var joint : NetBase.NetVert
-		joint = me.vert_under_mouse()
+		if me.hover_object is FlowchartGizmo:
+			joint = me.socket_under_mouse()
+		if joint == null: joint = me.vert_under_mouse()
 		if joint == null:
-			me.sel_wire = me.wire_under_mouse()
-			if me.sel_wire.is_empty():
+			var wire = me.wire_under_mouse()
+			if wire.is_empty():
 				joint = me.add_via(me.canvas_mouse())
 			else:
 				joint = split_wire(me.sel_wire.pair_hash).netvert
@@ -349,8 +325,8 @@ class Wire extends State:
 		#TODO Check if joint creation logic is correct.
 		var wire0 : NetBase.Link = my("Network").netlist.links.get(link)
 		var joints = my("Network").netlist.pairs[link]
-		var where = wire0.position_along(me.sel_wire.ratio, 
-			me.joint_canvas_position(joints[0]), 
+		var where = wire0.position_along(me.sel_wire.ratio,
+			me.joint_canvas_position(joints[0]),
 			me.joint_canvas_position(joints[1]))
 		var new_joint = me.add_via(where)
 		var cell = Flowchart.to_grid(where)
@@ -364,16 +340,15 @@ class Wire extends State:
 		me.sel_wire.clear()
 		return {"netvert": new_joint, "coord": cell, "canvas_position": where}
 
-
 class WireBend extends State:
 	var pair : Array[NetBase.NetVert]
 	var joints : Array[Vector2]
 	var wire : NetBase.Link
-	
+
 	func cancel():
 		me.sel_wire.clear()
 		switch_state.emit("Idle")
-	
+
 	func enter(_prev:StringName):
 		if me.sel_wire.is_empty(): cancel()
 		var link = me.sel_wire.pair_hash
@@ -381,20 +356,21 @@ class WireBend extends State:
 		pair.assign( my("Network").netlist.pairs[ link ] )
 		joints = [me.joint_canvas_position(pair[0]), me.joint_canvas_position(pair[1])]
 	
-	func drag_stopped(_drag_button:MouseButton):
-		switch_state.emit("Idle")
-	
 	func input(event:InputEvent):
+		if event is InputEventMouseButton and event.is_released():
+			if event.button_index == MOUSE_BUTTON_RIGHT:
+				switch_state.emit("Idle")
+		
 		if event is InputEventMouseMotion:
 			me.queue_redraw()
 			var diff = joints[0] - joints[1]
 			var delta = me.get_local_mouse_position() - me.ini_mouse
-			
+
 			# Find shortest segment, the maximum value of the bend.
 			var diff_abs = diff.abs()
 			var short_axis = diff_abs.min_axis_index()
 			var shortest = diff_abs[short_axis]
-		
+
 			# Find the direction of the bend
 			var diff_norm = diff.normalized()
 			if wire.chirality:
@@ -402,7 +378,7 @@ class WireBend extends State:
 			else:
 				diff_norm = Vector2(-diff_norm.y, diff_norm.x)
 			var dir = delta.normalized().dot(diff_norm)
-			
+
 			delta = delta.length() * dir * 2
 			var ini_bend : float = me.sel_wire.ini_bend
 			wire.bend = clamp(ini_bend + delta, Flowchart.SNAP, shortest)
@@ -427,40 +403,23 @@ func _ready() -> void:
 	%LineEdit.text_submitted.connect(_on_line_edit_submit)
 	$Canvas_Menu.index_pressed.connect(_on_popup_pressed)
 
-
-func _gui_input(event: InputEvent) -> void:
-	super(event)
-	
-	if event is InputEventMouseButton:
-		if event.button_index == MOUSE_BUTTON_LEFT and event.is_released() and at_state("Idle"):
-			var grab_gizmo = G.grabbed_buttons.get_pressed_button()
-			if grab_gizmo != null:
-				add_gizmo(grab_gizmo.get_meta("name"), to_canvas_coord(event.position))
-		elif event.button_index == MOUSE_BUTTON_RIGHT and event.is_pressed() and at_state("Idle"):
-			var rect := Rect2(get_global_mouse_position(), Vector2.ZERO) 
-			if sel_vert != null:
-				$Via_Menu.popup(rect)
-			elif not sel_wire.is_empty():
-				pass
-			else:
-				$Canvas_Menu.popup(rect)
-
 func _input(event: InputEvent) -> void:
 	super(event)
 	
 	if event is InputEventKey and not event.is_echo():
-		if event.keycode == KEY_DELETE and at_state("Idle") and event.is_released():
-			#queue_redraw()
-			if not sel_wire.is_empty():
-				$Network.unlink_hash(sel_wire.pair_hash)
-				sel_wire.clear()
-			else:
-				for each in _selected:
-					if each is FlowchartPanel:
-						rem_gizmo(each)
-					if each is FlowchartVia:
-						rem_via(each)
-			clear_selected()
+		if event.keycode == KEY_DELETE and event.is_released():
+			if at_state("Idle", "Hover"):
+				queue_redraw()
+				if not sel_wire.is_empty():
+					$Network.unlink_hash(sel_wire.pair_hash)
+					sel_wire.clear()
+				else:
+					for each in _selected:
+						if each is FlowchartPanel:
+							rem_gizmo(each)
+						if each is FlowchartVia:
+							rem_via(each)
+				clear_selected()
 	
 	if event is InputEventMouseMotion:
 		if _mouse_stopped:
@@ -472,7 +431,7 @@ const _MOUSE_MOVE_THRESHOLD = 6  # How many process frames have to pass to consi
 var _mouse_stopped_frames : int  # How many frames the mouse hasn't moved.
 var _mouse_stopped : bool = false
 func _on_mouse_stopped():
-	if hover_object == null or hover_object is FlowchartVia:
+	if hover_object == null or hover_object is FlowchartVia:  # This test makes sure we don't set `hover_object` to a via behind a Gizmo, if the mouse is over a Gizmo.
 		hover_object = vert_under_mouse()
 
 
@@ -502,7 +461,7 @@ func _on_popup_pressed(idx:int):
 			add_gizmo("_info_panel", to_canvas_coord(ini_mouse))
 		"Bundle":
 			add_gizmo("_bundle", to_canvas_coord(ini_mouse))
-		"Bundle":
+		"Constant":
 			add_gizmo("_constant", to_canvas_coord(ini_mouse))
 		"Gate":
 			add_gizmo("_buffer_gate", to_canvas_coord(ini_mouse))
@@ -520,8 +479,13 @@ func _draw_back_geometry(canvas:Control, viewed_canvas_rect:Rect2):
 		# We don't track GizmoSockets here. We use Gizmo search to tell if to find their links.
 		if joint is GizmoSocket: continue
 		if joint.layer == layer:
-			var where = from_grid(joint.coord)
-			joint.draw(self, canvas, to_screen_coord(where))
+			#NOTE, usually we avoid relying on joint `position` as much as we can,
+			# but we hope vias can be trusted, otherwise the repositioning by
+			# mouse drag needs to be way more complicated.
+			# While the mouse drags, we maintain the `coord`as the initial
+			# reference position, while changing `position`. Once the drag ends
+			# we convert `position` into `coord` and keep things consistent.
+			joint.draw(self, canvas, to_screen_coord(joint.position))
 			for link in $Network.netlist.get_links(joint):
 				_visible_links[link] = null
 
@@ -602,6 +566,12 @@ func rem_via(via:FlowchartVia):
 	queue_redraw()
 	$Network.rem_vert(via)
 	remove_object(via)
+
+func move_via(via:FlowchartVia, where:Vector2i) -> Error:
+	var error = $Network.move_vert(via, where)
+	if error == OK:
+		parti.joint.update_object(via)
+	return error
 
 #region Simulation Implementation
 signal sim_cycle_started

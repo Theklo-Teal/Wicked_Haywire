@@ -320,7 +320,7 @@ class Link extends Resource:
 				# Even after finding a matching segment, we keep iterating through
 				# all segments so we can find the total length of the wire.
 				continue
-			if along < 1 and along > 0 and prox < (Flowchart.MAX_WIRE + Flowchart.CLEARANCE):
+			if along < 1 and along > 0 and prox < (Flowchart.MAX_WIRE):
 				# We don't want to accept distances further than a segment's
 				# length, which happens when clicking near the mid corner as if
 				# bend ratio was 1.

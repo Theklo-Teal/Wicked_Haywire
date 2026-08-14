@@ -564,13 +564,13 @@ func _draw() -> void:
 	draw_polyline(line, Color.REBECCA_PURPLE, 3)
 "
 
+[sub_resource type="Resource" id="Resource_kek77"]
+script = ExtResource("4_7mycd")
+
 [sub_resource type="Resource" id="Resource_7mycd"]
 script = ExtResource("4_7mycd")
 
 [sub_resource type="Resource" id="Resource_272bh"]
-script = ExtResource("4_7mycd")
-
-[sub_resource type="Resource" id="Resource_kek77"]
 script = ExtResource("4_7mycd")
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_7mycd"]
@@ -743,11 +743,12 @@ custom_minimum_size = Vector2(300, 0)
 layout_mode = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_lswn8")
 tab_alignment = 1
-current_tab = 0
+current_tab = 1
 tab_1/title = "SETTINGS"
 tab_2/title = "HELP"
 
 [node name="Files" type="ScrollContainer" parent="MarginContainer/HBoxContainer/Sidebar" unique_id=1517429527]
+visible = false
 layout_mode = 2
 metadata/_tab_index = 0
 
@@ -764,7 +765,6 @@ size_flags_horizontal = 4
 text = "ADD_SCHEMATIC"
 
 [node name="Settings" type="VBoxContainer" parent="MarginContainer/HBoxContainer/Sidebar" unique_id=188177199]
-visible = false
 layout_mode = 2
 metadata/_tab_index = 1
 metadata/_tab_name = "SETTINGS"
@@ -789,6 +789,11 @@ visible = false
 layout_mode = 2
 metadata/_tab_index = 2
 metadata/_tab_name = "HELP"
+
+[node name="RichTextLabel" type="RichTextLabel" parent="MarginContainer/HBoxContainer/Sidebar/Help" unique_id=1820904769]
+layout_mode = 2
+text = "Make technology that is visible, so it can also be understandable. Make it a way of thinking."
+fit_content = true
 
 [node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer/HBoxContainer" unique_id=1077216975]
 layout_mode = 2

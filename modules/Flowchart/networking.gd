@@ -115,16 +115,18 @@ func add_vert(vert:NetVert, coord:Vector2i, layer:int):
 	vert.coord = coord
 	netlist.verts[hash(vert)] = vert
 
-func move_vert(vert:NetVert, where:Vector2) -> Error:
-	#TODO Check if this isn't conflicting with node movement in the SpatialPartitioning, producing bad coordinate or position.
+## Changes the index of a vert from [code]netlist.vias[/code], so it stays tracked
+## to the physical position of a vert. It also updates the vert's coord, thus position.[br]
+func move_vert(vert:NetVert, where:Vector2i) -> Error:
+	#NOTE This doesn't update the SpatialPartition information about the vert.
+	# You have to also update the partition after calling this function.
 	if vert is GizmoSocket: return ERR_INVALID_PARAMETER
 	var cell_from = Vector3i(vert.coord.x, vert.coord.y, vert.layer)
-	var to = Flowchart.to_grid(where)
-	var cell_to = Vector3i(to.coord.x, to.coord.y, vert.layer)
+	var cell_to = Vector3i(where.x, where.y, vert.layer)
+	netlist.vias.erase(cell_from)
 	if cell_to in netlist.vias:
 		return ERR_ALREADY_IN_USE
-	netlist.vias.erase(cell_from)
-	vert.coord = to.coord
+	vert.coord = where
 	netlist.vias[cell_to] = vert
 	return OK
 

@@ -33,6 +33,8 @@ Gizmo ideas:
 	Automata:
 		ROM - The user can write data in that persist, or take it from a file. Can only be read.
 		RAM - The user can write data in to start as a default, but can be written along with writing.
+		Markov Multiplexer - There are several channel inputs, each with a different probability assigned. Another input is an update signal that randomly picks a channel to the output.
+		Markov Demultiplexer - There are several channel outputs, each with a different probability assigned. Another input is an update signal that randomly selects which output connects to the input.
 		Lookup - A rudimentary scriptable finite state machine. A "data" input can be used to load a "page" ID (state). Multiple outputs combinatorily respond to multiple inputs defined according to Page ID. Certain input permutates cause an internal change in Page ID.
 		Turing - As in "Turing Machine", a microcontroller or central processor; can have a script written to it to manage inputs and outputs.
 		Teletype - A text line that can be written to, producing output signals and displays text according to inputs.
