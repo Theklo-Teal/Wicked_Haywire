@@ -16,13 +16,17 @@ func _ready() -> void:
 	
 	
 	sock = sockets.keys()[0]
+	bitwidth = 4
+
+func _set_bitwidth():
+	sock.bitwidth = bitwidth
 
 func _update_layout():
 	match facing:
 		pass
 
 func _sim_update_respond(_graph:FlowchartNetwork):
-	sock.write(value, "int")
+	sock.write_int(value)
 
 func _on_h_slider_value_changed(val: float) -> void:
 	if exponential:

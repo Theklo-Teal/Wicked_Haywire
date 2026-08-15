@@ -53,7 +53,7 @@ class Port:
 	func sim_update(graph:FlowchartNetwork):
 		_sim_update(graph)
 	func sim_cycle_finish(graph:FlowchartNetwork):
-		_integrate()
+		integrate()
 		aggregate.clear()
 		_sim_cycle_finish(graph)
 	
@@ -64,10 +64,12 @@ class Port:
 	func _sim_cycle_finish(graph:FlowchartNetwork): pass
 	@warning_ignore_restore("unused_parameter")
 	
+	func integrate():
+		if aggregate.size() > 0: _integrate()
+	
 	## Called before the aggregate is cleared. Override this function to decide
 	## what to write to the port value.
 	func _integrate():
-		if aggregate.size() == 0: return
 		value = roundi(aggregate.reduce(func(sum, a):return sum + a, 0) / aggregate.size())
 	
 	func write_none(data, ..._other):

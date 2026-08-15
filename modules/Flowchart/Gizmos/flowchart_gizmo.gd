@@ -79,6 +79,7 @@ func _on_mouse_exit():
 
 func _input(event: InputEvent) -> void:
 	if not _mouse_hover: return
+	if owner is Flowchart: _hover_input(event)
 	#if event is InputEventKey:
 	#	if event.keycode == KEY_CTRL and event.is_released():
 	#		socket_tooltip_visible(false)
@@ -105,6 +106,10 @@ func _input(event: InputEvent) -> void:
 					hover_socket.mouse_release()
 					_on_socket_released(hover_socket)
 
+@warning_ignore("unused_parameter")
+## Called if the [code]owner[/code] is Flowchart and the mouse is over the Gizmo.
+func _hover_input(event:InputEvent):
+	pass
 
 #region Detect When the Mouse is Over a Socket
 const _MOUSE_MOVE_THRESHOLD = 6  # How many process frames have to pass to consider the mouse stopped?

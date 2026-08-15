@@ -26,6 +26,10 @@ func _ready() -> void:
 	pos = sockets.keys()[2]
 	neg = sockets.keys()[3]
 	watch_sockets.call_deferred(rise, fall)
+	
+	await get_tree().process_frame
+	pos.write_bool(0, elapsed > 0)
+	neg.write_bool(0, elapsed == 0)
 
 func _sim_update(graph:FlowchartNetwork):
 	super(graph)
@@ -44,13 +48,13 @@ func _sim_update(graph:FlowchartNetwork):
 		if triggered: 
 			$Bar.value = remap(elapsed, 0, slew, 0, 100)
 			$Counter.text = str(-elapsed).pad_zeros(3)
-			if blocking and (rise.read("bool") or not fall.read("bool")):
+			if blocking and (rise.read_bool() or not fall.read_bool()):
 				elapsed = slew
 				return
 		elif switched: 
 			$Bar.value = remap(elapsed, 0, duration, 100, 0)
 			$Counter.text = str(elapsed).pad_zeros(3)
-			if blocking and (rise.read("bool") or not fall.read("bool")):
+			if blocking and (rise.read_bool() or not fall.read_bool()):
 				elapsed = duration
 
 
@@ -69,5 +73,5 @@ func _edge_triggered_sampling(_graph:FlowchartNetwork, socket: BitInput, rising:
 
 func _sim_update_respond(_graph:FlowchartNetwork):
 	if triggered or switched:
-		pos.write(int(elapsed > 0), "value", bitwidth)
-		neg.write(int(elapsed == 0), "value", bitwidth)
+		pos.write_bool(0, elapsed > 0)
+		neg.write_bool(0, elapsed == 0)

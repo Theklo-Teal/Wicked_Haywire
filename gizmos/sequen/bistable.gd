@@ -16,9 +16,13 @@ func _ready() -> void:
 	rst = sockets.keys()[1]
 	pos = sockets.keys()[2]
 	neg = sockets.keys()[3]
+	
+	await get_tree().process_frame
+	pos.write_bool(0, state)
+	neg.write_bool(0, not state)
 
 func _sim_update_sampling(_graph:FlowchartNetwork):
-	match int(zet.read("bool")) | (int(rst.read("bool")) << 1):
+	match int(zet.read_bool()) | (int(rst.read_bool()) << 1):
 		0b01:
 			state = true
 		0b10:
@@ -27,5 +31,5 @@ func _sim_update_sampling(_graph:FlowchartNetwork):
 			state = not state
 
 func _sim_update_respond(_graph:FlowchartNetwork):
-	pos.write(int(state), "value", bitwidth)
-	neg.write(int(not state), "value", bitwidth)
+	pos.write_bool(0, state)
+	neg.write_bool(0, not state)

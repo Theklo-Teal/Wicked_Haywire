@@ -4,11 +4,18 @@ class_name Electronics
 
 @export var bitwidth : int = 1 : 
 	set(val):
-		bitwidth = max(1, val)
+		bitwidth = clampi(val, 1, 32)
 		maxval = (1 << bitwidth) - 1
-		_set_bitwidth()
+		_bitwidth_changed = true
 
 var maxval : int = 1  ## The value of having all bits set high. This is set when also setting [code]bitwidth[/code], so don't change it otherwise.
+
+var _bitwidth_changed : bool = true
+func _process(delta: float) -> void:
+	super(delta)
+	if _bitwidth_changed:
+		_bitwidth_changed = false
+		_set_bitwidth()
 
 ## Override this function if something changes when the bitwidth changes
 func _set_bitwidth():
@@ -38,12 +45,12 @@ static func toybox_included() -> bool:
 func watch_sockets(...bit_input_socks):
 	for sock in bit_input_socks:
 		if sock is BitInput:
-			_edgy_sockets[sock] = sock.read("int")
+			_edgy_sockets[sock] = sock.read_int()
 
 func sim_update(graph:FlowchartNetwork):
 	var changed : Dictionary[BitInput, Vector2i]
 	for sock in _edgy_sockets:
-		var curr_val = sock.read("int")
+		var curr_val = sock.read_int()
 		var diff = curr_val ^ _edgy_sockets[sock]
 		if diff > 0:
 			var highs = diff & curr_val
@@ -82,7 +89,7 @@ func _edge_triggered_sampling(graph:FlowchartNetwork, socket: BitInput, rising:i
 	pass
 @warning_ignore_restore("unused_parameter")
 
-class BitSignal extends RefCounted:
+class BitData extends RefCounted:
 	## The protocol for Ports managing binary digital signals.
 	
 	var width : int = 1 :  ## Bit amount of values
@@ -112,14 +119,51 @@ class BitSignal extends RefCounted:
 		width = bitwidth
 	
 	func duplicate():
-		var dupl = BitSignal.new(width)
+		var dupl = BitData.new(width)
 		dupl.bits = bits
-		dupl.up = bits
-		dupl.down = bits
+		dupl.hiz = hiz
+		dupl.up = up
+		dupl.down = down
 		return dupl
 
 
 #region Utilities
+## Get the largest binary number given a number of [code]bits[/code].[br]
+## Can also be thought as a value with all bits set high.
+static func max_val(bit_width:int) -> int:
+	return (1 << bit_width) - 1
+
+## Produces a mask similar to [code]max_val()[/code], but assuming the most significant bit tells the bit width.
+static func msb_bit_mask(val:int) -> int:
+	var wid : int = 0
+	while val > 0:
+		# Shift right until all bits disappear
+		val = val >> 1
+		wid += 1
+	return max_val(wid)  # The resulting count of bits is the bitwidth.
+
+## Get all bits inverted, using a [code]mask[/code] to tell which bits.
+static func invert_max(val:int, mask:int) -> int:
+	return val ^ mask
+
+## Get all bits inverted, using the amount of bits to tell which ones.
+static func invert_wid(val:int, bit_width:int) -> int:
+	return invert_max(val, max_val(bit_width))
+
+## Set all bits high that are high in the mask.
+static func set_high(val:int, high_mask:int, wid_mask:int) -> int:
+	return val | (high_mask & wid_mask)
+
+## Set all bits low that are high in the mask.
+static func set_low(val:int, low_mask:int, wid_mask:int) -> int:
+	return val & invert_max(low_mask, wid_mask)
+
+## Set the bits in [code]val[/code] to bits in [code]new[/code] where
+## [code]mask[/code] is high.[br]
+## https://graphics.stanford.edu/~seander/bithacks.html#MaskedMerge[br]
+static func set_bits(val:int, new:int, mask:int) -> int:
+	return val ^ ((val ^ new) & mask);
+
 ## Produce an integer which is the concatenation of input bits.
 static func parallel_to_int(nums:Array[bool]) -> int:
 	var serial : int = 0
@@ -136,7 +180,7 @@ static func parallel_bit_count(nums:PackedInt32Array, bit_width:int) -> PackedIn
 	counts.fill(0)
 	for n in nums:
 		for i in range(bit_width):
-			counts[i] += n >> 1 & 1
+			counts[i] += (n >> i) & 1
 	return counts
 
 ## Return how many bits are high or low in an integer.

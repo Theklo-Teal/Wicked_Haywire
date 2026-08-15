@@ -2,6 +2,18 @@
 extends GizmoSocket
 class_name BitInput
 
+enum {
+	NONE,
+	PULL_DN,
+	PULL_UP,
+	INVERT
+}
+
+@export_enum("None", "Pull Down", "Pull Up", "Invert") var variant : int
+@export var bitwidth : int = 1 : 
+	set(val):
+		bitwidth = clamp(val, 1, 32)
+
 func _init() -> void:
 	super()
 	mode = SINK
@@ -9,12 +21,40 @@ func _init() -> void:
 	port_class = &"BitPort"
 	accepted_port = [&"BitPort"]
 
-#func read(filter:="none", ...filter_args) -> Variant:
-	#var bitsignal = port.read()
-	#var conflict = bitsignal.hiz | (bitsignal.up & bitsignal.down)
-	#var agreed = bitsignal.maxval ^ conflict
-	#var val = port.read(filter, filter_args)
-	#val = val & agreed | conflict
-	#_has_read(val)
-	#has_read.emit(val)
-	#return val
+func mouse_press():
+	variant = (variant + 1) % 4
+	pressed = variant == INVERT
+func mouse_release():
+	# Clear default behavior.
+	return
+
+
+func read_int() -> int:
+	var val : Electronics.BitData = port.value.duplicate()
+	val.width = bitwidth
+	match variant:
+		PULL_DN:
+			val.pull_down = val.maxval
+			val.pull_up = 0
+		PULL_UP:
+			val.pull_down = 0
+			val.pull_up = val.maxval
+		INVERT:
+			val.bits = val.bits ^ val.maxval
+	var result = port.to_int(val)
+	_has_read(result)
+	has_read.emit(result)
+	return result
+
+## Returns the bool state of the given bit.
+func read_bool(digit:int=0) -> bool:
+	return ((read_int() >> digit) & 1) > 0
+
+## Returns the bool state of all bits.
+func read_array() -> Array[bool]:
+	var arr : Array[bool]
+	var val = read_int()
+	for i in range(bitwidth):
+		arr.append((val & 1) > 0)
+		val = val >> 1
+	return arr

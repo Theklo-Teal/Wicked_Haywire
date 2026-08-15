@@ -2,6 +2,12 @@
 extends GizmoSocket
 class_name BitOutput
 
+## The pressed state indicates the values written to the port are inverted.
+
+@export var bitwidth : int = 1 : 
+	set(val):
+		bitwidth = clamp(val, 1, 32)
+
 func _init() -> void:
 	super()
 	mode = SOURCE
@@ -9,21 +15,23 @@ func _init() -> void:
 	port_class = &"BitPort"
 	accepted_port = [&"BitPort"]
 
-func mouse_press():
-	show_state = not show_state
 
-#func _has_written(val:Electronics.BitSignal):
-	#pressed = val.bits > 0
+func send(pack:Electronics.BitData):
+	if pressed: pack.bits = pack.bits ^ pack.maxval
+	write(pack)
 
-func draw(chart:Flowchart, canvas:Control, where:Vector2):
-	var color = Color.DARK_GRAY
-	var hover_offset = Flowchart.VIA_HOLE if hover else 0
-	var thick = Flowchart.JOINT_RAD - Flowchart.VIA_HOLE + hover_offset
-	var radius = Flowchart.JOINT_RAD + hover_offset - thick / 2.0
-	var sqr_wid = radius * 1.4142  # (Square-root of 2)
-	
-	if chart is Flowchart:
-		radius *= chart.zoom
-		color = chart.trace_color_primary if hover else chart.trace_color_secondary
-	
-	canvas.draw_rect(Rect2(-Vector2(0.5, 0.5) * sqr_wid + where, Vector2.ONE * sqr_wid), color, pressed and show_state, thick)
+func write_int(val:int, hiz:int=0):
+	var data = Electronics.BitData.new(bitwidth)
+	data.bits = val
+	data.hiz = hiz
+	send(data)
+
+func write_bool(digit_from:int=0, ...bools):
+	var data = Electronics.BitData.new(bitwidth)
+	var mask = Electronics.max_val(bools.size()) << digit_from
+	data.hiz = data.maxval ^ mask
+	var num : int = 0
+	for b in bools:
+		num = (num << (1 + digit_from)) | int(b)
+	data.bits = Electronics.set_bits(data.bits, num, mask)
+	send(data)

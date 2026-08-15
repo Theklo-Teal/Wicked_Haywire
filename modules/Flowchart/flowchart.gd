@@ -237,16 +237,22 @@ class ChartIdle extends Idle:
 						pass
 					elif floori(me.sel_wire.subratio) == 1:
 						switch_state.emit("WireBend")
+					else:  # Wire splitting
+						switch_state.emit("Wire")
 			elif event.button_index == MOUSE_BUTTON_LEFT and event.is_released():
 				if me.sel_vert == null:
 					var grab_gizmo = G.grabbed_buttons.get_pressed_button()
 					if grab_gizmo != null:
 						me.add_gizmo(grab_gizmo.get_meta("name"), me.canvas_mouse())
-				
 
 class ChartHover extends Hover:
 	static func override_state() -> StringName:
 		return &"Hover"
+	
+	func enter(prev:StringName):
+		super(prev)
+		if me.mode == Flowchart.Mode.SIMULAT:
+			switch_state.emit("Interact")
 	
 	func input(event:InputEvent):
 		super(event)
@@ -261,7 +267,16 @@ class ChartHover extends Hover:
 							me.wire_from = me.socket_under_mouse()
 					elif me.hover_object is FlowchartVia:
 						me.wire_from = me.hover_object
-					switch_state.emit("Wire")
+					if Input.is_key_pressed(KEY_CTRL) and me.wire_from is FlowchartVia:
+						# Popup Via Menu
+						pass
+					else:
+						switch_state.emit("Wire")
+
+class Interact extends State:
+	func hover_object(object):
+		if object == null:
+			switch_state.emit("Idle")
 
 class Wire extends State:
 	var origin : NetBase.Joint
@@ -556,7 +571,6 @@ func rem_gizmo(gizmo:FlowchartPanel):
 	gizmo.queue_free()
 
 func add_via(where:Vector2) -> FlowchartVia:
-	#TODO Check if this is positioning vias correctly.
 	queue_redraw()
 	var via = $Network.get_or_add_via(to_grid(where), layer, FlowchartVia.new())
 	place_object(via, via.position, parti.joint)

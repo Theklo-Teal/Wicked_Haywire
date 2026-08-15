@@ -35,6 +35,7 @@ offset_right = 192.0
 offset_bottom = 24.0
 script = ExtResource("1_6bta8")
 expo_curve = SubResource("Curve_6bta8")
+bitwidth = 4
 sockets = Dictionary[ExtResource("2_6bta8"), ExtResource("3_8oqbc")]({
 SubResource("Resource_jnm3w"): SubResource("Resource_kwtlo")
 })

@@ -154,6 +154,7 @@ var obj_groups : Dictionary[StringName, Array] ## Objects which are grouped toge
 func set_selected(...objs):
 	_selected.clear()
 	for obj in objs:
+		if obj == null: continue
 		var pos := Vector2.ZERO
 		if "position" in obj: pos = obj.position
 		elif obj is Object:
@@ -168,6 +169,7 @@ func set_selected(...objs):
 
 func add_selected(...objs):
 	for obj in objs:
+		if obj == null: continue
 		var pos := Vector2.ZERO
 		if "position" in obj: pos = obj.position
 		elif obj is Object:

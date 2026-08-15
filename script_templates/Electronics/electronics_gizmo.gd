@@ -15,6 +15,9 @@ func _ready() -> void:
 	#watch_sockets.call_deferred(input_socket)
 	pass
 
+func _set_bitwidth():
+	pass
+
 func _update_layout():
 	match facing:
 		pass

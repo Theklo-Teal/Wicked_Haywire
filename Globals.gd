@@ -64,3 +64,11 @@ static func list_classes() -> Dictionary:
 				if "added_class_info" in karto[konst]:  #NOTE: has_method() doesn't work here.
 					result[konst].added = karto[konst].added_class_info()
 	return result
+
+
+func bin(...num):
+	var parts : Array
+	for n in num:
+		parts.append(String.num_uint64(n, 2))
+		parts.append(" • ")
+	print.callv(parts)
