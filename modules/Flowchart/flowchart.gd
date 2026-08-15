@@ -299,7 +299,8 @@ class Wire extends State:
 			if me.sel_wire.is_empty():
 				switch_state.emit(prev)
 			else:
-				origin = split_wire(me.sel_wire.pair_hash).netvert
+				origin = split_wire(me.sel_wire.pair_hash).get("netvert", null)
+				me.wire_from = origin
 		if origin == null:
 			cancel()
 	
@@ -333,13 +334,14 @@ class Wire extends State:
 			if wire.is_empty():
 				joint = me.add_via(me.canvas_mouse())
 			else:
-				joint = split_wire(me.sel_wire.pair_hash).netvert
+				me.sel_wire = wire
+				joint = split_wire(wire.pair_hash).netvert
 		return joint
 	
 	func split_wire(link:int) -> Dictionary:
 		#TODO Check if joint creation logic is correct.
 		var wire0 : NetBase.Link = my("Network").netlist.links.get(link)
-		var joints = my("Network").netlist.pairs[link]
+		var joints = my("Network").netlist.pairs.get(link)
 		var where = wire0.position_along(me.sel_wire.ratio,
 			me.joint_canvas_position(joints[0]),
 			me.joint_canvas_position(joints[1]))
@@ -354,7 +356,7 @@ class Wire extends State:
 		wire2.bend = wire0.bend
 		me.sel_wire.clear()
 		return {"netvert": new_joint, "coord": cell, "canvas_position": where}
-
+	
 class WireBend extends State:
 	var pair : Array[NetBase.NetVert]
 	var joints : Array[Vector2]
@@ -517,7 +519,8 @@ func _draw_fore_geometry(canvas:Control, viewed_canvas_rect:Rect2):
 	
 	# Drawing Wires
 	for link in _visible_links:
-		var wire : NetBase.Link = $Network.netlist.links[link]
+		var wire : NetBase.Link = $Network.netlist.links.get(link)
+		if wire == null: continue
 		var pair : Array[NetBase.NetVert]
 		pair.assign($Network.netlist.pairs[link])
 		var pos1 = joint_canvas_position(pair[0])
