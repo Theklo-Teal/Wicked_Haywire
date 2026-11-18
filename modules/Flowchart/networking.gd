@@ -42,8 +42,6 @@ signal sim_cycle_begun
 signal sim_cycle_finished
 signal sim_reset
 
-var sim_ticks : int = 0  ## How many sim update cycles since the start of the application. It will rollover if the value goes past 64 bits.
-
 func reset_simulation():
 	rebuild_network()
 	sim_reset.emit()
@@ -51,13 +49,14 @@ func reset_simulation():
 func sim_cycle_begin():
 	_sim_cycle_begin()
 	sim_cycle_begun.emit()
+
 func sim_cycle_update():
-	sim_ticks += 1
 	for layer in netlist.gizmos:
 		for gizmo : FlowchartPanel in netlist.gizmos[layer]:
-			gizmo.sim_update(self)
-			await gizmo.sim_update_done
+			await gizmo.sim_update()
+	
 	sim_update_done.emit()
+
 func sim_cycle_finish():
 	_sim_cycle_finish()
 	sim_cycle_finished.emit()
@@ -90,6 +89,8 @@ func register_gizmo(gizmo:FlowchartPanel, layer:int):
 		socket.port = port_new(socket.port_class)
 		netlist.verts[hash(socket)] = socket
 		netlist.sockets[socket as NetVert] = gizmo
+		netlist.ports[socket.port] = hash(Time.get_unix_time_from_system())
+		netlist.bridges[netlist.ports[socket.port]] = socket.port
 
 func unregister_gizmo(gizmo:FlowchartPanel, layer:int):
 	netlist.gizmos[layer].erase(gizmo)
@@ -114,6 +115,9 @@ func add_vert(vert:NetVert, coord:Vector2i, layer:int):
 	vert.layer = layer
 	vert.coord = coord
 	netlist.verts[hash(vert)] = vert
+	netlist.ports[vert.port] = hash(Time.get_unix_time_from_system())
+	netlist.bridges[netlist.ports[vert.port]] = vert.port
+
 
 ## Changes the index of a vert from [code]netlist.vias[/code], so it stays tracked
 ## to the physical position of a vert. It also updates the vert's coord, thus position.[br]

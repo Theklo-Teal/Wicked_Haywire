@@ -1,42 +1,37 @@
 @tool
 extends Electronics
 
-@export var key_mode : Dictionary[Key, bool] = {KEY_1: false}  ## Keyboard keys that control this switch and whether they behave as toggles, rather than momentary switches.
-@export var key_bit : Dictionary[Key, int] = {KEY_1: 0}  ## Which bit the
+#TODO Make multi-bit (DIP switch on a bus)
+
+@export var key_mode : Dictionary[Key, bool] = {KEY_1: true}  ## Keyboard keys that control this switch and whether they behave as toggles, rather than momentary switches.
+@export var key_bit : Dictionary[Key, int] = {KEY_1: 0}  ## Which bit a Keyboard key affects.
 var sock : BitOutput
 var state : bool
+var throw : bool
 
 static func toybox_included() -> bool:
 	return true
 
 func _ready() -> void:
 	sock = sockets.keys()[0]
+func _entered_sim():
+	_sim_update()
 
-var _state_start : bool
-var _drag_start : float
 func _hover_input(event: InputEvent) -> void:
 	if owner.mode == Flowchart.Mode.SIMULAT:
 		if event is InputEventMouseButton:
 			if event.button_index == MOUSE_BUTTON_LEFT:
 				queue_redraw()
 				if event.is_pressed():
-					_drag_start = event.position.x
-					_state_start = state
-					state = not state
+					state = not throw
 				else:
-					state = _state_start
-			elif event.button_index == MOUSE_BUTTON_RIGHT and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) and event.is_released():
-				_state_start = state
-		
-		if event is InputEventKey:
-			var bit = key_bit.get(event.keycode, -1)
-			var toggle = key_mode.get(event.keycode, false)
-			if bit >= 0:
-				if event.is_pressed() and not event.is_echo():
-					state = not state if toggle else true
-				elif event.is_released():
-					if not toggle: state = false
- 
+					state = throw
+			elif event.button_index == MOUSE_BUTTON_RIGHT:
+				if event.is_pressed():
+					queue_redraw()
+					throw = not state
+					state = not state
+
 func _set_bitwidth():
 	sock.bitwidth = bitwidth
 
@@ -44,9 +39,16 @@ func _draw():
 	super()
 	
 	draw_style_box(panelstyle[2 if state else 1], Rect2(
-		Vector2((size.x - Flowchart.SNAP * 2) if state else 0.0, Flowchart.SNAP * 0.14),
-		Vector2(Flowchart.SNAP, Flowchart.SNAP * 0.8)
+		Vector2((size.x - _snap * 2) if state else 0.0, _snap * 0.14),
+		Vector2(_snap, _snap * 0.8)
 		))
 
-func _sim_update(_graph:FlowchartNetwork):
-	sock.write_bool(0, state)
+func _sim_update() -> Array[NetBase.Port]:
+	if owner.mode == Flowchart.Mode.SIMULAT:
+		for klavo in key_bit:
+			var kenlet = key_bit[klavo]
+			var ken_state = Input.is_key_pressed(klavo) != state
+			sock.write_bool(kenlet, ken_state)
+	else:
+		sock.write_bool(0, state)
+	return []

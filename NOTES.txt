@@ -1,5 +1,7 @@
 Making technology visible, so it's understandable.
 
+"Tutorial" mode where it challanges the user to build more complex devices from simpler ones.
+
 Device panel design:
 https://en.wikipedia.org/wiki/Neumorphism
 
@@ -13,6 +15,7 @@ Gizmo ideas:
 		_Maestro - A synchronization clock.
 		Relay - Switches between two network ports depending on a control signal.
 		Monostable - A pulse flips output, which then returns after a set time.
+		Random Number - A box that outputs a random number when updated. It has inputs for supplying a seed and resetting state.
 	Arithmetic:
 		Negator - Finds 2s Complement
 		Adder - Adds and Subtracts
@@ -21,6 +24,7 @@ Gizmo ideas:
 		Bus Match - Compares input with given value, outputting high if they are equal.
 		Bit Counter - Counts how many bits in a value are High or LowBit Counter - Counts how many bits in a value are High or Low
 		Condition Check - A logic gate; All/Some, Any/None, Odd/Even
+		Priority Encoder - From multiple single bit inputs, produce an output number of the index of the one given most priority.
 		Multiplexer - Selects one from many inputs to the output.
 		Demultiplexer - Selects one of many outputs to relay the input.
 		Bit Selector - A multiplexer that outputs a bit from a bus value, selected by another value.
@@ -30,17 +34,21 @@ Gizmo ideas:
 		Register/Bistable - Stores data; Latch (transparent input), Toggle (Flip-Flop), Implier (J-K Flip-Flop)
 		Shifter - Moves bits along a chain of registers. Can be a FIFO memory if bitwidth is larger than 1.
 		Counter - A Register which can change its state internal with an update signal.
+		Stock - A Counter with independent pins to count up and down. Meant to simulate processes in System Theory.
 	Automata:
 		ROM - The user can write data in that persist, or take it from a file. Can only be read.
 		RAM - The user can write data in to start as a default, but can be written along with writing.
 		Markov Multiplexer - There are several channel inputs, each with a different probability assigned. Another input is an update signal that randomly picks a channel to the output.
 		Markov Demultiplexer - There are several channel outputs, each with a different probability assigned. Another input is an update signal that randomly selects which output connects to the input.
+		Stack - Push and Pull.
+		Deque - A double ended queue.
 		Lookup - A rudimentary scriptable finite state machine. A "data" input can be used to load a "page" ID (state). Multiple outputs combinatorily respond to multiple inputs defined according to Page ID. Certain input permutates cause an internal change in Page ID.
 		Turing - As in "Turing Machine", a microcontroller or central processor; can have a script written to it to manage inputs and outputs.
 		Teletype - A text line that can be written to, producing output signals and displays text according to inputs.
 	Input:
 		Push Button - Can also be toggled. Can be stacked to act like a DIP Switch.
-		Slider - Outputs a binary number according to position on a scale.
+		Slide Encoder - Outputs a binary number according to position on a scale.
+		Rotary Encoder - Outputs a binary number according to position on a scale. It can be receive input to actuate a stepper motor, effectively acting like a Selsyn.
 		Key - Select a Keyboard key to respond to, producing a signal.
 		Joystick - A circle that can be dragged to produce an X value and a Y value on different outputs.
 	Output:
@@ -48,6 +56,7 @@ Gizmo ideas:
 		Segmented Display - LEDs arranged in a particular way that light up in a certain pattern according to the code in a bus.
 		Matrix Display - LEDs arranged in 2D plane.
 		Speaker - Plays a sound.
-
+		Plot - An update input increments X coordinate on a graphical plot, the other takes a number for Y value at time of update. Result is a cartesian curve.
+		
 Cabling/Bundle/Combiner/Splitter Is implemented as a Via connected to a bus and relays to other wires
 certain bits specified in options. Effectively wire taps.

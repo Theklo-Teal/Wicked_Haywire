@@ -42,9 +42,12 @@ var states : Dictionary[StringName, State]
 func at_state(...stt) -> bool:
 	return curr in stt
 
-## Call a method [code]funk[/code] on the current state.
+## Call a method [code]funk[/code] on the current state. It returns anything the
+## method would return, or [code]null[/code] if method doesn't exist.
 func state(funk:StringName, ...args):
-	return states[curr].callv(funk, args)
+	if states[curr].has_method(funk):
+		return states[curr].callv(funk, args)
+	return null
 
 ## Immediately change to [code]next[/code] state.
 func switch_state(next:StringName):

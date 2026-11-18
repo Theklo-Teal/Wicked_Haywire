@@ -29,16 +29,18 @@ func mouse_release():
 	return
 
 
+## This applies socket options to BitData before extracting information of
+## interest from it.
 func read_int() -> int:
 	var val : Electronics.BitData = port.value.duplicate()
 	val.width = bitwidth
 	match variant:
 		PULL_DN:
-			val.pull_down = val.maxval
-			val.pull_up = 0
+			val.down = val.maxval
+			val.up = 0
 		PULL_UP:
-			val.pull_down = 0
-			val.pull_up = val.maxval
+			val.down = 0
+			val.up = val.maxval
 		INVERT:
 			val.bits = val.bits ^ val.maxval
 	var result = port.to_int(val)

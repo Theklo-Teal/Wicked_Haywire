@@ -61,11 +61,10 @@ anchors_preset = 0
 offset_right = 72.0
 offset_bottom = 24.0
 script = ExtResource("1_enejn")
-bitwidth = null
-dwell = null
-delay = null
-description = null
-options = null
+key_mode = Dictionary[int, bool]({
+49: false
+})
+description = "Click with left mouse button to switch from the latched state. Click with right mouse button to switch the latched state."
 sockets = Dictionary[ExtResource("1_gebwe"), ExtResource("2_enejn")]({
 SubResource("Resource_7y7cw"): SubResource("Resource_iprko")
 })

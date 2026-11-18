@@ -10,16 +10,16 @@ func _ready() -> void:
 		}
 	update_layout()
 
-var inps : Array[GizmoSocket]
-var pos : GizmoSocket
-var neg : GizmoSocket
+var inps : Array[BitInput]
+var pos : BitOutput
+var neg : BitOutput
 var in_cluster : Cluster
 var out_cluster : Cluster
 
 func _update_sockdex():
 	super()
 	if sockets.is_empty(): return
-	inps = sockets.keys().slice(2)
+	inps.assign( sockets.keys().slice(2) )
 	pos = sockets.keys()[0]
 	neg = sockets.keys()[1]
 	in_cluster = sockets[inps[0]]
@@ -64,36 +64,37 @@ enum {
 		update_layout()
 		if not is_node_ready(): await ready
 		%rule_option.select(rule)
-		
 
 const NEG_RULE = ["SOME", "NONE", "EVEN", "LOW"]
 
-#func _sim_update(_graph:FlowchartNetwork):
-	#var words : PackedInt32Array
-	#for i in inps:
-		#words.append(i.read())
-	#
-	#var digit : int = -1
-	#var parallel : Array[bool]
-	#var inverted : Array[bool]
-	#parallel.resize(bitwidth)
-	#inverted.resize(bitwidth)
-	#for cnt in parallel_bit_count(words, bitwidth):
-		#match rule:
-			#AND:
-				#parallel[digit] = cnt == inps.size()
-				#inverted[digit] = not parallel[digit]
-			#OR:
-				#parallel[digit] = cnt != 0
-				#inverted[digit] = not parallel[digit]
-			#XOR:  # The intuitive form of the XOR which performs parity check.
-				#parallel[digit] = cnt % 2 == 0
-				#inverted[digit] = not parallel[digit]
-			#HIGH:  # A XOR as per IEC standard: Output High if only one input is high. The negated detects if only one input is low.
-				#parallel[digit] = cnt == 1
-				#inverted[digit] = bitwidth - cnt == 1
-	##pos.write(parallel_to_int(parallel))
-	##neg.write(invert)
+func _sim_update() -> Array[NetBase.Port]:
+	var words : PackedInt32Array
+	for i in inps:
+		words.append(i.read_int())
+	
+	var digit : int = -1
+	var parallel : Array[bool]
+	var inverted : Array[bool]
+	parallel.resize(bitwidth)
+	inverted.resize(bitwidth)
+	for cnt in parallel_bit_count(words, bitwidth):
+		digit += 1
+		match rule:
+			AND:
+				parallel[digit] = cnt == inps.size()
+				inverted[digit] = not parallel[digit]
+			OR:
+				parallel[digit] = cnt != 0
+				inverted[digit] = not parallel[digit]
+			XOR:  # The intuitive form of the XOR which performs parity check.
+				parallel[digit] = cnt % 2 != 0
+				inverted[digit] = not parallel[digit]
+			HIGH:  # A XOR as per IEC standard: Output High if only one input is high. The negated detects if only one input is low.
+				parallel[digit] = cnt == 1
+				inverted[digit] = bitwidth - cnt == 1
+	pos.write_int(parallel_to_int(parallel))
+	neg.write_int(parallel_to_int(inverted))
+	return []
 #endregion
 
 
@@ -135,7 +136,7 @@ func _update_layout():
 	%rule_invert.text = NEG_RULE[rule] if facing in [FACE.EAST, FACE.WEST] else ["↓", "↑"][(facing == FACE.NORTH) as int]
 	%rule_invert.reset_size()
 	out_cluster.limit.y = _grid.size.y - 1
-	size = Vector2(5, 5) * Flowchart.SNAP
+	size = Vector2(5, 5) * _snap
 	$Layout.set_layout(facing)
 
 #endregion

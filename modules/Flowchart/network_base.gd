@@ -23,9 +23,11 @@ func _init() -> void:
 class Port:
 	## Target for signals being conveyed during simulation using an Observer Pattern.
 	
-	var value  ## Current value in the link for reading by sockets.
+	var value ## Current value in the link for reading by sockets.
 	var changed : bool  ## Tells if for a given sim update cycle a significant change in the value happened. Implement what that means with [code]_has_changed()[/code].
 	var aggregate : Array  ## Append written values during simulation update to then integrate to final decision.
+	var past_state  # A reference of state used for comparing when checking if value changed meaningfully.
+	var curr_state  # A reference of state used for comparing when checking if value changed meaningfully.
 	
 	static func added_class_info() -> StringName:
 		return &"Port"
@@ -48,13 +50,21 @@ class Port:
 	func reset():
 		value = default_value()
 	
+	## Implement this function to define a rule to compare past state and new state,
+	## such as we can tell if the port's [code]value[/code] changed meaningfully.[br]
+	## the "state" refers to values returned by [code]_integrate()[/code].
+	func _has_changed(prev, next) -> bool:
+		return prev == next
+	
 	func sim_cycle_begin(graph:FlowchartNetwork):
 		_sim_cycle_begin(graph)
 	func sim_update(graph:FlowchartNetwork):
 		_sim_update(graph)
 	func sim_cycle_finish(graph:FlowchartNetwork):
-		integrate()
+		past_state = curr_state
+		curr_state = integrate()
 		aggregate.clear()
+		changed = _has_changed(past_state, curr_state)
 		_sim_cycle_finish(graph)
 	
 	@warning_ignore_start("unused_parameter")
@@ -64,13 +74,18 @@ class Port:
 	func _sim_cycle_finish(graph:FlowchartNetwork): pass
 	@warning_ignore_restore("unused_parameter")
 	
-	func integrate():
-		if aggregate.size() > 0: _integrate()
+	func integrate() -> Variant:
+		if aggregate.size() > 0: return _integrate()
+		else: return past_state
 	
 	## Called before the aggregate is cleared. Override this function to decide
-	## what to write to the port value.
-	func _integrate():
+	## what to write to the port's [code]value[/code]. It expects to be returned
+	## Some object representative of the new port state, which is then compared
+	## in [code]_has_changed[/code]. Objects passed by reference will require
+	## duplication, otherwise changing next state also sets past state.
+	func _integrate() -> Variant:
 		value = roundi(aggregate.reduce(func(sum, a):return sum + a, 0) / aggregate.size())
+		return value
 	
 	func write_none(data, ..._other):
 		return data
@@ -161,9 +176,13 @@ class Port:
 
 class Joint extends NetVert:
 	func draw(chart:Flowchart, canvas:Control, where:Vector2):
-		var color = G.appearance.color.inverted()
+		if chart == null:
+			canvas.draw_circle(where, 12, Color.RED)
+			return
+		
+		var color = chart.trace_color_primary.inverted()
 		color.a = 0.4
-		canvas.draw_circle(where, Flowchart.JOINT_RAD * chart.zoom, color)
+		canvas.draw_circle(where, chart._joint_rad * chart.zoom, color)
 
 class Socket extends Joint:
 	signal has_read(val)  ## This socket was used to read a Port. The value is after any Port filtering.
@@ -225,7 +244,7 @@ class Link extends Resource:
 	
 	#region Drawing
 	func wire_thick(chart:Flowchart) -> int:
-		return clamp(_wire_thick(), 1, Flowchart.MAX_WIRE) * chart.zoom
+		return clamp(_wire_thick(), 1, chart._max_wire) * chart.zoom
 	static func _wire_thick() -> int:
 		return 12
 	
@@ -299,7 +318,8 @@ class Link extends Resource:
 	## Returns empty if the point is not over the lines drawn by the wire segment.
 	## This includes around the mid corner, if there's a diagonal bend so nothing
 	## drawn there.
-	func near(point:Vector2, start:Vector2, stop:Vector2) -> Dictionary:
+	func near(point:Vector2, start:Vector2, stop:Vector2, wire_thickness:=-1) -> Dictionary:
+		if wire_thickness < 0: wire_thickness = _wire_thick()
 		var verts : PackedVector2Array = get_verts(start, stop)
 		var solved : bool  # A segment under the point has been found.
 		var total : float = 0.0  # Total wire length.
@@ -322,7 +342,7 @@ class Link extends Resource:
 				# Even after finding a matching segment, we keep iterating through
 				# all segments so we can find the total length of the wire.
 				continue
-			if along < 1 and along > 0 and prox < (Flowchart.MAX_WIRE):
+			if along < 1 and along > 0 and prox < wire_thick:
 				# We don't want to accept distances further than a segment's
 				# length, which happens when clicking near the mid corner as if
 				# bend ratio was 1.

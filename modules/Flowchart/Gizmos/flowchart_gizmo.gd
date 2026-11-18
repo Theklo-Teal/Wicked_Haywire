@@ -13,6 +13,52 @@ class_name FlowchartGizmo
 ## we have an undersized panel shape (by 0.5) and then we can still have sockets totally
 ## enclose the Gizmo area while it looks like they hang off.
 
+#region System Theory Complications
+@export var delay : int = 0 :  ## How many jiffies it takes after input is read, for outputs to respond by writing to their ports.
+	set(val):
+		delay = max(0, val)
+@export var dwell : int = 0 :  ## After the last sampling due [code]delay[/code] how many jiffies before it can sample again?
+	set(val):
+		dwell = max(0, val)
+#NOTE: The terminology of "stock", "inflow" and "outflow" refers to processes with memory from System Theory.
+var _stocks : Dictionary[int, Array]  # Values read from sockets, stored as `_Query` instances, that are being delayed.
+var _queries : Dictionary[GizmoSocket, int]  # When was a socket last sampled? Given a `dwell` period, this might inhibit further inflow.
+
+class _Query:
+	var value  # A value read from a socket that's waiting in a stock.
+	var created : int  # The global jiffy count when the query was created
+
+	func _init(jiffies:int, socket_value) -> void:
+		value = socket_value
+		created = jiffies
+
+## Samples a value from a socket using the given method of the socket. Calling this function
+## instead of calling the method on the socket directly, using this function allows
+## delay mechanisms to act.
+func inflow(socket:GizmoSocket, method:StringName, ...args):
+	if owner.jiffies - _queries.get(socket, 0) < dwell: return  # Inhibit sampling if already sampled within dwell time.
+	var query_id = hash(socket) ^ hash(method)
+	var fifo = _stocks.get_or_add(query_id, [])
+	var query = _Query.new(owner.jiffies, socket.callv(method, args))
+	fifo.append(query)
+	_queries[socket] = owner.jiffies
+
+## Retrieve the value of a socket which duration has surpassed delay. If no input is
+## available, you may provide a default response.
+func outflow(socket:GizmoSocket, method:StringName, default:=0):
+	var query_id = hash(socket) ^ hash(method)
+	var fifo : Array = _stocks.get(query_id, [])
+	if fifo.is_empty(): return default
+	var i : int = -1
+	for query in fifo:
+		i += 1
+		var delta = owner.jiffies - query.created
+		if delta == delay: break  #NOTE we discard queries that are too old, otherwise we might get into a situation of ever growing stocks among other problems.
+	fifo = fifo.slice(i - 1)
+	if fifo.is_empty(): return default
+	return fifo[0].value
+#endregion
+
 @export var sockets : Dictionary[GizmoSocket, Cluster] :  ## GizmoSockets and the cluster they belong to.
 	set(val):
 		queue_redraw()
@@ -212,7 +258,7 @@ func socket_tooltip_visible(shown:bool, sock:GizmoSocket=null):
 	if owner is Flowchart and socket_tooltip != null:
 		if shown:
 			socket_tooltip.show()
-			socket_tooltip.position = sock.position + Vector2.ONE * Flowchart.SNAP
+			socket_tooltip.position = sock.position
 			socket_tooltip.get_node("%Body").text = str(sock.port)
 			socket_tooltip.get_node("%Show_State").button_pressed = sock.pressed
 		else:

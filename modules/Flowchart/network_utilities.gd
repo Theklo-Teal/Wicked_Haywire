@@ -16,7 +16,9 @@ class NetData extends Resource:
 	@export_storage var links : Dictionary[int, Link]  ## The key is the XOR of hashes of two joints. The value is the Link instance representing that. 	
 	@export_storage var gizmos : Dictionary[int, Array]  ## An array of Gizmo for a given layer.
 	@export_storage var sockets : Dictionary[NetVert, FlowchartGizmo]  ## Which Gizmo are sockets found?
-
+	@export_storage var ports : Dictionary[Port, int]  ## Port -> Bridge
+	@export_storage var bridges : Dictionary[int, Port]  ## Bridge -> integral Port
+	
 	## Return the verts the given one leads to. Optionally you may select whether to
 	## get only those originating [code]vert[/code] or ending in it.
 	func get_connections(vert:NetVert, outgoing:=true, ingoing:=true) -> Array[NetVert]:

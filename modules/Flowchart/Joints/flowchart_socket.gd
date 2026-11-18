@@ -2,7 +2,7 @@
 extends NetBase.Socket
 class_name GizmoSocket
 
-## The type of joint meant to be part of Gizmos. It works a bit like Button node.
+## The type of joint meant to be part of Gizmos. It works a bit like Button node.[br]
 
 var toggle : bool  ## Once pressed it stays pressed until clicked again.
 var pressed : bool  ## Is in a pressed state.
@@ -23,16 +23,17 @@ func mouse_release():
 	if not toggle: pressed = false
 
 func draw(chart:Flowchart, canvas:Control, where:Vector2):
+	if chart == null:
+		return super(chart, canvas, where)
+		
 	var color = Color.DARK_GRAY
-	var hover_offset = Flowchart.VIA_HOLE if hover else 0
-	var thick = Flowchart.JOINT_RAD - Flowchart.VIA_HOLE + hover_offset
-	var radius = Flowchart.JOINT_RAD + hover_offset - thick / 2.0
+	var hover_offset = chart._via_hole if hover else 0
+	var thick = chart._joint_rad - chart._via_hole + hover_offset
+	var radius = chart._joint_rad + hover_offset - thick / 2.0
 	var sqr_wid = radius * 1.4142  # (Square-root of 2)
 	
-	if chart is Flowchart:
-		radius *= chart.zoom
-		color = chart.trace_color_primary if hover else chart.trace_color_secondary
-	
+	radius *= chart.zoom
+	color = chart.trace_color_primary if hover else chart.trace_color_secondary
 	
 	match mode:
 		HIZ:

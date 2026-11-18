@@ -4,7 +4,7 @@ class_name BitOutput
 
 ## The pressed state indicates the values written to the port are inverted.
 
-@export var bitwidth : int = 1 : 
+@export var bitwidth : int = 1 :
 	set(val):
 		bitwidth = clamp(val, 1, 32)
 
@@ -16,6 +16,7 @@ func _init() -> void:
 	accepted_port = [&"BitPort"]
 
 
+## Invert the BitData value if socket is set to do so.
 func send(pack:Electronics.BitData):
 	if pressed: pack.bits = pack.bits ^ pack.maxval
 	write(pack)
@@ -34,4 +35,16 @@ func write_bool(digit_from:int=0, ...bools):
 	for b in bools:
 		num = (num << (1 + digit_from)) | int(b)
 	data.bits = Electronics.set_bits(data.bits, num, mask)
+	send(data)
+
+func write_pull_dn(mask:int):
+	var data = Electronics.BitData.new(bitwidth)
+	data.hiz = data.maxval
+	data.down = mask
+	send(data)
+
+func write_pull_up(mask:int):
+	var data = Electronics.BitData.new(bitwidth)
+	data.hiz = data.maxval
+	data.up = mask
 	send(data)

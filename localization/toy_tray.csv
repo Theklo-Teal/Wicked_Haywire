@@ -1,23 +1,34 @@
 KEYS,en,eo,pt
 CHECKS,Logic Gates,Logika Elemento,Guardas
-INPUT,Inputs,Enigaj,Entradas
-OUTPUT,Outputs,Elradika,Saidas
 MEMORY,Memories,Memoroj,Memorias
-MISC,Misc.,Čiuspeca,Misc.
 PLEXER,Plexer,Multipleksoro,Plexer
 SHIFTER,Shifter,Forŝovigo,Deslocador
-COMBIN,Combinational,Kombina,Combinatório
-SEQUEN,Sequencial,Sekvenca,Sequencial
-ARITHM,Arithmetic,Aritmetika,Aritmético
-AUTOMATA,Automata,Aŭtomatoj,Automatos
-COND_CHECK,Condition,Kondiĉo,Condição
+,,,
+,,,
+INPUT,Inputs,Enigaj,Entradas
 PUSH_BUTTON,Push Button,Klavo,Botão de Pressão
-BISTABLE,Bistable,Dustabilo,Bi-estável
-MICROCONTROLLER,MCU,Micro-Regilo,Micro-Controlador
-MONOSTABLE,Monostable,Unstabilo,Mono-estável
-SWITCH_RELAY,Switch Relay,Relajso,Comutador
-BIT_COUNTER,Bit Counter,Bito Komptilo,Contador de Bits
-BIT_SELECTOR,Bit Selector,Bito Selekto,Selector de Bits
-COMPARATOR,Comparator,Komparilo,Comparador
-SEQUENCE_GENERATOR,Sequencer,Sekvencilo,Sequenciador
+LINEAR_ENCODER,Slide_Encoder,Glitkodilo,Encoder Linear
+,,,
+OUTPUT,Outputs,Elradika,Saidas
 INDICATOR,Lightbulb,Lumdiodo,LED Indicador
+,,,
+MISC,Misc.,Čiuspeca,Misc.
+SWITCH_RELAY,Switch Relay,Relajso,Comutador
+MONOSTABLE,Monostable,Unstabilo,Mono-estável
+,,,
+COMBIN,Combinational,Kombina,Combinatório
+COND_CHECK,Condition,Kondiĉo,Condição
+DEMULTIPLEXER,Demultiplexer,Malkunigilo,Demultiplexador
+MULTIPLEXER,Multiplexer,Kunigilo,Multiplexador
+BIT_SELECTOR,Bit Selector,Bito Selekto,Selector de Bits
+BIT_COUNTER,Bit Counter,Bito Komptilo,Contador de Bits
+,,,
+SEQUEN,Sequencial,Sekvenca,Sequencial
+BISTABLE,Bistable,Dustabilo,Bi-estável
+,,,
+ARITHM,Arithmetic,Aritmetika,Aritmético
+COMPARATOR,Comparator,Komparilo,Comparador
+ADDER,Adder,Adiciilo,Somador
+,,,
+AUTOMATA,Automata,Aŭtomatoj,Automatos
+MICROCONTROLLER,MCU,Micro-Regilo,Micro-Controlador

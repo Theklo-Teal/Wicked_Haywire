@@ -39,6 +39,52 @@ enum Mode{
 @export var update_rate : float = 0.01 :  # Time for the simulation to update state.
 	set(val):
 		update_rate = max(0, val)
+
+#region Grid Snapping
+@export_group("Grid Size")
+@export var snap : int = 24 :  ## Size of grid snapping cells. Refer to [code]to_grid()[/code] for more information.
+	set(val):
+		snap = min(1, val)
+		_grid_update = true
+@export var clearance = 2 :  ## Minimum distance between conductors.
+	set(val):
+		clearance = min(1, val)
+		_grid_update = true
+var _max_wire := 20.0
+@export var max_wire := 0.7 :  ## Maximum thickness of a wire as a portion of [code]snap[/code].
+	set(val):
+		max_wire = val
+		_grid_update = true
+var _joint_rad := 12.0
+@export var joint_rad := 0.65 :  ## Portion of [code]snap[/code] that the joint's radius defaults to.
+	set(val):
+		joint_rad = val
+		_grid_update = true
+var _via_hole := 7.0
+@export var via_hole := 0.6 :  ## Radius of the holes in joints as a portion of default joint radius. See [code]joint_rad[/code].
+	set(val):
+		via_hole = min(0, val)
+		_grid_update = true
+
+var _grid_update := false
+@warning_ignore_start("shadowed_variable")
+static func snap_grid(pos:Vector2, snap:=24) -> Vector2:
+	return pos.snappedf(snap) + (Vector2(0.5, 0.5) * snap)
+## Returns the actual space position snapped to the grid from a grid coordinate.
+static func from_grid(coord:Vector2i, snap:=24) -> Vector2:
+	return Vector2(coord) * snap + (Vector2(0.5, 0.5) * snap)
+## Returns [code]coord[/code] on the grid.
+static func to_grid(pos:Vector2, snap:=24) -> Vector2i:
+	pos -= Vector2(0.5, 0.5) * snap
+	var coord := Vector2i(  ## Find cell coordinate in the grid
+		roundi(inverse_lerp(0, snap, pos.x)),
+		roundi(inverse_lerp(0, snap, pos.y))
+		)
+	return coord
+@warning_ignore_restore("shadowed_variable")
+#endregion
+
+@export_group("Default Colors")
 @export var trace_color_primary := Color.GOLDENROD
 @export var trace_color_secondary := Color.GOLD
 @export var trace_color_highlight := Color.YELLOW
@@ -46,6 +92,7 @@ enum Mode{
 var mode : Mode : 
 	set(val):
 		mode = val
+		state("mode_changed", mode)
 		for gizmo : FlowchartPanel in $Network.netlist.gizmos.get(layer, []):
 			gizmo._on_flowchart_mode_changed(self, mode)
 var gizmo_pallet : Dictionary[String, PackedScene]
@@ -65,33 +112,12 @@ func _on_appearance_changed():
 	trace_color_secondary = G.appearance.trace_secondary
 	trace_color_highlight = G.appearance.trace_highlight
 
-#region Grid Snapping
-const SNAP = 24  ## Size of grid SNAPping cells. The snap grid is based on a rhombus. Refer to [code]Flowchart.to_grid()[/code] for more information.
-const VIA_HOLE = 5  ## Radius of the holes in joints.
-const MAX_WIRE = 20  ## Maximum thickness of a wire.
-const CLEARANCE = 2  ## Minimum distance between conductors.
-const JOINT_RAD = 12
-static func snap_grid(pos:Vector2) -> Vector2:
-	return pos.snappedf(SNAP) + (Vector2(0.5, 0.5) * SNAP)
-## Returns the actual space position snapped to the grid from a grid coordinate.
-static func from_grid(coord:Vector2i) -> Vector2:
-	return Vector2(coord) * SNAP + (Vector2(0.5, 0.5) * SNAP)
-## Returns [code]coord[/code] on the grid.
-static func to_grid(pos:Vector2) -> Vector2i:
-	pos -= Vector2(0.5, 0.5) * SNAP
-	var coord := Vector2i(  ## Find cell coordinate in the grid
-		roundi(inverse_lerp(0, SNAP, pos.x)),
-		roundi(inverse_lerp(0, SNAP, pos.y))
-		)
-	return coord
-#endregion
-
 
 #region Utilities
 func grid_mouse() -> Vector2i:
-	return Flowchart.to_grid(to_canvas_coord(get_local_mouse_position()))
+	return to_grid(to_canvas_coord(get_local_mouse_position()), snap)
 func canvas_mouse() -> Vector2:
-	return Flowchart.snap_grid(to_canvas_coord(get_local_mouse_position()))
+	return snap_grid(to_canvas_coord(get_local_mouse_position()), snap)
 func screen_mouse() -> Vector2:
 	return get_local_mouse_position()
 func global_screen_mouse() -> Vector2:
@@ -158,18 +184,18 @@ func _selected_changed():
 
 func _obj_movement_modulate(object, new_position:Vector2) -> Vector2:
 	if object is FlowchartPanel:
-		return snap_grid(new_position) - Vector2(0.5, 0.5) * SNAP
+		return snap_grid(new_position, snap) - Vector2(0.5, 0.5) * snap
 	#NOTE the way repositioning Vias works is that we maintain their `coord`
 	# untouched. We only change the `position` and drawing functions use that
 	# variable as well. After the movement stops, we call `Flowchart.move_via()`
 	# which sets the new `coord`, given the final position.
 	# Changing `coord` directly messes up with `move_via()` and we need that
 	# to update spatial partitioning and netlist.
-	return snap_grid(new_position)
+	return snap_grid(new_position, snap)
 
 func _selected_obj_movement_stop(obj):
 	if obj is FlowchartVia:
-		move_via(obj, to_grid(obj.position))
+		move_via(obj, to_grid(obj.position, snap))
 
 func lasso_select_objects(lasso_rect:Rect2) -> void:
 	var gizmos : Array = [parti.node.find_objects_tolerant, parti.node.find_objects_zealous][chirality].call(lasso_rect)
@@ -254,6 +280,10 @@ class ChartHover extends Hover:
 		if me.mode == Flowchart.Mode.SIMULAT:
 			switch_state.emit("Interact")
 	
+	func mode_changed(mode:Mode):
+		if me.mode == Flowchart.Mode.SIMULAT:
+			switch_state.emit("Interact")
+	
 	func input(event:InputEvent):
 		super(event)
 		if event is InputEventMouseButton:
@@ -277,6 +307,10 @@ class Interact extends State:
 	func hover_object(object):
 		if object == null:
 			switch_state.emit("Idle")
+	
+	func mode_changed(mode:Mode):
+		if me.mode == Flowchart.Mode.EDITING:
+			switch_state.emit("Hover")
 
 class Wire extends State:
 	var origin : NetBase.Joint
@@ -319,7 +353,7 @@ class Wire extends State:
 					var pos1 = me.joint_canvas_position(origin)
 					var pos2 = me.joint_canvas_position(destin)
 					wire.set_chi_from_len(pos1, pos2, not Input.is_key_pressed(KEY_SHIFT))
-					wire.bend = Flowchart.SNAP
+					wire.bend = me.snap
 					cancel()
 				#NOTE if finding a joint fails, we do nothing. The user may try
 				# clicking on something again, allowing click-to-click wiring.
@@ -346,7 +380,7 @@ class Wire extends State:
 			me.joint_canvas_position(joints[0]),
 			me.joint_canvas_position(joints[1]))
 		var new_joint = me.add_via(where)
-		var cell = Flowchart.to_grid(where)
+		var cell = me.to_grid(where, me.snap)
 		my("Network").unlink_verts(joints[0], joints[1])
 		var wire1 = my("Network").linking(joints[0], new_joint)
 		var wire2 = my("Network").linking(new_joint, joints[1])
@@ -398,7 +432,7 @@ class WireBend extends State:
 
 			delta = delta.length() * dir * 2
 			var ini_bend : float = me.sel_wire.ini_bend
-			wire.bend = clamp(ini_bend + delta, Flowchart.SNAP, shortest)
+			wire.bend = clamp(ini_bend + delta, me.snap, shortest)
 
 #endregion
 
@@ -412,7 +446,6 @@ func _ready() -> void:
 	parti["node" as Variant] = SpatialPartition.new()
 	
 	if OS.has_feature("editor_hint"): return
-	G.chart = self
 	
 	%zoom.pressed.connect(_on_zoom_pressed)
 	%origin.pressed.connect(_on_origin_pressed)
@@ -483,7 +516,7 @@ func _on_popup_pressed(idx:int):
 		"Gate":
 			add_gizmo("_buffer_gate", to_canvas_coord(ini_mouse))
 		"Maestro":
-			add_gizmo("_bundle", to_canvas_coord(ini_mouse))
+			add_gizmo("_maestro", to_canvas_coord(ini_mouse))
 
 #region Drawing
 var _visible_links : Dictionary
@@ -527,8 +560,17 @@ func _draw_fore_geometry(canvas:Control, viewed_canvas_rect:Rect2):
 		var pos2 = joint_canvas_position(pair[1])
 		wire.draw(self, canvas, to_screen_coord(pos1), to_screen_coord(pos2))
 
-func _draw_overlay(canvas:Control, _viewed_canvas_rect:Rect2):
+func _draw_overlay(canvas:Control, viewed_canvas_rect:Rect2):
 	if OS.has_feature("editor_hint"): return
+	
+	if _grid_update:
+		_grid_update = false
+		queue_redraw()
+		_max_wire = snap * joint_rad
+		_joint_rad = snap * joint_rad
+		_via_hole = _joint_rad * via_hole
+		for each in parti.node.find_objects_tolerant(viewed_canvas_rect):
+			each._on_flowchart_grid_update(snap)
 	
 	%coord.text = str(to_canvas_coord(get_local_mouse_position()))
 	%coord.position = get_local_mouse_position() + Vector2(0, -24)
@@ -538,17 +580,17 @@ func _draw_overlay(canvas:Control, _viewed_canvas_rect:Rect2):
 		@warning_ignore("static_called_on_instance")
 		var wire_type = $Network.link_classes[wire_from.port.default_link()]
 		var thickness = wire_type._wire_thick()
-		thickness = clamp(thickness, 1, MAX_WIRE) * zoom
+		thickness = clamp(thickness, 1, max_wire) * zoom
 		#FIXME Fixed? For some reason, `Link.set_chi_from_len()` doesn't agree on the effect of `longest` with `Link.draw_length()`
-		wire_type.draw_length(canvas, joint_canvas_position(wire_from), get_local_mouse_position(), not Input.is_key_pressed(KEY_SHIFT), thickness, SNAP, trace_color_highlight)
+		wire_type.draw_length(canvas, joint_canvas_position(wire_from), get_local_mouse_position(), not Input.is_key_pressed(KEY_SHIFT), thickness, snap, trace_color_highlight)
 	
 	# Highlight grid cell under mouse.
 	if at_state("Idle"):
-		var where = to_canvas_coord(get_local_mouse_position(), -Vector2(0.5, 0.5) * SNAP)
-		where = to_screen_coord( snap_grid(where) )
-		var clr = G.appearance.color.inverted()
+		var where = to_canvas_coord(get_local_mouse_position(), -Vector2(0.5, 0.5) * snap)
+		where = to_screen_coord( snap_grid(where, snap) )
+		var clr = color.inverted()
 		clr.a = 0.4
-		canvas.draw_circle(where, JOINT_RAD * zoom, clr)
+		canvas.draw_circle(where, joint_rad * zoom, clr)
 
 #endregion
 
@@ -561,9 +603,10 @@ func set_netlist(netdata:FlowchartNetwork.NetData):
 func add_gizmo(res:String, where:=Vector2.ZERO) -> FlowchartPanel:
 	var gizmo = gizmo_pallet.get(res)
 	gizmo = gizmo.instantiate()
-	where = snap_grid(where)
+	where = snap_grid(where, snap)
 	place_object(gizmo, where, parti.node)
 	$Network.register_gizmo(gizmo, layer)
+	gizmo.entered_sim()
 	gizmo._on_flowchart_mode_changed(self, mode)
 	return gizmo
 
@@ -575,7 +618,7 @@ func rem_gizmo(gizmo:FlowchartPanel):
 
 func add_via(where:Vector2) -> FlowchartVia:
 	queue_redraw()
-	var via = $Network.get_or_add_via(to_grid(where), layer, FlowchartVia.new())
+	var via = $Network.get_or_add_via(to_grid(where, snap), layer, FlowchartVia.new())
 	place_object(via, via.position, parti.joint)
 	return via
 
@@ -599,16 +642,19 @@ signal auto_paused
 #signal auto_resume
 
 var in_a_cycle : bool = false
-var skip_cycle : bool = false
 var sim_paused : bool = false
+var jiffy_countdown : int = -1  # For when pausing or resuming momentarily.
+var tick_start_time : float = 0
+var tick_stop_time : float = 0
 var tick_elapse : float = 0
-var process_elapse : float = 0
-var tick_countdown : int = -1
+var jiffies : int = 0  ## How many sim update cycles since the start of the application. It will rollover if the value goes past 64 bits.
+
+
 
 func _process(delta: float) -> void:
 	super(delta)
 	if OS.has_feature("editor_hint"): return
-
+	
 	# Mouse stop detection.
 	# The _MOUSE_MOVE_THRESHOLD here acts a bit like an input debouncing mechanism.
 	if _mouse_stopped_frames > _MOUSE_MOVE_THRESHOLD and not _mouse_stopped:
@@ -619,50 +665,43 @@ func _process(delta: float) -> void:
 		# Keep number above threshold if it wraps around the larges possible int.
 		if _mouse_stopped_frames < 0: _mouse_stopped_frames = _MOUSE_MOVE_THRESHOLD
 	
-	process_elapse += delta
-	if process_elapse > update_rate:
-		process_elapse = 0.0
-		if in_a_cycle:
-			skip_cycle = true
-			printerr("Flowchart: Simulation Rate not keeping up with cycle duration!")
-		_on_sim_update()
+	tick_stop_time = Time.get_ticks_usec()
+	if not in_a_cycle:  # Prevent calling _on_sim_update() while still updating.
+		tick_elapse = (tick_stop_time - tick_start_time) / 1_000_000.0
+		if tick_elapse > update_rate: # Wait for a tick duration to pass before updating.
+			tick_start_time = Time.get_ticks_usec()
+			_on_sim_update()
+
 
 func pause_sim():
-	#NOTE: we can't stop the timer because the Network relies on it for removing or adding Network Nodes.
 	sim_paused = true
 ## Run simulation cycles. If duration is a positive value, it will pause itself
 ## after that amount of cycles, after which the signal [code]auto_pause[/code]
 ## is emitted.
 func resume_sim(duration:int = -1):
 	sim_paused = false
-	tick_countdown = duration - 1
+	jiffy_countdown = duration - 1
 func reset_sim():
+	jiffies = 0
 	$Network.reset_simulation()
 
 func _on_sim_update():
-	var begin_time := Time.get_ticks_usec()
+	in_a_cycle = true
+	sim_cycle_started.emit()
+	$Network.sim_cycle_begin()
 	
-	if not skip_cycle:
-		in_a_cycle = true
-		sim_cycle_started.emit()
+	if not sim_paused:
+		if jiffy_countdown == 0:
+			pause_sim()
+			auto_paused.emit()
+		elif jiffy_countdown > 0: jiffy_countdown -= 1
 		
-		$Network.sim_cycle_begin()
-		
-		if not sim_paused:
-			if tick_countdown == 0:
-				pause_sim()
-				auto_paused.emit()
-			elif tick_countdown > 0: tick_countdown -= 1
-			
-			sim_update_started.emit()
-			$Network.sim_cycle_update()
-			await $Network.sim_update_done
-			sim_update_finish.emit()
-		
-		$Network.sim_cycle_finish()
-		
-		sim_cycle_finish.emit()
+		sim_update_started.emit()
+		jiffies += 1
+		await $Network.sim_cycle_update()
+		sim_update_finish.emit()
+	
+	$Network.sim_cycle_finish()
+	sim_cycle_finish.emit()
 	in_a_cycle = false
-	skip_cycle = false
-	tick_elapse = (Time.get_ticks_usec() - begin_time) / 1_000_000.0  # microseconds it took for all nodes to be done.
 #endregion

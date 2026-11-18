@@ -29,16 +29,17 @@ class_name FlowchartPanel
 
 #TODO Disable Gizmo repositioning if clicking on controls in editing mode.
 
-signal sim_update_done
 
 enum FACE{
-	EAST,
-	SOUTH,
-	WEST,
-	NORTH
+	EAST =	0b0001,
+	SOUTH =	0b0010,
+	WEST =	0b0100,
+	NORTH =	0b1000,
+	HORIZ =	0b0101,
+	VERTI =	0b1010,
 }
 
-@export var facing : FACE = FACE.EAST :
+@export_enum("East:1", "South:2", "West:4", "North:8") var facing : int = FACE.EAST :
 	set(val):
 		facing = val
 		update_layout()
@@ -78,8 +79,11 @@ func _canvas_repositioned(_data:Dictionary):
 func _parti_registered(_parti:SpatialPartition, data:Dictionary) -> void:
 	data.registry_acknowledged = true
 
+var _snap := 24
+func _on_flowchart_grid_update(snap:int):
+	_snap = snap
+
 func _init() -> void:
-	
 	# Enable offset control to grid-bound elements.
 	for each in get_children():
 		if each is Control and each.has_meta("grid_bound"):
@@ -107,10 +111,10 @@ func _init() -> void:
 
 var _grid : Rect2i  ## Rect2i.position is a coordinate in flowchart.
 func _on_resized():
-	custom_minimum_size = custom_minimum_size.max(Vector2.ONE * Flowchart.SNAP)
-	size = size.snappedf(Flowchart.SNAP)
-	_grid.size.x = floori(size.x / Flowchart.SNAP)
-	_grid.size.y = floori(size.y / Flowchart.SNAP)
+	custom_minimum_size = custom_minimum_size.max(Vector2.ONE * _snap)
+	size = size.snappedf(_snap)
+	_grid.size.x = floori(size.x / _snap)
+	_grid.size.y = floori(size.y / _snap)
 
 
 #region Positioning things to the grid
@@ -149,25 +153,35 @@ func get_bound_distance(dist:float, axis_y:bool, centered:=false) -> float:
 	var dist_dec = dist - dist_int  # decimal part of the values
 	
 	# Scale with grid cell size.
-	dist = Flowchart.SNAP * (dist_int + (0.5 if centered else 0.0)) + dist_dec * Flowchart.SNAP
+	dist = _snap * (dist_int + (0.5 if centered else 0.0)) + dist_dec * _snap
 	
 	# Limit magnitude to node size, both in negative
 	# and positive direction.
 	dist = clamp(dist, -size[int(axis_y)], size[int(axis_y)])
 	
 	# Make negatives count from the end.
-	dist = wrap(dist, 0.0, size[int(axis_y)] + Flowchart.SNAP)
+	dist = wrap(dist, 0.0, size[int(axis_y)] + _snap)
 	
 	return dist
 #endregion
 
 
 @warning_ignore_start("unused_parameter")
-func sim_update(graph:FlowchartNetwork):
-	_sim_update(graph)
-	sim_update_done.emit()
-func _sim_update(graph:FlowchartNetwork):
+func entered_sim():
+	_entered_sim()
+func _entered_sim():
 	pass
+
+signal sim_updated
+## Call this function to update state at the step of one jiffy.
+func sim_update():
+	_sim_update()
+	sim_updated.emit()
+
+## This is called every jiffy, a sim cycle update. The count of jiffies since the
+## start of simulation can be found with [code]owner.jiffies[/code].[br]
+func _sim_update():
+	return []
 
 
 var _layout_outdated : bool
@@ -230,7 +244,7 @@ func _draw() -> void:
 			for y : int in range(_grid.size.y):
 				for x : int in range(_grid.size.x):
 					var pos = Flowchart.from_grid(Vector2i(x,y))
-					draw_circle(pos, Flowchart.JOINT_RAD, Color.HOT_PINK, false)
+					draw_circle(pos, _snap * 0.8, Color.HOT_PINK, false)
 	elif owner is Flowchart:
 		# Allow socket effects to update when it's the Flowchart drawing them.
 		owner.queue_redraw()

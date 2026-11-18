@@ -18,14 +18,15 @@ func _init() -> void:
 # This keeps electronic noise when reading consistent regardless of how many
 # times functions that use RNG are called in the same sim cycle.
 var rng_cycle_state : int
-func sim_cycle_begin(_graph:FlowchartNetwork):
+func _sim_cycle_begin(_graph:FlowchartNetwork):
 	G.rng.randi()  # Advances the RNG State for this port, so different ports will have different RNG outcomes.
 	rng_cycle_state = G.rng.state
 
-
-func _integrate():
+func _integrate() -> int:
 	value.width = 1
 	var hizs : PackedInt32Array
+	value.up = 0
+	value.down = 0
 	
 	for entry : Electronics.BitData in aggregate:
 		value.width = max(value.width, entry.width)
@@ -42,13 +43,30 @@ func _integrate():
 		digit += 1
 		hiz |= int(count != 1) << digit
 	value.hiz = hiz
+	
+	return to_int(value)
 
 func to_int(data:Electronics.BitData) -> int:
+	var result : int = data.bits
 	G.rng.state = rng_cycle_state
 	var conflict = data.up & data.down
 	var noisy = data.hiz | conflict
-	var valid = Electronics.invert_max(noisy, data.maxval)
-	data.bits = Electronics.set_low(data.bits, data.down & valid, data.maxval)
-	data.bits = Electronics.set_high(data.bits, data.up & valid, data.maxval)
-	data.bits = Electronics.set_bits(data.bits, G.rng.randi(), noisy)
-	return data.bits
+	var valid = data.hiz & (data.maxval ^ conflict)
+	result = Electronics.set_bits(result, G.rng.randi(), noisy)
+	result = Electronics.set_low(result, data.down & valid, data.maxval)
+	result = Electronics.set_high(result, data.up & valid, data.maxval)
+	return result
+
+## Return only certain bits from the value. Negative arguments wrap around the bitwidth
+## of this port's value.
+func read_splice(data:Electronics.BitData, from:int, to:int):
+	from = posmod(from, data.width + 1)
+	to = posmod(to, data.width + 1)
+	var start = min(from, to)
+	var stop = max(from, to)
+	var pack = Electronics.BitData.new(stop - start)
+	pack.bits = (data.bits >> start) & pack.maxval
+	pack.hiz = (data.hiz >> start) & pack.maxval
+	pack.up = (data.up >> start) & pack.maxval
+	pack.down = (data.down >> start) & pack.maxval
+	return pack
