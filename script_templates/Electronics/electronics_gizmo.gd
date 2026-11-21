@@ -12,7 +12,6 @@ func _ready() -> void:
 	
 	
 	#var input_socket = sockets.keys()[0]
-	#watch_sockets.call_deferred(input_socket)
 	pass
 
 func _set_bitwidth():
@@ -22,17 +21,14 @@ func _update_layout():
 	match facing:
 		pass
 
-func _sim_update():
+func _entered_sim(_network:FlowchartNetwork):
 	pass
 
+## This is always called when the network updates state.
+func _sim_update(_network:FlowchartNetwork):
+	pass
+
+## This is called at the networks update state, but only if something about a
+## owned socket has changed.
 func _edge_triggered(_socket: BitInput, _rising:int, _falling:int):
-	pass
-
-func _sim_update_sampling():
-	pass
-
-func _edge_triggered_sampling(_socket: BitInput, _rising:int, _falling:int):
-	pass
-
-func _sim_update_respond():
 	pass

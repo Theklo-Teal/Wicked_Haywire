@@ -7,6 +7,3 @@ func _init() -> void:
 	mode = BIDIR
 	port_class = &"BitPort"
 	accepted_port = [&"BitPort"]
-
-func bridge(other_port:NetBase.Port, bitmask:int, shift:int = 0):
-	pass

@@ -22,8 +22,6 @@ grow_vertical = 2
 offset_transform_enabled = true
 color = Color(0.27387273, 0.27387273, 0.27387273, 1)
 script = ExtResource("1_88cu4")
-max_wire = 20.0
-joint_rad = 12.0
 via_hole = 0.0
 parti = Dictionary[Variant, ExtResource("2_tpykx")]({
 0: SubResource("Resource_rbv8w"),

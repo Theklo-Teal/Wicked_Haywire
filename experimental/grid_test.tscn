@@ -1,0 +1,15 @@
+[gd_scene format=3 uid="uid://c2ymmplp70dak"]
+
+[ext_resource type="Script" uid="uid://ylhv8lae1ff0" path="res://experimental/GridModule.gd" id="1_5xoyv"]
+
+[node name="GridTest" type="Node" unique_id=412692344]
+
+[node name="Griddy" type="Control" parent="." unique_id=1064240644]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_5xoyv")
+metadata/_custom_type_script = "uid://ylhv8lae1ff0"

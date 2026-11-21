@@ -102,15 +102,16 @@ var sel_vert : NetBase.NetVert
 var sel_wire : Dictionary
 
 func _on_appearance_changed():
-	cell_size = G.appearance.cell_size
-	color = G.appearance.color
-	orig_color = G.appearance.orig_color
-	grid_color = G.appearance.grid_color
-	grid_thick = G.appearance.grid_thick
-	orig_thick = G.appearance.orig_thick
-	trace_color_primary = G.appearance.trace_primary
-	trace_color_secondary = G.appearance.trace_secondary
-	trace_color_highlight = G.appearance.trace_highlight
+	#cell_size = G.appearance.cell_size
+	#color = G.appearance.color
+	#orig_color = G.appearance.orig_color
+	#grid_color = G.appearance.grid_color
+	#grid_thick = G.appearance.grid_thick
+	#orig_thick = G.appearance.orig_thick
+	#trace_color_primary = G.appearance.trace_primary
+	#trace_color_secondary = G.appearance.trace_secondary
+	#trace_color_highlight = G.appearance.trace_highlight
+	pass
 
 
 #region Utilities
@@ -159,7 +160,7 @@ func wire_under_mouse():
 		var pair = $Network.netlist.pairs[link]
 		var pos1 = joint_canvas_position(pair[0])
 		var pos2 = joint_canvas_position(pair[1])
-		wire_info = wire.near(screen_mouse(), to_screen_coord(pos1), to_screen_coord(pos2))
+		wire_info = wire.near(self, screen_mouse(), to_screen_coord(pos1), to_screen_coord(pos2))
 		if not wire_info.is_empty():
 			if _wire_skip <= 0:
 				wire_info["wire"] = wire
@@ -580,7 +581,7 @@ func _draw_overlay(canvas:Control, viewed_canvas_rect:Rect2):
 		@warning_ignore("static_called_on_instance")
 		var wire_type = $Network.link_classes[wire_from.port.default_link()]
 		var thickness = wire_type._wire_thick()
-		thickness = clamp(thickness, 1, max_wire) * zoom
+		thickness = clamp(thickness, 1, _max_wire) * zoom
 		#FIXME Fixed? For some reason, `Link.set_chi_from_len()` doesn't agree on the effect of `longest` with `Link.draw_length()`
 		wire_type.draw_length(canvas, joint_canvas_position(wire_from), get_local_mouse_position(), not Input.is_key_pressed(KEY_SHIFT), thickness, snap, trace_color_highlight)
 	
@@ -606,7 +607,7 @@ func add_gizmo(res:String, where:=Vector2.ZERO) -> FlowchartPanel:
 	where = snap_grid(where, snap)
 	place_object(gizmo, where, parti.node)
 	$Network.register_gizmo(gizmo, layer)
-	gizmo.entered_sim()
+	gizmo.entered_sim($Network)
 	gizmo._on_flowchart_mode_changed(self, mode)
 	return gizmo
 
@@ -689,6 +690,7 @@ func _on_sim_update():
 	in_a_cycle = true
 	sim_cycle_started.emit()
 	$Network.sim_cycle_begin()
+	G.jiffy_noise = jiffies ^ Time.get_ticks_usec()  ## Set the noise value for a given jiffy.
 	
 	if not sim_paused:
 		if jiffy_countdown == 0:

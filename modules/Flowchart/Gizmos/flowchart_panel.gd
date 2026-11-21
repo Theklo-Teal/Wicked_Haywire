@@ -27,6 +27,7 @@ class_name FlowchartPanel
 ## Afterwards use [code]offset_transform_*()[/code] to position the child control
 ## relative to that position when defining layout with [code]_update_layout()[/code].
 
+#FIXME It thinks children UI don't have meta!
 #TODO Disable Gizmo repositioning if clicking on controls in editing mode.
 
 
@@ -86,7 +87,7 @@ func _on_flowchart_grid_update(snap:int):
 func _init() -> void:
 	# Enable offset control to grid-bound elements.
 	for each in get_children():
-		if each is Control and each.has_meta("grid_bound"):
+		if each is Control and each.has_meta(&"grid_bound"):
 			offset_transform_enabled = true
 			offset_transform_visual_only = false
 	
@@ -167,20 +168,20 @@ func get_bound_distance(dist:float, axis_y:bool, centered:=false) -> float:
 
 
 @warning_ignore_start("unused_parameter")
-func entered_sim():
-	_entered_sim()
-func _entered_sim():
+func entered_sim(network:FlowchartNetwork):
+	_entered_sim(network)
+func _entered_sim(network:FlowchartNetwork):
 	pass
 
 signal sim_updated
 ## Call this function to update state at the step of one jiffy.
-func sim_update():
-	_sim_update()
+func sim_update(network:FlowchartNetwork):
+	_sim_update(network)
 	sim_updated.emit()
 
 ## This is called every jiffy, a sim cycle update. The count of jiffies since the
 ## start of simulation can be found with [code]owner.jiffies[/code].[br]
-func _sim_update():
+func _sim_update(network:FlowchartNetwork):
 	return []
 
 
@@ -221,7 +222,7 @@ func _process(_delta: float) -> void:
 func _draw() -> void:
 	for each in get_children():
 		if each is Control:
-			var coord = each.get_meta("grid_bound", false)
+			var coord = each.get_meta(&"grid_bound", false)
 			if typeof(coord) == TYPE_BOOL: continue
 			#TODO Change anchors instead of position.
 			var where = get_bound_position(coord)
@@ -244,7 +245,7 @@ func _draw() -> void:
 			for y : int in range(_grid.size.y):
 				for x : int in range(_grid.size.x):
 					var pos = Flowchart.from_grid(Vector2i(x,y))
-					draw_circle(pos, _snap * 0.8, Color.HOT_PINK, false)
+					draw_circle(pos, _snap * 0.45, Color.HOT_PINK, false)
 	elif owner is Flowchart:
 		# Allow socket effects to update when it's the Flowchart drawing them.
 		owner.queue_redraw()
@@ -256,23 +257,21 @@ func _on_flowchart_mode_changed(chart:Flowchart, mode:Flowchart.Mode):
 			# Allow re-positioning and wiring
 			for each in get_children():
 				if not each is Control: continue
-				if each.get_meta("edit_control", false) or each.get_meta("edit_only_control", false):
-					if each.get_meta("hide_on_disable", false):
-						each.show()
+				if each.get_meta(&"edit_control", false) or each.get_meta(&"edit_only_control", false):
 					each.mouse_behavior_recursive = MOUSE_BEHAVIOR_ENABLED
+					if each.get_meta(&"hide_on_disable", false): each.show()
 				else:
-					if each.get_meta("hide_on_disable", false):
-						each.hide()
 					each.mouse_behavior_recursive = MOUSE_BEHAVIOR_DISABLED
+					if each.get_meta(&"hide_on_disable", false): each.hide()
+					
 		Flowchart.Mode.SIMULAT:
 			# Allow interacting which children UI
 			for each in get_children():
 				if not each is Control: continue
-				if each.get_meta("edit_only_control", false):
-					if each.get_meta("hide_on_disable", false):
-						each.hide()
+				if each.get_meta(&"edit_only_control", false):
 					each.mouse_behavior_recursive = MOUSE_BEHAVIOR_DISABLED
+					if each.get_meta(&"hide_on_disable", false): each.hide()
 				else:
-					if each.get_meta("hide_on_disable", false):
-						each.show()
 					each.mouse_behavior_recursive = MOUSE_BEHAVIOR_ENABLED
+					if each.get_meta(&"hide_on_disable", false): each.show()
+					

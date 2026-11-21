@@ -14,8 +14,8 @@ static func toybox_included() -> bool:
 
 func _ready() -> void:
 	sock = sockets.keys()[0]
-func _entered_sim():
-	_sim_update()
+func _entered_sim(network:FlowchartNetwork):
+	_sim_update(network)
 
 func _hover_input(event: InputEvent) -> void:
 	if owner.mode == Flowchart.Mode.SIMULAT:
@@ -43,7 +43,7 @@ func _draw():
 		Vector2(_snap, _snap * 0.8)
 		))
 
-func _sim_update() -> Array[NetBase.Port]:
+func _sim_update(_network:FlowchartNetwork) -> Array[NetBase.Port]:
 	if owner.mode == Flowchart.Mode.SIMULAT:
 		for klavo in key_bit:
 			var kenlet = key_bit[klavo]

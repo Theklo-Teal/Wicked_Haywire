@@ -31,7 +31,7 @@ func _set_bitwidth():
 static func toybox_included() -> bool:
 	return false
 
-func sim_update() -> Array[NetBase.Port]:
+func sim_update(network:FlowchartNetwork):
 	var changed_sockets : Dictionary[GizmoSocket, Vector2i]
 	
 	for sock in sockets:
@@ -43,7 +43,7 @@ func sim_update() -> Array[NetBase.Port]:
 			var lows = diff ^ highs
 			changed_sockets[sock] = Vector2i(highs, lows)
 			edge_triggered(sock, highs, lows)
-	return super()
+	return super(network)
 
 @warning_ignore_start("unused_parameter")
 func edge_triggered(socket: BitInput, rising:int, falling:int):
@@ -81,8 +81,18 @@ class BitData extends RefCounted:
 		set(val):
 			down = val & maxval
 	
-	func _init(bitwidth:int):
+	func _init(bitwidth:int=1):
 		width = bitwidth
+	
+	func to_int() -> int:
+		var result : int = bits
+		var conflict = up & down
+		var noisy = hiz | conflict
+		var valid = hiz & (maxval ^ conflict)
+		result = Electronics.set_bits(result, G.jiffy_noise, noisy)
+		result = Electronics.set_low(result, down & valid, maxval)
+		result = Electronics.set_high(result, up & valid, maxval)
+		return result
 	
 	## Returns a new BitData with copied contents of this one. Optionally only
 	## copy desired bits selected by the [code]mask[/code].[br]

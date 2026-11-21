@@ -22,11 +22,9 @@ func _set_bitwidth():
 	panels.clear()
 	size.x = _snap * bitwidth
 
-func _sim_update() -> Array[NetBase.Port]:
-	var old_state = state_int
-	states.assign(sock.read_array())
-	state_int = sock.read_int()
-	if state_int != old_state:
+func _sim_update(_network:FlowchartNetwork) -> Array[NetBase.Port]:
+	if sock.changed:
+		states.assign(sock.read_array())
 		queue_redraw()
 	return []
 

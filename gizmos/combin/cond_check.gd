@@ -67,7 +67,7 @@ enum {
 
 const NEG_RULE = ["SOME", "NONE", "EVEN", "LOW"]
 
-func _sim_update() -> Array[NetBase.Port]:
+func _sim_update(_network) -> Array[NetBase.Port]:
 	var words : PackedInt32Array
 	for i in inps:
 		words.append(i.read_int())

@@ -43,7 +43,7 @@ func read_int() -> int:
 			val.up = val.maxval
 		INVERT:
 			val.bits = val.bits ^ val.maxval
-	var result = port.to_int(val)
+	var result = val.to_int()
 	_has_read(result)
 	has_read.emit(result)
 	return result

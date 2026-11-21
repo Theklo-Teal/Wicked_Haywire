@@ -11,16 +11,18 @@ extends Node
 
 var setts := ConfigFile.new()
 var rng := RandomNumberGenerator.new()
+var jiffy_noise : int  ## The noise of the current jiffy.
 
 @onready var grabbed_buttons := ButtonGroup.new()
 
 func _ready() -> void:
-	rng.seed = floori(Time.get_unix_time_from_system())
 	setts.load("res://settings.cfg")
+	rng.seed = setts.get_value("0", "rng_seed", Time.get_unix_time_from_system())
 	grabbed_buttons.allow_unpress = true
 
 func _exit_tree() -> void:
 	setts.save("res://settings.cfg")
+
 
 
 ## Returns information about each defined class, with its name as key and

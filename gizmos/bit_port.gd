@@ -15,20 +15,14 @@ static func default_value() -> Variant:
 func _init() -> void:
 	value = default_value()
 
-# This keeps electronic noise when reading consistent regardless of how many
-# times functions that use RNG are called in the same sim cycle.
-var rng_cycle_state : int
-func _sim_cycle_begin(_graph:FlowchartNetwork):
-	G.rng.randi()  # Advances the RNG State for this port, so different ports will have different RNG outcomes.
-	rng_cycle_state = G.rng.state
-
-func _integrate() -> int:
+func _integrate(...aggregate) -> int:
 	value.width = 1
 	var hizs : PackedInt32Array
 	value.up = 0
 	value.down = 0
 	
-	for entry : Electronics.BitData in aggregate:
+	for entry in aggregate:
+		# : Electronics.BitData
 		value.width = max(value.width, entry.width)
 		hizs.append(value.maxval ^ entry.hiz)
 		
@@ -44,18 +38,7 @@ func _integrate() -> int:
 		hiz |= int(count != 1) << digit
 	value.hiz = hiz
 	
-	return to_int(value)
-
-func to_int(data:Electronics.BitData) -> int:
-	var result : int = data.bits
-	G.rng.state = rng_cycle_state
-	var conflict = data.up & data.down
-	var noisy = data.hiz | conflict
-	var valid = data.hiz & (data.maxval ^ conflict)
-	result = Electronics.set_bits(result, G.rng.randi(), noisy)
-	result = Electronics.set_low(result, data.down & valid, data.maxval)
-	result = Electronics.set_high(result, data.up & valid, data.maxval)
-	return result
+	return value.to_int()
 
 ## Return only certain bits from the value. Negative arguments wrap around the bitwidth
 ## of this port's value.

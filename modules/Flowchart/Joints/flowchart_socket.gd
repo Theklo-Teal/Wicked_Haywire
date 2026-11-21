@@ -27,6 +27,7 @@ func draw(chart:Flowchart, canvas:Control, where:Vector2):
 		return super(chart, canvas, where)
 		
 	var color = Color.DARK_GRAY
+	@warning_ignore("incompatible_ternary")
 	var hover_offset = chart._via_hole if hover else 0
 	var thick = chart._joint_rad - chart._via_hole + hover_offset
 	var radius = chart._joint_rad + hover_offset - thick / 2.0

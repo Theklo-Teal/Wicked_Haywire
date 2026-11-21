@@ -8,7 +8,7 @@ class_name FlowchartVia
 @export var text : String = ""
 
 func draw(chart:Flowchart, canvas:Control, where:Vector2):
-	var color = G.appearance.trace_secondary
+	var color = chart.trace_color_secondary
 	if chart.sel_vert == self or self in chart._selected:
-		color = G.appearance.trace_primary
+		color = chart.trace_color_primary
 	canvas.draw_circle(where, chart._joint_rad * 0.5 * chart.zoom, color, false, chart._joint_rad * 0.3)

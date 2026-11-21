@@ -4,7 +4,6 @@ class_name NetBase
 
 ## Definition of classes necessary to build a network.
 
-
 #region Index Port and Link Classes.
 var port_classes : Dictionary[StringName, Script]
 var link_classes : Dictionary[StringName, Script]
@@ -20,14 +19,21 @@ func _init() -> void:
 			link_classes[klaso] = info.script
 #endregion
 
+class Bridge:
+	var id : int
+	var aggregate : Dictionary[GizmoSocket, Variant]  ## Append written values during simulation update to then integrate to final decision.
+	func _init() -> void:
+		id = hash(Time.get_unix_time_from_system()) ^ Time.get_ticks_usec()
+	func append(socket:GizmoSocket, value):
+		if socket in aggregate: return
+		aggregate[socket] = value as Variant
+
 class Port:
 	## Target for signals being conveyed during simulation using an Observer Pattern.
 	
+	var bridge : Bridge
 	var value ## Current value in the link for reading by sockets.
 	var changed : bool  ## Tells if for a given sim update cycle a significant change in the value happened. Implement what that means with [code]_has_changed()[/code].
-	var aggregate : Array  ## Append written values during simulation update to then integrate to final decision.
-	var past_state  # A reference of state used for comparing when checking if value changed meaningfully.
-	var curr_state  # A reference of state used for comparing when checking if value changed meaningfully.
 	
 	static func added_class_info() -> StringName:
 		return &"Port"
@@ -54,36 +60,23 @@ class Port:
 	## such as we can tell if the port's [code]value[/code] changed meaningfully.[br]
 	## the "state" refers to values returned by [code]_integrate()[/code].
 	func _has_changed(prev, next) -> bool:
-		return prev == next
+		return hash(prev) == hash(next)
 	
-	func sim_cycle_begin(graph:FlowchartNetwork):
-		_sim_cycle_begin(graph)
-	func sim_update(graph:FlowchartNetwork):
-		_sim_update(graph)
-	func sim_cycle_finish(graph:FlowchartNetwork):
-		past_state = curr_state
-		curr_state = integrate()
-		aggregate.clear()
-		changed = _has_changed(past_state, curr_state)
-		_sim_cycle_finish(graph)
-	
-	@warning_ignore_start("unused_parameter")
-	func _sim_cycle_begin(graph:FlowchartNetwork): pass
-	func _sim_update(graph:FlowchartNetwork): pass
-	## Called after aggregate is cleared.
-	func _sim_cycle_finish(graph:FlowchartNetwork): pass
-	@warning_ignore_restore("unused_parameter")
-	
-	func integrate() -> Variant:
-		if aggregate.size() > 0: return _integrate()
-		else: return past_state
+	#NOTE `next_state` is not necessarily the same as data going into `value`,
+	# But something that can be used to check for changes.
+	func integrate(...aggregate) -> Variant:
+		if aggregate.size() < 1: return  # Do nothing if nothing was attempted to be written here.
+		var prev_state = value
+		var next_state = _integrate.callv(aggregate)
+		changed = _has_changed(prev_state, next_state)
+		return next_state
 	
 	## Called before the aggregate is cleared. Override this function to decide
 	## what to write to the port's [code]value[/code]. It expects to be returned
 	## Some object representative of the new port state, which is then compared
 	## in [code]_has_changed[/code]. Objects passed by reference will require
 	## duplication, otherwise changing next state also sets past state.
-	func _integrate() -> Variant:
+	func _integrate(...aggregate) -> Variant:
 		value = roundi(aggregate.reduce(func(sum, a):return sum + a, 0) / aggregate.size())
 		return value
 	
@@ -97,10 +90,10 @@ class Port:
 	## Optionally, a write [code]filter[/code] of a Port class can be chosen,
 	## which transforms the format of the data before storing. An
 	##[code]null[/code] is return if the requested filter doesn't exist.
-	func write(val, filter:String="none", filter_args:Array=[]) -> Variant:
+	func write(socket:GizmoSocket, val, filter:String="none", filter_args:Array=[]) -> Variant:
 		if has_method("write_" + filter):
 			val = callv("write_" + filter, [val] + filter_args)
-			aggregate.append(val)
+			bridge.append(socket, val)
 			return val
 		return null
 	
@@ -205,7 +198,7 @@ class Socket extends Joint:
 		has_read.emit(val)
 		return val
 	func write(val, filter:="none", ...filter_args) -> Variant:
-		val = port.write(val, filter, filter_args)
+		val = port.write(self, val, filter, filter_args)
 		_has_written(val)
 		has_written.emit(val)
 		return val
@@ -318,7 +311,7 @@ class Link extends Resource:
 	## Returns empty if the point is not over the lines drawn by the wire segment.
 	## This includes around the mid corner, if there's a diagonal bend so nothing
 	## drawn there.
-	func near(point:Vector2, start:Vector2, stop:Vector2, wire_thickness:=-1) -> Dictionary:
+	func near(chart:Flowchart, point:Vector2, start:Vector2, stop:Vector2, wire_thickness:=-1) -> Dictionary:
 		if wire_thickness < 0: wire_thickness = _wire_thick()
 		var verts : PackedVector2Array = get_verts(start, stop)
 		var solved : bool  # A segment under the point has been found.
@@ -342,7 +335,7 @@ class Link extends Resource:
 				# Even after finding a matching segment, we keep iterating through
 				# all segments so we can find the total length of the wire.
 				continue
-			if along < 1 and along > 0 and prox < wire_thick:
+			if along < 1 and along > 0 and prox < wire_thick(chart):
 				# We don't want to accept distances further than a segment's
 				# length, which happens when clicking near the mid corner as if
 				# bend ratio was 1.

@@ -14,6 +14,21 @@ class_name FlowchartNetwork
 		netlist = val
 		rebuild_network()
 
+#TODO What if bridges overlap? They need to be merged.
+func bridge_ports(...ports):
+	var bridge : Bridge
+	for port in ports:
+		if port.bridge is Bridge:
+			bridge = port.bridge
+			break
+	
+	if bridge == null:
+		bridge = Bridge.new()
+	netlist.bridges.append(bridge)
+	
+	for port in ports:
+		port.bridge = bridge
+
 func _init() -> void:
 	super()
 	if netlist == null:
@@ -53,8 +68,14 @@ func sim_cycle_begin():
 func sim_cycle_update():
 	for layer in netlist.gizmos:
 		for gizmo : FlowchartPanel in netlist.gizmos[layer]:
-			await gizmo.sim_update()
+			await gizmo.sim_update(self)
 	
+	for bridge in netlist.bridges:
+		var aggre : Array = bridge.aggregate.values().filter(func(a): return a != null)
+		if aggre.is_empty(): continue
+		for sock in bridge.aggregate:
+			sock.port.integrate.callv(aggre)
+		bridge.aggregate.clear()
 	sim_update_done.emit()
 
 func sim_cycle_finish():
@@ -68,10 +89,9 @@ func _sim_cycle_finish():
 
 func port_new(port_name:StringName) -> Port:
 	var port = port_classes[port_name].new()
-	sim_cycle_begun.connect(port.sim_cycle_begin.bind(self), CONNECT_PERSIST)
-	sim_update_done.connect(port.sim_update.bind(self), CONNECT_PERSIST)
-	sim_cycle_finished.connect(port.sim_cycle_finish.bind(self), CONNECT_PERSIST)
 	sim_reset.connect(port.reset, CONNECT_PERSIST)
+	port.bridge = Bridge.new()
+	netlist.bridges.append(port.bridge)
 	return port
 func link_new(link_name:StringName) -> Port:
 	return link_classes[link_name].new()
@@ -89,8 +109,6 @@ func register_gizmo(gizmo:FlowchartPanel, layer:int):
 		socket.port = port_new(socket.port_class)
 		netlist.verts[hash(socket)] = socket
 		netlist.sockets[socket as NetVert] = gizmo
-		netlist.ports[socket.port] = hash(Time.get_unix_time_from_system())
-		netlist.bridges[netlist.ports[socket.port]] = socket.port
 
 func unregister_gizmo(gizmo:FlowchartPanel, layer:int):
 	netlist.gizmos[layer].erase(gizmo)
@@ -115,8 +133,6 @@ func add_vert(vert:NetVert, coord:Vector2i, layer:int):
 	vert.layer = layer
 	vert.coord = coord
 	netlist.verts[hash(vert)] = vert
-	netlist.ports[vert.port] = hash(Time.get_unix_time_from_system())
-	netlist.bridges[netlist.ports[vert.port]] = vert.port
 
 
 ## Changes the index of a vert from [code]netlist.vias[/code], so it stays tracked
